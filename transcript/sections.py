@@ -111,6 +111,22 @@ def _is_questioner(speaker: str, known_executives: set[str]) -> bool:
 # Public API
 # ---------------------------------------------------------------------------
 
+def extract_speakers(transcript: str) -> list[tuple[str, int]]:
+    """Returns the unique speakers in the transcript, in order of first appearance.
+
+    Args:
+        transcript: Raw transcript text.
+
+    Returns:
+        List of (speaker_name, turn_count) tuples, ordered by first appearance.
+    """
+    seen: dict[str, int] = {}
+    for m in _TURN_PATTERN.finditer(transcript):
+        speaker = m.group("speaker").strip()
+        seen[speaker] = seen.get(speaker, 0) + 1
+    return list(seen.items())
+
+
 def extract_transcript_sections(
     transcript: str,
     prepared_pattern: re.Pattern = PREPARED_REMARKS_PATTERN,
