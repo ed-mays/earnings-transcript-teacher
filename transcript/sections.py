@@ -121,16 +121,33 @@ def _speaker_sections(name: str, prepared: str, qa: str) -> set[str]:
 
 
 def _parse_analyst_introductions(transcript: str) -> dict[str, str | None]:
-    """Extract {name: firm_or_None} from operator turns that introduce analysts."""
+    """Extract {name: firm_or_None} from operator turns that introduce analysts.
+
+    Note: operator may use a shortened first name (e.g. 'Chris') while the
+    speaker label uses the full name ('Christopher'). Use ``_analyst_last_names``
+    for suffix-based matching to handle these mismatches.
+    """
     result: dict[str, str | None] = {}
     for m in _TURN_PATTERN.finditer(transcript):
         if m.group("speaker").strip().lower() != "operator":
             continue
         for am in _ANALYST_INTRO_PATTERN.finditer(m.group("text")):
             name = am.group("name").strip()
+            # Strip firm if pattern over-captured it into the name field
+            # (re.IGNORECASE makes [A-Z] match lowercase prepositions like 'with').
+            for sep in (" with ", " at ", " from "):
+                idx = name.lower().find(sep)
+                if idx != -1:
+                    name = name[:idx].strip()
+                    break
             firm_raw = am.group("firm")
-            result[name] = firm_raw.strip() if firm_raw else None
+            result[name] = firm_raw.strip().rstrip(".") if firm_raw else None
     return result
+
+
+def _analyst_last_names(analyst_map: dict[str, str | None]) -> set[str]:
+    """Returns lowercase last names of all introduced analysts for fuzzy matching."""
+    return {name.split()[-1].lower() for name in analyst_map if name}
 
 
 def _parse_executive_introductions(prepared_remarks: str) -> dict[str, str]:
@@ -313,6 +330,7 @@ Exchange = list[Turn]
 def extract_qa_exchanges(
     qa_text: str,
     executive_names: set[str] | None = None,
+    prepared_remarks: str | None = None,
 ) -> list[Exchange]:
     """Extracts Q&A exchanges from the Q&A section of an earnings transcript.
 
@@ -330,6 +348,9 @@ def extract_qa_exchanges(
             ``extract_transcript_sections``), NOT the full transcript.
         executive_names: Known executive speaker names. When omitted, inferred
             from title keywords in speaker names.
+        prepared_remarks: The prepared remarks section. When provided, any
+            speaker present there is treated as an executive — useful when
+            executives have no title keywords in their speaker label.
 
     Returns:
         List of exchanges. Each exchange is a list of (speaker, text) turns
@@ -343,30 +364,70 @@ def extract_qa_exchanges(
     if executive_names is None:
         executive_names = _build_executive_set(turns)
 
+    # Augment with section-presence: speakers in prepared remarks are executives.
+    if prepared_remarks:
+        pr_speakers = {
+            m.group("speaker").strip()
+            for m in _TURN_PATTERN.finditer(prepared_remarks)
+        }
+        executive_names = executive_names | pr_speakers
+
+    # Derive analyst names from operator introductions in the Q&A text.
+    # This is more reliable than keyword fallbacks when executives don't have
+    # title keywords in their speaker label (e.g. "Charles Magro" vs "Amy Hood, CFO").
+    analyst_names: set[str] = set(_parse_analyst_introductions(qa_text).keys())
+    analyst_lasts: set[str] = _analyst_last_names({n: None for n in analyst_names})
+    use_intro_classification = bool(analyst_names)
+
+    def _classify_questioner(speaker: str) -> bool:
+        """Returns True if this speaker is asking a question (not an executive)."""
+        if speaker.lower() == "operator":
+            return False
+        if speaker in executive_names:
+            return False
+        if use_intro_classification:
+            # Exact match on introduced name.
+            if speaker in analyst_names:
+                return True
+            # Suffix fallback: handles 'Chris'/'Christopher' mismatches.
+            speaker_last = speaker.split()[-1].lower()
+            return speaker_last in analyst_lasts
+        # No operator intros available — fall back to keyword heuristics.
+        return _is_questioner(speaker, executive_names)
+
     exchanges: list[Exchange] = []
     current_exchange: Exchange = []
     current_questioner: str | None = None
     had_exec_response: bool = False
 
     for speaker, text in turns:
-        if _is_questioner(speaker, executive_names):
+        if _classify_questioner(speaker):
             if had_exec_response and speaker != current_questioner:
                 # A different analyst starting after an exec response → new exchange.
+                # Move any trailing operator turns (next-question announcements) from
+                # the end of the closing exchange to the start of the new one.
+                held: Exchange = []
+                while current_exchange and current_exchange[-1][0].lower() == "operator":
+                    held.insert(0, current_exchange.pop())
                 if current_exchange:
                     exchanges.append(current_exchange)
-                current_exchange = []
+                current_exchange = held           # new exchange opens with the operator intro
                 current_questioner = speaker
                 had_exec_response = False
             elif current_questioner is None:
                 current_questioner = speaker
-            # Same questioner speaking again (clarification) → stays in exchange.
+            # Same questioner (clarification) or first questioner → stays in exchange.
             current_exchange.append((speaker, text))
         else:
-            # Executive or operator turn.
             current_exchange.append((speaker, text))
-            had_exec_response = True
+            # Only non-operator turns count as "executive responses".
+            # Operator bridging turns (announcing the next question) should not
+            # trigger a new exchange boundary on their own.
+            if speaker.lower() != "operator":
+                had_exec_response = True
 
     if current_exchange:
         exchanges.append(current_exchange)
 
     return exchanges
+

@@ -3,7 +3,7 @@ from transcript.analysis import clean_text, tokenize, count_word_frequency
 from transcript.sections import extract_transcript_sections, extract_qa_exchanges, enrich_speakers
 
 
-def main(file_path: str = "./transcripts/CTVA.json") -> None:
+def main(file_path: str = "./transcripts/MSFT.json") -> None:
     content = read_text_file(file_path)
     raw_text = extract_transcript_text(content)
 
@@ -27,7 +27,7 @@ def main(file_path: str = "./transcripts/CTVA.json") -> None:
         print(f"  [{p.role:<10}] {p.name}{detail_str} ({p.turn_count} turn{'s' if p.turn_count != 1 else ''})")
 
     print("\nQ&A Exchange Extraction")
-    exchanges = extract_qa_exchanges(qa)
+    exchanges = extract_qa_exchanges(qa, prepared_remarks=prepared_remarks)
     print(f"\nQ&A exchanges found: {len(exchanges)}")
     for i, exchange in enumerate(exchanges[:3], start=1):
         print(f"\n--- Exchange {i} ({len(exchange)} turns) ---")
