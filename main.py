@@ -1,6 +1,6 @@
 from transcript.loader import read_text_file, extract_transcript_text
 from transcript.analysis import clean_text, tokenize, count_word_frequency
-from transcript.sections import extract_transcript_sections, extract_qa_exchanges, extract_speakers
+from transcript.sections import extract_transcript_sections, extract_qa_exchanges, enrich_speakers
 
 
 def main(file_path: str = "./transcripts/MSFT.json") -> None:
@@ -13,16 +13,18 @@ def main(file_path: str = "./transcripts/MSFT.json") -> None:
     print(f"Token count: {len(tokens)}")
     # print(f"Top 10 words: {word_counts[:10]}")
 
-    print("\nSpeaker Identification")
-    speakers = extract_speakers(raw_text)
-    print(f"\nSpeakers ({len(speakers)} unique):")
-    for name, turns in speakers:
-        print(f"  {name} ({turns} turn{'s' if turns != 1 else ''})")
-
     print("\nSection Extraction")
     prepared_remarks, qa = extract_transcript_sections(raw_text)
     print(f"Prepared Remarks: {len(prepared_remarks)} chars")
     print(f"Q&A: {len(qa)} chars")
+
+    print("\nSpeaker Identification")
+    profiles = enrich_speakers(raw_text, prepared_remarks, qa)
+    print(f"Speakers ({len(profiles)} unique):")
+    for p in profiles:
+        detail = p.title or p.firm or ""
+        detail_str = f", {detail}" if detail else ""
+        print(f"  [{p.role:<10}] {p.name}{detail_str} ({p.turn_count} turn{'s' if p.turn_count != 1 else ''})")
 
     print("\nQ&A Exchange Extraction")
     exchanges = extract_qa_exchanges(qa)
