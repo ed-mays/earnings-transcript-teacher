@@ -1,9 +1,9 @@
 from transcript.loader import read_text_file, extract_transcript_text
 from transcript.analysis import clean_text, tokenize, count_word_frequency
-from transcript.sections import extract_transcript_sections, extract_qa_pairs
+from transcript.sections import extract_transcript_sections, extract_qa_exchanges
 
 
-def main(file_path: str = "./transcripts/CLOV Q3 2025 Earnings Transcript.json") -> None:
+def main(file_path: str = "./transcripts/MSFT.json") -> None:
     content = read_text_file(file_path)
     raw_text = extract_transcript_text(content)
 
@@ -16,12 +16,12 @@ def main(file_path: str = "./transcripts/CLOV Q3 2025 Earnings Transcript.json")
     print(f"Prepared Remarks: {len(prepared_remarks)} chars")
     print(f"Q&A: {len(qa)} chars")
 
-    qa_pairs = extract_qa_pairs(raw_text)
-    print(f"\nQ&A pairs found: {len(qa_pairs)}")
-    for i, (question, answer) in enumerate(qa_pairs[:3], start=1):
-        print(f"\n--- Pair {i} ---")
-        print(f"Q: {question[:200]}")
-        print(f"A: {answer[:200]}")
+    exchanges = extract_qa_exchanges(qa)
+    print(f"\nQ&A exchanges found: {len(exchanges)}")
+    for i, exchange in enumerate(exchanges[:3], start=1):
+        print(f"\n--- Exchange {i} ({len(exchange)} turns) ---")
+        for speaker, text in exchange:
+            print(f"  {speaker}: {text[:120]}")
 
 
 if __name__ == "__main__":

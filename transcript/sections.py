@@ -9,15 +9,18 @@ PREPARED_REMARKS_PATTERN: re.Pattern = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 
-# Explicit Q&A section headings used by various transcript providers.
+# Explicit Q&A section headings — must appear as a standalone line to avoid
+# matching boilerplate like "A question and answer session will follow...".
 _QA_HEADING_PATTERN: re.Pattern = re.compile(
+    r"^(?:"
     r"questions?\s+and\s+answers?"      # "Questions and Answers"
     r"|question[- ]and[- ]answer"       # "Question-and-Answer"
     r"|q\s*&\s*a\s+session"            # "Q&A Session"
     r"|analyst\s+q\s*&\s*a"           # "Analyst Q&A"
     r"|operator\s+q\s*&\s*a"          # "Operator Q&A"
-    r"|q\s*&\s*a",                     # bare "Q&A"
-    re.IGNORECASE,
+    r"|q\s*&\s*a"                      # bare "Q&A"
+    r")\s*$",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 # Natural-language phrases that signal the moderator is opening Q&A.
@@ -34,8 +37,8 @@ _QA_TRANSITION_PATTERN: re.Pattern = re.compile(
     # "turn it over for questions", "turn the call over to Q&A"
     r"|turn\s+(?:it|the\s+call)?\s*over\s+(?:to\s+)?(?:the\s+)?(?:q\s*&\s*a|questions?)"
 
-    # "move on to / move to the Q&A / questions portion"
-    r"|move\s+(?:on\s+)?to\s+(?:the\s+)?(?:q\s*&\s*a|questions?\s*(?:portion|section|part)?)"
+    # "move on/over to the Q&A / questions portion", "move to Q and A"
+    r"|move\s+(?:on|over)?\s*to\s+(?:the\s+)?(?:q\s*(?:&|and)\s*a|questions?\s*(?:portion|section|part)?)"
 
     # "start / begin the Q&A", "start taking questions"
     r"|(?:start|begin)\s+(?:the\s+)?(?:q\s*&\s*a|(?:taking\s+)?questions?)",
@@ -125,7 +128,11 @@ def extract_transcript_sections(
         either boundary is not found.
     """
     prepared_match = prepared_pattern.search(transcript)
-    qa_match = qa_pattern.search(transcript)
+    # Use the LAST Q&A match — operator boilerplate near the top of the
+    # transcript often contains the same phrases as the real Q&A transition,
+    # so the final occurrence is the most reliable boundary.
+    all_qa_matches = list(qa_pattern.finditer(transcript))
+    qa_match = all_qa_matches[-1] if all_qa_matches else None
 
     if not prepared_match and not qa_match:
         # No section markers found at all — return the full transcript.
@@ -144,47 +151,71 @@ def extract_transcript_sections(
     return prepared_remarks, qa
 
 
-def extract_qa_pairs(
-    transcript: str,
-    executive_names: set[str] | None = None,
-) -> list[tuple[str, str]]:
-    """Extracts question-and-answer pairs from an earnings transcript.
+# A single turn within a Q&A exchange: (speaker, text).
+Turn = tuple[str, str]
 
-    Speaker turns are identified by the "Speaker Name: text" format. Analyst/
-    investor turns are treated as questions; consecutive executive turns that
-    follow are joined as the answer.
+# A full Q&A exchange: all turns from one analyst's question thread,
+# including any clarification back-and-forth, until the next analyst speaks.
+Exchange = list[Turn]
+
+
+def extract_qa_exchanges(
+    qa_text: str,
+    executive_names: set[str] | None = None,
+) -> list[Exchange]:
+    """Extracts Q&A exchanges from the Q&A section of an earnings transcript.
+
+    Each exchange groups all turns belonging to one analyst's question thread,
+    including clarification requests from executives and follow-up from the
+    analyst, until a *different* analyst begins a new question.
+
+    A new exchange boundary is drawn when:
+    - A questioner speaks, AND
+    - The current exchange already contains at least one executive turn, AND
+    - The speaker is different from the analyst who opened the current exchange.
 
     Args:
-        transcript: Raw transcript text (full or Q&A section only).
+        qa_text: The Q&A section of the transcript (output of
+            ``extract_transcript_sections``), NOT the full transcript.
         executive_names: Known executive speaker names. When omitted, inferred
             from title keywords in speaker names.
 
     Returns:
-        List of (question, answer) string tuples.
+        List of exchanges. Each exchange is a list of (speaker, text) turns
+        in conversation order.
     """
-    turns = [
+    turns: list[Turn] = [
         (m.group("speaker").strip(), m.group("text").strip())
-        for m in _TURN_PATTERN.finditer(transcript)
+        for m in _TURN_PATTERN.finditer(qa_text)
     ]
 
     if executive_names is None:
         executive_names = _build_executive_set(turns)
 
-    pairs: list[tuple[str, str]] = []
-    i = 0
-    while i < len(turns):
-        speaker, text = turns[i]
-        if _is_questioner(speaker, executive_names):
-            # Collect all consecutive executive turns as the answer.
-            answer_parts: list[str] = []
-            j = i + 1
-            while j < len(turns) and not _is_questioner(turns[j][0], executive_names):
-                answer_parts.append(turns[j][1])
-                j += 1
-            if answer_parts:
-                pairs.append((text, " ".join(answer_parts)))
-            i = j
-        else:
-            i += 1
+    exchanges: list[Exchange] = []
+    current_exchange: Exchange = []
+    current_questioner: str | None = None
+    had_exec_response: bool = False
 
-    return pairs
+    for speaker, text in turns:
+        if _is_questioner(speaker, executive_names):
+            if had_exec_response and speaker != current_questioner:
+                # A different analyst starting after an exec response → new exchange.
+                if current_exchange:
+                    exchanges.append(current_exchange)
+                current_exchange = []
+                current_questioner = speaker
+                had_exec_response = False
+            elif current_questioner is None:
+                current_questioner = speaker
+            # Same questioner speaking again (clarification) → stays in exchange.
+            current_exchange.append((speaker, text))
+        else:
+            # Executive or operator turn.
+            current_exchange.append((speaker, text))
+            had_exec_response = True
+
+    if current_exchange:
+        exchanges.append(current_exchange)
+
+    return exchanges
