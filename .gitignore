@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# pyenv
+.python-version
+
+# Distribution / packaging
+*.whl
+
+# Unit test / coverage reports
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# mypy / type checkers
+.mypy_cache/
+.dmypy.json
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Google Antigravity
+.gemini/
+
+# Transcripts data (local only – fetched at runtime)
+transcripts/
