@@ -38,8 +38,8 @@ _QA_TRANSITION_PATTERN: re.Pattern = re.compile(
     # "turn it over for questions", "turn the call over to Q&A"
     r"|turn\s+(?:it|the\s+call)?\s*over\s+(?:to\s+)?(?:the\s+)?(?:q\s*&\s*a|questions?)"
 
-    # "move on/over to the Q&A / questions portion", "move to Q and A"
-    r"|move\s+(?:on|over)?\s*to\s+(?:the\s+)?(?:q\s*(?:&|and)\s*a|questions?\s*(?:portion|section|part)?)"
+    # "move on/over to the/your Q&A / questions portion", incl. "let's move on to your questions"
+    r"|(?:let(?:'s|us)\s+)?move\s+(?:on|over)?\s*to\s+(?:the\s+|your\s+|any\s+|some\s+)?(?:q\s*(?:&|and)\s*a|questions?\s*(?:portion|section|part)?)"
 
     # "start / begin the Q&A", "start taking questions"
     r"|(?:start|begin)\s+(?:the\s+)?(?:q\s*&\s*a|(?:taking\s+)?questions?)",
