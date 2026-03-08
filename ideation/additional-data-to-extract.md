@@ -1,122 +1,104 @@
-You can turn your extracted fields into “handles” that drive spaced repetition, pattern recognition, and deliberate practice on real earnings calls. I’ll assume your learning tool’s goal is to help someone get better at understanding, analyzing, and comparing earnings calls over time.[1][2]
+You already capture structure, people, topics, and “central” statements. The next useful layer is _how_ things are said: intent, certainty, quality of answers, and explicit forward‑looking content.[1][2][3]
 
-Because I couldn’t load your specific markdown file, I’ll speak in terms of typical items people extract from earnings transcripts (speakers, sections, sentiment, topics, Q&A pairs, metrics mentioned, guidance language, etc.) and how to use them, then suggest additional fields commonly used in earnings‑call NLP projects.[2][3][4][1]
+Below is a menu of additional signals that would give your Feynman‑style LLM maximal context.
 
-## 1. Using your existing extracted data in a learning tool
+## 1. Management communication signals
 
-Here are concrete learning experiences your current data can power:
+These are sentence/turn‑level tags on executive speech, especially in Q&A.
 
-- Speaker‑aware drills
-  - Use speaker labels (CEO, CFO, analyst) to let learners practice: “Summarize the CEO’s opening remarks,” or “Compare CEO vs CFO tone on guidance.”[3][1]
-  - Build exercises where a learner identifies which speaker likely made a given statement (management vs sell‑side) based on style and content.
+- Forward‑looking vs historical
+  - Tag sentences as historical (reporting past KPIs) vs forward‑looking (plans, projections, assumptions).[4][5][6]
+  - Add subtype labels: guidance (numeric ranges), strategic plans, qualitative outlook.
 
-- Section‑by‑section comprehension
-  - If you split calls into prepared remarks vs Q&A, you can create tasks like: “Highlight three concrete metrics in prepared remarks and three in Q&A; which feel more forward‑looking?”[1][3]
-  - Let users practice summarizing each section separately (business overview, segment performance, outlook, risk) and then stitch into a one‑paragraph thesis.
+- Hedging and uncertainty language
+  - Detect hedges/softeners (“we believe”, “too early to tell”, “we’re cautiously optimistic”) and uncertainty markers.[5][6]
+  - You can aggregate a “hedge density” per answer, topic, or quarter.
 
-- Sentiment and tone calibration
-  - Use sentence‑ or segment‑level sentiment to create labeling tasks: show a passage and ask learners to rate the tone and then reveal the model’s score and expert commentary.[4][3]
-  - Track how sentiment changes from opening remarks to Q&A and ask: “Why might management sound more cautious here?”
+- Commitment strength
+  - Classify statements by commitment: strong (“we will”), moderate (“we expect”), weak (“we hope”, “we’ll see”).[6][5]
+  - This lets the LLM reason about management conviction when explaining the call.
 
-- Topic and concept recognition
-  - If you already extract topics/themes (e.g., demand, pricing, margins, supply chain, regulation), turn them into tagging exercises: “Tag each excerpt with relevant themes.”[2][3][1]
-  - Build “theme timelines” across quarters so learners can visually see how often a topic appears and answer reflection questions like “What has management talked about more over the last four quarters and why might that matter?”
+- Evasiveness in Q&A
+  - Label answers as direct, partially evasive, or evasive, based on semantic alignment between question and answer and cues like verbosity, topic shifts, and hedging.[3][7][8][9]
+  - Recent work shows evasiveness is distinct from sentiment and veracity, so it’s a valuable separate channel.[9][3]
 
-- Q&A pair learning
-  - Use question–answer pairs to train people on how analysts ask questions and how good/bad answers sound.[3][2]
-  - Exercises: “Rewrite this analyst question to make it more precise,” or “What did management _not_ answer in this response?”
+## 2. Content and information‑density signals
 
-- Metric extraction for sanity checks
-  - If you extract numbers (revenue, growth rates, margins, guidance), build quick‑check tasks: “Match each metric to its context,” or “Which of these numbers belongs to guidance vs historical performance?”[5][6][1]
-  - Ask learners to compute simple relationships from extracted metrics (e.g., y/y growth, margin deltas) and reconcile them with management’s narrative.
+These help the LLM gauge “how much substance” is in a passage.
 
-- Cross‑call comparison modules
-  - Use metadata (company, ticker, date, sector) plus aggregated features (overall sentiment, theme counts) to let users compare two companies’ calls side by side.[5][1][3]
-  - Design tasks like: “Compare how these two companies discuss competition” or “Which management team is more explicit about risks this quarter?”
+- Metric and specificity tagging
+  - Detect explicit numbers (growth rates, margins, dollar amounts) and qualifiers (exact timing, cohorts, geographies).
+  - For each answer/remark, compute a simple specificity score: count of metrics, concrete nouns, and time references.
 
-## 2. Additional information worth extracting
+- Risk and driver taxonomy
+  - Classify spans into drivers like demand, pricing, costs, margins, capex, competition, regulation, labor, FX, etc., similar to how commercial NLP systems score key drivers.[2][10]
+  - Also tag explicit risks vs opportunities and mitigation actions.
 
-Based on how earnings‑call analysis tools and research projects work, here are useful fields you may not be capturing yet.[7][8][4][1][2][3]
+- Novelty vs boilerplate
+  - Identify sentences that are highly similar to prior calls (e.g., safe‑harbor and standard intros) vs genuinely new content.[10][1]
+  - A novelty flag lets the LLM focus explanations on what changed this quarter.
 
-- Hedging, uncertainty, and obfuscation language
-  - Explicitly flag hedges (“we hope,” “we believe,” “too early to tell”), uncertainty markers, and vague language.[8][4][3]
-  - In a learning tool, you can ask: “Highlight hedging phrases in this answer; what are they signaling?”
+## 3. Q&A interaction quality
 
-- Forward‑looking vs backward‑looking statements
-  - Tag sentences as historical reporting vs guidance or forward‑looking commentary.[9][8][3]
-  - This supports drills like: “Separate what actually happened from what management says will happen.”
+You already have structured question–answer threads; you can enrich them.
 
-- Risk and opportunity frames
-  - Detect explicit mentions of risk factors, headwinds, tailwinds, opportunities, and mitigation strategies.[8][1][3]
-  - Then create tasks: “List three risks and three mitigations mentioned in this call.”
+- Question type and quality
+  - Classify analyst questions as: housekeeping, clarification, drill‑down, model‑building, challenge/critical, or speculative.[2][10]
+  - This lets your tutor ask, “Was this a good modeling question or just housekeeping?”
 
-- Explicit vs implicit guidance quality
-  - Extract whether guidance is given (yes/no), its form (numeric range, qualitative only), and whether it was raised, lowered, reaffirmed relative to prior statements.[6][1][5][8]
-  - Learners can practice classifying guidance language as clear, vague, or evasive and link that to later realized results.
+- Answer responsiveness
+  - Tag whether the answer: directly addresses the core question, partially addresses it, or pivots away, leveraging the evasiveness taxonomy.[7][8][3][9]
+  - You can annotate if follow‑ups were needed, or if the analyst accepted an evasive answer.
 
-- Commitment strength and accountability signals
-  - Tag phrases that indicate commitments (“we will,” “we are committed to”) and references back to prior promises.[4][3][8]
-  - Use this to train learners to track whether management follows through over multiple quarters.
+- Turn‑level sentiment and stance
+  - Apply finance‑tuned sentiment (e.g., FinBERT‑style) for each answer and question to capture optimism/pessimism by topic and by speaker.[11][12]
+  - This supports explanations like “management is positive on demand but cautious on margins.”
 
-- Question quality and type
-  - Classify analyst questions by type (clarification, drill‑down, model‑building, challenge, softball) and by topic.[2][3][4]
-  - This enables exercises where users rate question quality, rewrite questions, or design better follow‑ups.
+## 4. Cross‑call and identity features
 
-- Answer quality and responsiveness
-  - Score answers on directness (did they actually answer the question?), specificity (metrics, timeframes), and spin.[3][4][8]
-  - Turn this into rubrics where learners grade answers and compare their grades with the tool’s assessment.
+These make the LLM’s reasoning more longitudinal and company‑aware.
 
-- Emotional and rhetorical signals
-  - Beyond sentiment, capture intensity (excitement vs flat), emphasis (repetition, “let me be clear”), and rhetorical devices (lists of three, analogies).[4][3]
-  - In the learning tool, highlight these and ask: “How is management trying to shape perception here?”
+- Per‑speaker history
+  - Maintain speaker‑level profiles across calls: typical tone, hedge density, evasiveness rate, and topic focus.[13][10]
+  - The tutor can then say, “Relative to their usual style, the CFO sounds more cautious here.”
 
-- Comparative and benchmarking language
-  - Extract mentions of competitors, market share, and relative performance (“outperform,” “gaining share,” “in line with peers”).[6][1][5]
-  - Then learners can practice inferring competitive positioning from the commentary.
+- Theme and sentiment trajectories
+  - Track topic prevalence and sentiment over time for the same company (e.g., supply chain mentions and tone across 6 quarters).[1][10][13]
+  - These trajectories are ideal context for Feynman‑style prompts about “what changed and why.”
 
-- Temporal references and timelines
-  - Tag future time frames (next quarter, fiscal year, multi‑year horizon) attached to each promise or risk.[3][4]
-  - This supports spaced‑repetition style follow‑ups: months later, prompt the learner to check whether a specific future claim played out.
+- Market‑response hooks (if you join with price data)
+  - Even without modeling, annotate each call with post‑earnings return/volatility buckets so the LLM can ground explanations in “how the market reacted.”[14][15][10][11]
 
-- Structure and discourse markers
-  - Extract section markers and discourse cues (“first,” “second,” “in summary,” “to your question”) to help learners see the structure of answers.[1][3]
-  - Build tasks like: “Re‑outline this answer into bullet points based on its implicit structure.”
+## 5. How this helps your Feynman LLM
 
-- Style and complexity metrics
-  - Track readability, sentence length, jargon density by speaker and over time.[4][3]
-  - Let learners see when simplicity increases or decreases, and what that might indicate (e.g., over‑complex answers around problematic topics).
+With these extra features, your tutor can:
 
-## 3. Designing higher‑level learning experiences
+- Localize explanations
+  - Point to specific high‑hedge, forward‑looking, or evasive answers when teaching “how to read between the lines.”
 
-Once you have these richer annotations, you can build more advanced modules:
+- Compare styles and quarters
+  - Use commitment strength, risk mentions, and topic sentiment trajectories to explain changes in tone or strategy across time.[10][13][1]
 
-- “Call clinic” mode
-  - Pick a single call, show auto‑extracted themes, risks, guidance, sentiment, and a short summary, then ask the learner to write their own thesis and compare.[5][1][3]
+- Run richer “what to notice” drills
+  - Ask the learner to explain why a specific high‑evasion answer, high‑novelty risk disclosure, or strongly committed guidance statement matters.
 
-- Longitudinal “trust the management team” module
-  - Use historical extractions (commitments, guidance changes, sentiment trends) to let learners track whether management earns or loses credibility over several quarters.[6][1][5][3]
+If you had to prioritize just 2–3 new layers _today_ for your learning tool, I’d start with: (1) forward‑looking vs historical tagging, (2) hedging/commitment strength, and (3) Q&A evasiveness labels. These three alone give your LLM a much richer handle on “how honest, clear, and confident is this management team?”[8][3][5][7][9]
 
-- Sector and macro pattern recognition
-  - Aggregate theme frequencies and sentiment by sector/period and ask learners what macro story they infer from calls in a given quarter.[8][1][5][3]
-
-- Structured note‑taking training
-  - Provide an interactive notepad seeded with extracted metrics, themes, and risks, and ask learners to organize them into a standard template (thesis, key drivers, risks, questions).[1][2][3]
-
-To give you more concrete advice, it would help to know: what is the primary outcome you want learners to achieve (e.g., writing better post‑call notes, building models, or improving qualitative judgment about management)?
+Are you primarily optimizing for helping users judge management quality, or for helping them build a better financial model off the call?
 
 Sources
-[1] GitHub - theouterlimitz/Earnings-Call-NLP-Analysis: Using NLP and Transformer models to analyze corporate earnings call transcripts for sentiment and key insights. https://github.com/theouterlimitz/Earnings-Call-NLP-Analysis
-[2] GitHub - korkridake/MSDS-DTSA-5714-EarningsCall: Earning Call Analytics is a solution that helps you extract insights from earnings calls transcripts. It saves you time and errors in analyzing these documents and helps you invest wisely in the stock market 📈 https://github.com/korkridake/msds-dtsa-5714-earningscall
-[3] Earnings Call Transcript Database and Analysis with NLTK in Python https://github.com/Tingting0618/Earnings_Call_Transcript_Database_Analysis_NLTK
-[4] NLP-Sentiment-Analysis-of-Earnings-Call-Transcripts/README.md at main · amberwalker-ds/NLP-Sentiment-Analysis-of-Earnings-Call-Transcripts https://github.com/amberwalker-ds/NLP-Sentiment-Analysis-of-Earnings-Call-Transcripts/blob/main/README.md
-[5] GitHub - lcsrodriguez/earnings: Equity earnings Python package (confirmed calendar, news articles, earnings transcripts, ...) https://github.com/lcsrodriguez/earnings
-[6] Earnings Call Themes &... https://fintool.com/app/research/companies/MAYS/earnings/Q3%202025
-[7] Earnings Lens - Earnigs call transcripts with AI and API https://www.earningslens.com
-[8] Earnings Call Analyzer | AI-Powered Investment Intelligence https://www.earningscallanalyzer.com
-[9] How to do Sentiment Analysis of Earnings Call Transcript using TextBlob & FMP API ✅ https://www.youtube.com/watch?v=RkUtuHPTMq0
-[10] [PDF] Examining the Teacher Pipeline: Will They Stay or Will They Go? https://files.eric.ed.gov/fulltext/EJ1225311.pdf
-[11] CME Group Inc. (CME) Q4 2025 Earnings Call Transcript https://seekingalpha.com/article/4865794-cme-group-inc-cme-q4-2025-earnings-call-transcript
-[12] Integrated Genomic Selection for Accelerating Breeding Programs of ... https://pmc.ncbi.nlm.nih.gov/articles/PMC10380062/
-[13] GitHub - carstonhernke/scrape-earnings-transcripts: A simple python script for scraping earnings transcripts from Seeking Alpha https://github.com/carstonhernke/scrape-earnings-transcripts
-[14] EXTREME NETWORKS INC https://www.stockinsights.ai/us/EXTR/earnings-transcript/fy25-q1-eaa0
-[15] Datasette of earning call transcripts from the Motley Fool - GitHub https://github.com/jeremiak/motley-fool-earning-transcripts
+[1] Extracting key insights from earnings call transcript via ... https://www.sciencedirect.com/science/article/abs/pii/S0306457324003571
+[2] 7 Use Cases for NLP in Large Hedge Funds https://symphony.com/insights/blog/7-use-cases-for-nlp-in-large-hedge-funds/
+[3] Evasive Answers in Financial Q\&A: Earnings Calls vs. FOMC Press Conferences https://neurips.cc/virtual/2025/loc/san-diego/132563
+[4] Forward-Looking Information in Financial Disclosures — Necessary ... https://blogs.cfainstitute.org/marketintegrity/2014/11/17/forward-looking-information-in-financial-disclosures-necessary-to-disclosure-effectiveness/
+[5] Forward-Looking Information: A Necessary Consideration in the SEC’s Review on Disclosure Effectiveness: Investor Perspectives https://rpc.cfainstitute.org/sites/default/files/-/media/documents/article/position-paper/forward-looking-information-a-necessary-consideration-in-sec-review.pdf
+[6] Forward-Looking Statements: Safe Harbors Compliance https://www.venable.com/insights/publications/2024/09/forward-looking-statements-safe-harbors-comp
+[7] EvasionBench: A Large-Scale Benchmark for Detecting Managerial Evasion in Earnings Call Q&A https://arxiv.org/abs/2601.09142
+[8] EvasionBench: Detecting Evasive Answers in Financial Q&A via ... https://huggingface.co/papers/2601.09142
+[9] Evasive Answers in Financial Q\&A: Earnings Calls vs. FOMC Press... https://openreview.net/forum?id=A1FDpZ0Kdg
+[10] Financial NLP Solutions | S&P Global Textual Data & AI Tools https://www.spglobal.com/market-intelligence/en/solutions/natural-language-processing
+[11] Advanced Deep Learning Techniques for Analyzing Earnings Call ... https://arxiv.org/abs/2503.01886
+[12] Advanced Deep Learning Techniques for Analyzing Earnings Call ... https://arxiv.org/html/2503.01886v1
+[13] Same Company, Same Signal: The Role of Identity in Earnings Call ... https://arxiv.org/html/2412.18029v1
+[14] Earnings Call Scripts Generation With Large Language Models ... https://onlinelibrary.wiley.com/doi/full/10.1002/ail2.110
+[15] [PDF] Forecasting Earnings Surprises from Conference Call ... https://aclanthology.org/2023.findings-acl.520.pdf
