@@ -24,13 +24,21 @@ import os
 import subprocess
 
 try:
-    from db.persistence import fetch_existing_embeddings, get_all_calls
+    from db.persistence import fetch_existing_embeddings, get_all_calls, search_spans
 except ImportError:
     # If psycopg isn't installed or db module fails, stub it
     def fetch_existing_embeddings(conn_str, ticker, quarter):
         return {}
     def get_all_calls(conn_str):
         return []
+    def search_spans(conn_str, ticker, query_vector, top_k=5):
+        return []
+
+try:
+    from transcript.chat_client import stream_chat
+except ImportError:
+    def stream_chat(messages, system_prompt, model="sonar-pro"):
+        yield "Error: LLM client not available."
 
 
 # ---------------------------------------------------------------------------
@@ -320,8 +328,57 @@ def interactive_menu() -> None:
                     print("Please use Option 1 to download and ingest it first.")
                 else:
                     print(f"\nStarting Feynman session on {ticker}...")
-                    print("(This feature is coming soon!)")
-                
+                    
+                    try:
+                        with open("prompts/feynman-learning-strategy.md", "r") as f:
+                            system_prompt = f.read()
+                    except FileNotFoundError:
+                        print("Error: Could not find prompts/feynman-learning-strategy.md")
+                        continue
+                        
+                    messages = []
+                    print("\nType your answers or questions below. Type 'exit' to return to the main menu.")
+                    
+                    while True:
+                        user_input = input("\nYou: ").strip()
+                        if user_input.lower() in ["exit", "quit"]:
+                            print("\nEnding session.")
+                            break
+                        if not user_input:
+                            continue
+                            
+                        # 1. RAG Retrieve
+                        query_embs = get_embeddings([user_input])
+                        context_spans = []
+                        if query_embs and query_embs[0]:
+                            context_spans = search_spans(conn_str, ticker, query_embs[0], top_k=3)
+                            
+                        # 2. Inject Context (Ephemeral)
+                        api_messages = list(messages)
+                        augmented_input = user_input
+                        if context_spans:
+                            context_str = "\n".join(f"- {span}" for span in context_spans)
+                            augmented_input = f"{user_input}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
+                            
+                        api_messages.append({"role": "user", "content": augmented_input})
+                        
+                        # Add raw input to actual persistent history
+                        messages.append({"role": "user", "content": user_input})
+                        
+                        # 3. Stream Response
+                        print("\nTeacher: ", end="", flush=True)
+                        assistant_response = ""
+                        try:
+                            for chunk in stream_chat(api_messages, system_prompt):
+                                print(chunk, end="", flush=True)
+                                assistant_response += chunk
+                        except Exception as e:
+                            print(f"[Error: {e}]", end="")
+                        print()
+                        
+                        # Add the raw response to history
+                        messages.append({"role": "assistant", "content": assistant_response})
+                        
         elif choice == "4":
             print("\nGoodbye!")
             break

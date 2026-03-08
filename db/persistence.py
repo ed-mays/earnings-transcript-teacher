@@ -79,6 +79,44 @@ def get_all_calls(conn_str: str) -> list[tuple[str, str]]:
     return calls
 
 
+def search_spans(
+    conn_str: str, ticker: str, query_vector: list[float], top_k: int = 5
+) -> list[str]:
+    """Perform a semantic similarity search within a specific transcript.
+
+    Args:
+        conn_str: PostgreSQL connection string.
+        ticker: The specific stock ticker to isolate the search to.
+        query_vector: The embedded user query.
+        top_k: Number of results to return.
+
+    Returns:
+        List of span texts matching the query.
+    """
+    results = []
+    try:
+        with psycopg.connect(conn_str) as conn:
+            register_vector(conn)
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT s.text
+                    FROM spans s
+                    JOIN calls c ON s.call_id = c.id
+                    WHERE c.ticker = %s
+                    ORDER BY s.embedding <=> %s::vector
+                    LIMIT %s
+                    """,
+                    (ticker, query_vector, top_k),
+                )
+                results = [row[0] for row in cur.fetchall()]
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not perform semantic search: {e}")
+        
+    return results
+
+
 def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     """Save the full call analysis result to the database.
 

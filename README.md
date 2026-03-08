@@ -8,7 +8,8 @@ A robust Python pipeline for analyzing, structuring, and persisting financial ea
 - **Key Takeaways (TextRank)**: Extracts the most central, highly-connected sentences from the call using graph-based ranking.
 - **Theme Extraction (NMF)**: Discovers core topics discussed during the call using Non-Negative Matrix Factorization.
 - **Keyword Extraction (TF-IDF)**: Identifies the most statistically significant terms unique to the transcript.
-- **Semantic Search (Voyage AI + pgvector)**: Embeds every speaker turn using `voyage-finance-2` (a finance-specialized embedding model) and stores the vectors in Postgres for blazingly fast cosine-similarity search.
+- **Semantic Search (Voyage AI + pgvector)**: Embeds every speaker turn using `voyage-finance-2` and stores vectors in Postgres.
+- **Feynman Learning Loop**: An interactive, multi-turn AI chat session guided by a strict pedagogical prompt (powered by Perplexity/OpenAI and RAG over the transcript) to help users deeply master the material.
 - **Smart Caching**: Seamlessly caches Voyage AI embeddings in Postgres to eliminate redundant API calls on subsequent runs.
 
 ## Prerequisites
@@ -17,6 +18,7 @@ A robust Python pipeline for analyzing, structuring, and persisting financial ea
 - **PostgreSQL** (with the `pgvector` extension installed)
 - **API Ninjas Key** (for downloading new transcripts)
 - **Voyage AI API Key** (for semantic vector generation)
+- **Perplexity API Key** (for the Feynman learning chat session)
 
 ## Setup
 
@@ -44,6 +46,7 @@ A robust Python pipeline for analyzing, structuring, and persisting financial ea
    ```bash
    export API_NINJAS_KEY="your-api-ninjas-key"
    export VOYAGE_API_KEY="your-voyage-api-key"
+   export PERPLEXITY_API_KEY="your-perplexity-api-key"
    ```
 
 ## Usage
