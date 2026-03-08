@@ -431,3 +431,48 @@ def extract_qa_exchanges(
 
     return exchanges
 
+
+# A raw span tuple: (speaker, section, text, sequence_order).
+RawSpan = tuple[str, str, str, int]
+
+
+def extract_spans(
+    transcript: str,
+    prepared_remarks: str,
+    qa: str,
+) -> list[RawSpan]:
+    """Parse every speaker turn into an ordered span with section assignment.
+
+    Each span is classified as ``'prepared'`` or ``'qa'`` based on whether
+    its text appears in the prepared-remarks or Q&A section.
+
+    Args:
+        transcript: Full raw transcript text.
+        prepared_remarks: The prepared remarks section text.
+        qa: The Q&A section text.
+
+    Returns:
+        List of ``(speaker, section, text, sequence_order)`` tuples in
+        document order.
+    """
+    spans: list[RawSpan] = []
+    order = 0
+
+    for m in _TURN_PATTERN.finditer(transcript):
+        speaker = m.group("speaker").strip()
+        text = m.group("text").strip()
+        if not text:
+            continue
+
+        # Classify section by checking membership in each section's text.
+        # Use the turn's character offset relative to the transcript to
+        # resolve ambiguity when the same text appears in both sections.
+        turn_start = m.start()
+        # Find where Q&A begins in the full transcript.
+        qa_offset = transcript.find(qa) if qa else len(transcript)
+
+        section = "qa" if turn_start >= qa_offset else "prepared"
+        spans.append((speaker, section, text, order))
+        order += 1
+
+    return spans
