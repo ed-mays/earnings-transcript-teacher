@@ -19,6 +19,7 @@ from transcript.models import (
     TopicRecord,
     QAPairRecord,
 )
+from transcript.embedder import get_embeddings
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +66,15 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
         for speaker, section, text, order in raw_spans
     ]
 
+    # Embeddings
+    texts_to_embed = [s.text for s in span_records]
+    embeddings = get_embeddings(texts_to_embed)
+    if embeddings and len(embeddings) == len(span_records):
+        for span, emb in zip(span_records, embeddings):
+            span.embedding = emb
+
     # Build a lookup: (speaker_name, text_prefix) -> SpanRecord for linking
+
     span_lookup: dict[tuple[str, str], SpanRecord] = {}
     for s in span_records:
         key = (s.speaker_name, s.text[:80])
@@ -201,6 +210,13 @@ def display(result: CallAnalysis) -> None:
     print("\nKey Takeaways (TextRank)")
     for i, t in enumerate(result.takeaways, 1):
         print(f"  {i}. [{t.speaker_name}] {t.text}")
+        
+    print("\nSemantic Search")
+    num_embeddings = sum(1 for s in result.spans if s.embedding is not None)
+    if num_embeddings > 0:
+        print(f"  {num_embeddings} span embeddings generated via Voyage AI")
+    else:
+        print("  Skipped (VOYAGE_API_KEY not set)")
 
 
 # ---------------------------------------------------------------------------

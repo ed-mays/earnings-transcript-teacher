@@ -42,6 +42,7 @@ class SpanRecord:
     sequence_order: int
     text: str
     textrank_score: float | None = None
+    embedding: list[float] | None = None
     id: UUID = field(default_factory=uuid4)
 
     @property

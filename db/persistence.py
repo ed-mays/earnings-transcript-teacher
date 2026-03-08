@@ -5,6 +5,7 @@ Requires psycopg 3.1+ (installed via `pip install "psycopg[binary]"`).
 
 import sys
 import psycopg
+from pgvector.psycopg import register_vector
 
 from transcript.models import CallAnalysis
 
@@ -22,6 +23,7 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     """
     # Use context managers to auto-commit on success or rollback on error.
     with psycopg.connect(conn_str) as conn:
+        register_vector(conn)
         with conn.cursor() as cur:
 
             # 1. Insert Call
@@ -80,8 +82,8 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
                     """
                     INSERT INTO spans (
                         id, call_id, speaker_id, section, span_type,
-                        sequence_order, text, char_count, textrank_score
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        sequence_order, text, char_count, textrank_score, embedding
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         str(span.id),
@@ -93,6 +95,7 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
                         span.text,
                         span.char_count,
                         span.textrank_score,
+                        span.embedding,
                     )
                 )
 

@@ -5,6 +5,9 @@
 -- Core tables
 -- ============================================================
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
+
 -- One row per earnings call
 CREATE TABLE calls (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,6 +63,10 @@ CREATE TABLE spans (
     -- current: TextRank score (NULL if not a takeaway)
     textrank_score  NUMERIC,
 
+    -- semantic search
+    embedding       vector(1024),
+
+
     -- future: communication signal annotations
     -- temporal_class    TEXT,                          -- 'historical' | 'forward_looking'
     -- temporal_subtype  TEXT,                          -- 'guidance' | 'strategic' | 'qualitative_outlook'
@@ -77,6 +84,7 @@ CREATE TABLE spans (
 CREATE INDEX idx_spans_call ON spans(call_id);
 CREATE INDEX idx_spans_speaker ON spans(speaker_id);
 CREATE INDEX idx_spans_section ON spans(call_id, section);
+CREATE INDEX idx_spans_embedding ON spans USING hnsw (embedding vector_cosine_ops);
 
 -- ============================================================
 -- Extracted analysis tables
