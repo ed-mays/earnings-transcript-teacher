@@ -1,3 +1,5 @@
+import sys
+
 from transcript.loader import read_text_file, extract_transcript_text
 from transcript.analysis import clean_text, tokenize, count_word_frequency
 from transcript.keywords import extract_keywords
@@ -6,11 +8,16 @@ from transcript.takeaways import extract_takeaways
 from transcript.sections import extract_transcript_sections, extract_qa_exchanges, enrich_speakers
 
 
-def main(file_path: str = "./transcripts/MSFT.json") -> None:
+def main(ticker: str = "MSFT") -> None:
+    ticker = ticker.upper()
+    file_path = f"./transcripts/{ticker}.json"
     content = read_text_file(file_path)
     raw_text = extract_transcript_text(content)
 
-    print("Basic stats:")
+    print(f"Analysing {ticker}")
+    print("=" * 40)
+
+    print("\nBasic stats:")
     tokens = tokenize(clean_text(raw_text))
     word_counts = count_word_frequency(tokens)
     print(f"Token count: {len(tokens)}")
@@ -54,4 +61,5 @@ def main(file_path: str = "./transcripts/MSFT.json") -> None:
 
 
 if __name__ == "__main__":
-    main()
+    ticker = sys.argv[1] if len(sys.argv) > 1 else "MSFT"
+    main(ticker)
