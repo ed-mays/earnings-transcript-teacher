@@ -34,7 +34,7 @@ _EARNINGS_STOP_WORDS: frozenset[str] = frozenset({
     "call", "today", "morning", "afternoon",
 })
 
-_ALL_STOP_WORDS: list[str] = sorted(STOP_WORDS | _EARNINGS_STOP_WORDS)
+ALL_STOP_WORDS: list[str] = sorted(STOP_WORDS | _EARNINGS_STOP_WORDS)
 
 
 def extract_keywords(
@@ -55,7 +55,7 @@ def extract_keywords(
         List of ``(term, tfidf_score)`` tuples sorted descending by score.
     """
     vectorizer = TfidfVectorizer(
-        stop_words=_ALL_STOP_WORDS,
+        stop_words=ALL_STOP_WORDS,
         ngram_range=(1, 2),
         max_features=5000,
         token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z+#]{1,}\b",  # 2+ char alpha tokens

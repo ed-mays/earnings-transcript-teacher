@@ -1,6 +1,7 @@
 from transcript.loader import read_text_file, extract_transcript_text
 from transcript.analysis import clean_text, tokenize, count_word_frequency
 from transcript.keywords import extract_keywords
+from transcript.themes import extract_themes
 from transcript.sections import extract_transcript_sections, extract_qa_exchanges, enrich_speakers
 
 
@@ -39,6 +40,11 @@ def main(file_path: str = "./transcripts/MSFT.json") -> None:
     keywords = extract_keywords(raw_text)
     for term, score in keywords:
         print(f"  {score:.4f}  {term}")
+
+    print("\nTheme Extraction (NMF)")
+    themes = extract_themes(raw_text)
+    for topic in themes:
+        print(f"  Topic {topic.label + 1}: {', '.join(topic.terms)}")
 
 
 if __name__ == "__main__":
