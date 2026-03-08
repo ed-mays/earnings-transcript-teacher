@@ -1,5 +1,6 @@
 from transcript.loader import read_text_file, extract_transcript_text
 from transcript.analysis import clean_text, tokenize, count_word_frequency
+from transcript.keywords import extract_keywords
 from transcript.sections import extract_transcript_sections, extract_qa_exchanges, enrich_speakers
 
 
@@ -33,6 +34,11 @@ def main(file_path: str = "./transcripts/MSFT.json") -> None:
         print(f"\n--- Exchange {i} ({len(exchange)} turns) ---")
         for speaker, text in exchange:
             print(f"  {speaker}: {text}")
+
+    print("\nKeyword Extraction (TF-IDF)")
+    keywords = extract_keywords(raw_text)
+    for term, score in keywords:
+        print(f"  {score:.4f}  {term}")
 
 
 if __name__ == "__main__":
