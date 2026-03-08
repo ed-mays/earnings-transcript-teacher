@@ -51,6 +51,34 @@ def fetch_existing_embeddings(
     return cache
 
 
+def get_all_calls(conn_str: str) -> list[tuple[str, str]]:
+    """Fetch all ingested transcripts from the database.
+
+    Args:
+        conn_str: PostgreSQL connection string.
+
+    Returns:
+        A list of tuples: (ticker, fiscal_quarter)
+    """
+    calls = []
+    try:
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT ticker, fiscal_quarter
+                    FROM calls
+                    ORDER BY created_at DESC
+                    """
+                )
+                calls = cur.fetchall()
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not fetch calls: {e}")
+        
+    return calls
+
+
 def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     """Save the full call analysis result to the database.
 

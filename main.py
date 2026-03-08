@@ -21,13 +21,16 @@ from transcript.models import (
 )
 from transcript.embedder import get_embeddings
 import os
+import subprocess
 
 try:
-    from db.persistence import fetch_existing_embeddings
+    from db.persistence import fetch_existing_embeddings, get_all_calls
 except ImportError:
     # If psycopg isn't installed or db module fails, stub it
     def fetch_existing_embeddings(conn_str, ticker, quarter):
         return {}
+    def get_all_calls(conn_str):
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +258,79 @@ def display(result: CallAnalysis) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Interactive Menu
+# ---------------------------------------------------------------------------
+
+def interactive_menu() -> None:
+    """Run the interactive CLI menu loop."""
+    print("Welcome to the Earnings Transcript Teacher!")
+    print("===========================================")
+    
+    conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+    
+    while True:
+        print("\nMain Menu:")
+        print("1. Download and ingest a new transcript")
+        print("2. List transcripts in database")
+        print("3. Start a Feynman session")
+        print("4. Exit")
+        
+        choice = input("\nEnter your choice (1-4): ").strip()
+        
+        if choice == "1":
+            ticker = input("Enter the ticker symbol (e.g. MSFT): ").strip().upper()
+            if not ticker:
+                continue
+                
+            print(f"\nDownloading transcript for {ticker}...")
+            # Call the download bash script
+            result = subprocess.run(["./download_transcript.sh", ticker])
+            
+            if result.returncode != 0:
+                print("Failed to download transcript. Check your API_NINJAS_KEY and ticker symbol.")
+            else:
+                print("\nIngesting and analyzing transcript...")
+                try:
+                    analysis = analyze(ticker)
+                    display(analysis)
+                    print(f"\nSaving analysis to database ({conn_str})...")
+                    from db.persistence import save_analysis
+                    save_analysis(conn_str, analysis)
+                    print("Successfully saved to database.")
+                except Exception as e:
+                    print(f"Error analyzing or saving transcript: {e}", file=sys.stderr)
+                    
+        elif choice == "2":
+            calls = get_all_calls(conn_str)
+            if not calls:
+                print("\nNo transcripts found in the database. Try downloading one first!")
+            else:
+                print(f"\nFound {len(calls)} transcripts in database:")
+                for ticker, quarter in calls:
+                    print(f"  - {ticker} ({quarter})")
+                    
+        elif choice == "3":
+            ticker = input("Enter the ticker symbol to study: ").strip().upper()
+            if ticker:
+                calls = get_all_calls(conn_str)
+                saved_tickers = [c[0] for c in calls]
+                
+                if ticker not in saved_tickers:
+                    print(f"\nTranscript for {ticker} not found in the database.")
+                    print("Please use Option 1 to download and ingest it first.")
+                else:
+                    print(f"\nStarting Feynman session on {ticker}...")
+                    print("(This feature is coming soon!)")
+                
+        elif choice == "4":
+            print("\nGoodbye!")
+            break
+            
+        else:
+            print("\nInvalid choice. Please enter a number between 1 and 4.")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -262,21 +338,30 @@ if __name__ == "__main__":
     import argparse
     import os
     
-    parser = argparse.ArgumentParser(description="Analyze an earnings transcript.")
-    parser.add_argument("ticker", nargs="?", default="MSFT", help="Ticker symbol (e.g., AAPL)")
-    parser.add_argument("--save", action="store_true", help="Save results to Postgres")
-    args = parser.parse_args()
-
-    result = analyze(args.ticker)
-    display(result)
-
-    if args.save:
-        from db.persistence import save_analysis
-        conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
-        print(f"\nSaving analysis to database ({conn_str})...")
+    # If run without arguments, use interactive menu
+    if len(sys.argv) == 1:
         try:
-            save_analysis(conn_str, result)
-            print("Successfully saved to database.")
-        except Exception as e:
-            print(f"Error saving to database: {e}", file=sys.stderr)
-            sys.exit(1)
+            interactive_menu()
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            sys.exit(0)
+    else:
+        # Legacy CLI mode
+        parser = argparse.ArgumentParser(description="Analyze an earnings transcript.")
+        parser.add_argument("ticker", help="Ticker symbol (e.g., AAPL)")
+        parser.add_argument("--save", action="store_true", help="Save results to Postgres")
+        args = parser.parse_args()
+    
+        result = analyze(args.ticker)
+        display(result)
+    
+        if args.save:
+            from db.persistence import save_analysis
+            conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+            print(f"\nSaving analysis to database ({conn_str})...")
+            try:
+                save_analysis(conn_str, result)
+                print("Successfully saved to database.")
+            except Exception as e:
+                print(f"Error saving to database: {e}", file=sys.stderr)
+                sys.exit(1)
