@@ -329,24 +329,43 @@ def interactive_menu() -> None:
                 else:
                     print(f"\nStarting Feynman session on {ticker}...")
                     
-                    try:
-                        with open("prompts/feynman-learning-strategy.md", "r") as f:
-                            system_prompt = f.read()
-                    except FileNotFoundError:
-                        print("Error: Could not find prompts/feynman-learning-strategy.md")
+                    topic = input("\nWhat topic from the transcript would you like to master? ").strip()
+                    if not topic:
                         continue
                         
+                    state = 1
                     messages = []
-                    print("\nType your answers or questions below. Type 'exit' to return to the main menu.")
+                    print("\nType your responses below. Type 'exit' to return to the main menu.")
                     
-                    while True:
-                        user_input = input("\nYou: ").strip()
-                        if user_input.lower() in ["exit", "quit"]:
-                            print("\nEnding session.")
+                    while state <= 5:
+                        prompt_files = {
+                            1: "prompts/feynman/01_initial_explanation.md",
+                            2: "prompts/feynman/02_gap_analysis.md",
+                            3: "prompts/feynman/03_guided_refinement.md",
+                            4: "prompts/feynman/04_understanding_test.md",
+                            5: "prompts/feynman/05_teaching_note.md",
+                        }
+                        
+                        try:
+                            with open(prompt_files[state], "r") as f:
+                                system_prompt = f.read()
+                        except FileNotFoundError:
+                            print(f"\nError: Could not find {prompt_files[state]}")
                             break
-                        if not user_input:
-                            continue
                             
+                        # 0. Get Input based on State
+                        if state == 1:
+                            user_input = f"I want to learn about: {topic}"
+                        elif state == 5:
+                            user_input = "I am ready for the ultimate teaching note."
+                        else:
+                            user_input = input("\nYou: ").strip()
+                            if user_input.lower() in ["exit", "quit"]:
+                                print("\nEnding session.")
+                                break
+                            if not user_input:
+                                continue
+                                
                         # 1. RAG Retrieve
                         query_embs = get_embeddings([user_input])
                         context_spans = []
@@ -362,8 +381,11 @@ def interactive_menu() -> None:
                             
                         api_messages.append({"role": "user", "content": augmented_input})
                         
-                        # Add raw input to actual persistent history
-                        messages.append({"role": "user", "content": user_input})
+                        # Add raw input to actual persistent history (only if it wasn't a hidden system prompt like state 1 or 5)
+                        if state not in [1, 5]:
+                            messages.append({"role": "user", "content": user_input})
+                        else:
+                             messages.append({"role": "user", "content": f"*[Proceeding to State {state}]*"})
                         
                         # 3. Stream Response
                         print("\nTeacher: ", end="", flush=True)
@@ -378,6 +400,17 @@ def interactive_menu() -> None:
                         
                         # Add the raw response to history
                         messages.append({"role": "assistant", "content": assistant_response})
+                        
+                        # 4. State Transitions
+                        if state in [1, 2, 4]:
+                            state += 1
+                        elif state == 3:
+                            advance = input("\n[System] Ready to test your understanding? (y/n): ").strip().lower()
+                            if advance == 'y':
+                                state += 1
+                        elif state == 5:
+                            print("\n[System] Feynman Session Complete!")
+                            break
                         
         elif choice == "4":
             print("\nGoodbye!")
