@@ -208,6 +208,24 @@ def display(result: CallAnalysis) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    ticker = sys.argv[1] if len(sys.argv) > 1 else "MSFT"
-    result = analyze(ticker)
+    import argparse
+    import os
+    
+    parser = argparse.ArgumentParser(description="Analyze an earnings transcript.")
+    parser.add_argument("ticker", nargs="?", default="MSFT", help="Ticker symbol (e.g., AAPL)")
+    parser.add_argument("--save", action="store_true", help="Save results to Postgres")
+    args = parser.parse_args()
+
+    result = analyze(args.ticker)
     display(result)
+
+    if args.save:
+        from db.persistence import save_analysis
+        conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+        print(f"\nSaving analysis to database ({conn_str})...")
+        try:
+            save_analysis(conn_str, result)
+            print("Successfully saved to database.")
+        except Exception as e:
+            print(f"Error saving to database: {e}", file=sys.stderr)
+            sys.exit(1)
