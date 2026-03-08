@@ -2,6 +2,7 @@ from transcript.loader import read_text_file, extract_transcript_text
 from transcript.analysis import clean_text, tokenize, count_word_frequency
 from transcript.keywords import extract_keywords
 from transcript.themes import extract_themes
+from transcript.takeaways import extract_takeaways
 from transcript.sections import extract_transcript_sections, extract_qa_exchanges, enrich_speakers
 
 
@@ -45,6 +46,11 @@ def main(file_path: str = "./transcripts/MSFT.json") -> None:
     themes = extract_themes(raw_text)
     for topic in themes:
         print(f"  Topic {topic.label + 1}: {', '.join(topic.terms)}")
+
+    print("\nKey Takeaways (TextRank)")
+    takeaways = extract_takeaways(raw_text)
+    for i, t in enumerate(takeaways, 1):
+        print(f"  {i}. [{t.speaker}] {t.text}")
 
 
 if __name__ == "__main__":
