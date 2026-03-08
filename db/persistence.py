@@ -10,6 +10,47 @@ from pgvector.psycopg import register_vector
 from transcript.models import CallAnalysis
 
 
+def fetch_existing_embeddings(
+    conn_str: str, ticker: str, fiscal_quarter: str
+) -> dict[str, list[float]]:
+    """Retrieve all previously computed embeddings for a given transcript.
+
+    Args:
+        conn_str: PostgreSQL connection string.
+        ticker: The stock ticker (e.g. 'MSFT').
+        fiscal_quarter: The fiscal quarter identifier.
+
+    Returns:
+        A dictionary mapping the exact span text to its embedding vector.
+    """
+    cache: dict[str, list[float]] = {}
+    try:
+        with psycopg.connect(conn_str) as conn:
+            register_vector(conn)
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT s.text, s.embedding
+                    FROM spans s
+                    JOIN calls c ON s.call_id = c.id
+                    WHERE c.ticker = %s AND c.fiscal_quarter = %s
+                        AND s.embedding IS NOT NULL
+                    """,
+                    (ticker, fiscal_quarter),
+                )
+                for text, embedding in cur.fetchall():
+                    # psycopg converts the pgvector type directly to a Python list
+                    if embedding is not None:
+                        cache[text] = embedding.tolist()
+    except Exception as e:
+        # If DB is down or table is missing, just return an empty cache
+        # so the pipeline can still degraded/re-compute.
+        import logging
+        logging.warning(f"Could not fetch embedding cache: {e}")
+
+    return cache
+
+
 def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     """Save the full call analysis result to the database.
 

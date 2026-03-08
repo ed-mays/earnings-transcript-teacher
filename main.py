@@ -20,6 +20,14 @@ from transcript.models import (
     QAPairRecord,
 )
 from transcript.embedder import get_embeddings
+import os
+
+try:
+    from db.persistence import fetch_existing_embeddings
+except ImportError:
+    # If psycopg isn't installed or db module fails, stub it
+    def fetch_existing_embeddings(conn_str, ticker, quarter):
+        return {}
 
 
 # ---------------------------------------------------------------------------
@@ -67,11 +75,34 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     ]
 
     # Embeddings
-    texts_to_embed = [s.text for s in span_records]
-    embeddings = get_embeddings(texts_to_embed)
-    if embeddings and len(embeddings) == len(span_records):
-        for span, emb in zip(span_records, embeddings):
-            span.embedding = emb
+    # 1. Try to load cached embeddings from Postgres
+    conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+    # Using the same placeholder quarter as persistence.py for now
+    fiscal_quarter = f"Q? {ticker}"
+    embedding_cache = fetch_existing_embeddings(conn_str, ticker, fiscal_quarter)
+
+    # 2. Separate spans into cache hits and cache misses
+    spans_to_embed = []
+    for span in span_records:
+        if span.text in embedding_cache:
+            span.embedding = embedding_cache[span.text]
+        else:
+            spans_to_embed.append(span)
+
+    # 3. Call Voyage API only for the misses
+    if spans_to_embed:
+        texts_to_embed = [s.text for s in spans_to_embed]
+        new_embeddings = get_embeddings(texts_to_embed)
+        if new_embeddings and len(new_embeddings) == len(spans_to_embed):
+            for span, emb in zip(spans_to_embed, new_embeddings):
+                span.embedding = emb
+
+    api_count = len(spans_to_embed) if new_embeddings else 0
+    cached_count = len(span_records) - len(spans_to_embed)
+    
+    # Store these counts temporarily on the call object so display() can show them
+    call.cached_embeddings_count = cached_count
+    call.api_embeddings_count = api_count
 
     # Build a lookup: (speaker_name, text_prefix) -> SpanRecord for linking
 
@@ -214,7 +245,11 @@ def display(result: CallAnalysis) -> None:
     print("\nSemantic Search")
     num_embeddings = sum(1 for s in result.spans if s.embedding is not None)
     if num_embeddings > 0:
-        print(f"  {num_embeddings} span embeddings generated via Voyage AI")
+        cached = getattr(call, "cached_embeddings_count", 0)
+        api = getattr(call, "api_embeddings_count", 0)
+        print(f"  {num_embeddings} span embeddings available")
+        print(f"    - {cached} loaded from Postgres cache")
+        print(f"    - {api} generated via Voyage AI API")
     else:
         print("  Skipped (VOYAGE_API_KEY not set)")
 
