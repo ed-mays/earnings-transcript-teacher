@@ -43,7 +43,14 @@ class AgenticExtractor:
             elif content.startswith("```"):
                 content = content[3:-3].strip()
                 
-            return json.loads(content)
+            result = json.loads(content)
+            if hasattr(response, 'usage') and response.usage:
+                result["_usage_stats"] = {
+                    "model": response.model,
+                    "prompt_tokens": response.usage.input_tokens,
+                    "completion_tokens": response.usage.output_tokens
+                }
+            return result
             
         except Exception as e:
             logger.error(f"Tier 1 Extraction failed: {e}")
@@ -74,7 +81,14 @@ class AgenticExtractor:
             elif content.startswith("```"):
                 content = content[3:-3].strip()
                 
-            return json.loads(content)
+            result = json.loads(content)
+            if hasattr(response, 'usage') and response.usage:
+                result["_usage_stats"] = {
+                    "model": response.model,
+                    "prompt_tokens": response.usage.input_tokens,
+                    "completion_tokens": response.usage.output_tokens
+                }
+            return result
             
         except Exception as e:
             logger.error(f"Tier 2 Extraction failed: {e}")

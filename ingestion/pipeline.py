@@ -122,21 +122,26 @@ class IngestionPipeline:
         
         # Phase 2: Tier 1 Extraction
         for i, chunk in enumerate(chunks, 1):
-            print(f"  [{i}/{len(chunks)}] Analysing {chunk.chunk_id}... ", end="", flush=True)
-            self._run_tier1(chunk)
+            print(f"  [{i}/{len(chunks)}] Analysing {chunk.chunk_id}... ")
+            t1_usage = self._run_tier1(chunk)
+            if t1_usage:
+                print(f"    ↳ Tier 1 [Model: {t1_usage['model']} | In: {t1_usage['prompt_tokens']} | Out: {t1_usage['completion_tokens']}]")
             
             # Phase 3: Tier 2 Deep Enrichment (Conditional routing)
             if chunk.requires_deep_analysis and getattr(chunk, 'tier1_score', 0) >= self.tier1_threshold:
-                print(f"Deep dive required (Score: {chunk.tier1_score}). Routing to Tier 2... ", end="", flush=True)
-                self._run_tier2(chunk)
-                print("Done.")
+                print(f"    ↳ Deep dive required (Score: {chunk.tier1_score}). Routing to Tier 2... ")
+                t2_usage = self._run_tier2(chunk)
+                if t2_usage:
+                    print(f"      ↳ Tier 2 [Model: {t2_usage['model']} | In: {t2_usage['prompt_tokens']} | Out: {t2_usage['completion_tokens']}]")
+                else:
+                    print("      ↳ Done.")
             else:
-                print(f"Skipping Tier 2 (Score: {getattr(chunk, 'tier1_score', 0)}).")
+                print(f"    ↳ Skipping Tier 2 (Score: {getattr(chunk, 'tier1_score', 0)}).")
         
         print("✅ Agentic ingestion complete.\n")
         return chunks
         
-    def _run_tier1(self, chunk: TranscriptChunk) -> None:
+    def _run_tier1(self, chunk: TranscriptChunk) -> Optional[Dict[str, Any]]:
         """Run fast, inexpensive extraction (OpenAI gpt-5-mini)."""
         tier1_data = self.extractor.extract_tier1(chunk.text, chunk.chunk_type)
         
@@ -145,10 +150,14 @@ class IngestionPipeline:
         chunk.tier1_score = tier1_data.get("tier1_score", 0)
         chunk.requires_deep_analysis = tier1_data.get("requires_deep_analysis", False)
         
-    def _run_tier2(self, chunk: TranscriptChunk) -> None:
+        return tier1_data.get("_usage_stats")
+        
+    def _run_tier2(self, chunk: TranscriptChunk) -> Optional[Dict[str, Any]]:
         """Run deep reasoning enrichment (Anthropic claude-4.5-sonnet)."""
         tier2_data = self.extractor.extract_tier2(chunk.text, chunk.chunk_type)
         
         chunk.takeaways = tier2_data.get("takeaways", [])
         chunk.evasion_analysis = tier2_data.get("evasion_analysis")
         chunk.misconceptions = tier2_data.get("misconceptions", [])
+        
+        return tier2_data.get("_usage_stats")

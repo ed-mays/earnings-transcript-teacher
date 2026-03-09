@@ -395,8 +395,15 @@ def interactive_menu() -> None:
 
                             print("\nTeacher: ", end="", flush=True)
                             try:
+                                usage_stats = None
                                 for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
+                                    if isinstance(chunk, dict):
+                                        usage_stats = chunk
+                                        continue
                                     print(chunk, end="", flush=True)
+                                
+                                if usage_stats:
+                                    print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
                             except Exception as e:
                                 print(f"[Error: {e}]", end="")
                             print("\n")
@@ -465,10 +472,18 @@ def interactive_menu() -> None:
                         # 3. Stream Response
                         print("\nTeacher: ", end="", flush=True)
                         assistant_response = ""
+                        usage_stats = None
                         try:
                             for chunk in stream_chat(api_messages, system_prompt):
+                                if isinstance(chunk, dict):
+                                    usage_stats = chunk
+                                    continue
+                                    
                                 print(chunk, end="", flush=True)
                                 assistant_response += chunk
+                                
+                            if usage_stats:
+                                print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
                         except Exception as e:
                             print(f"[Error: {e}]", end="")
                         print()

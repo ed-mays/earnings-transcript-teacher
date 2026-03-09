@@ -45,7 +45,8 @@ def stream_chat(
     payload = {
         "model": model,
         "messages": api_messages,
-        "stream": True
+        "stream": True,
+        "stream_options": {"include_usage": True} # Ask standards-compliant APIs to send final usage
     }
     
     try:
@@ -67,6 +68,11 @@ def stream_chat(
                         try:
                             # Parse JSON and extract delta content
                             data_json = json.loads(data_str)
+                            
+                            # Optional: Send usage stats back up
+                            if "usage" in data_json and data_json["usage"]:
+                                yield {"model": data_json.get("model", model), "usage": data_json["usage"]}
+                                
                             if "choices" in data_json and len(data_json["choices"]) > 0:
                                 delta = data_json["choices"][0].get("delta", {})
                                 content = delta.get("content", "")
