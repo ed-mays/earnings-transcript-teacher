@@ -4,3 +4,6 @@ voyageai
 pgvector
 requests>=2.0
 perplexityai>=0.30
+pytest
+pytest-cov
+pytest-mock
