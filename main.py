@@ -368,11 +368,12 @@ def interactive_menu() -> None:
                             
                             takeaway_embs = get_embeddings(takeaways)
                             context_spans = []
-                            for emb in takeaway_embs:
-                                if emb:
-                                    # Get top 2 spans per takeaway to build a comprehensive context
-                                    spans = search_spans(conn_str, ticker, emb, top_k=2)
-                                    context_spans.extend(spans)
+                            if takeaway_embs:
+                                for emb in takeaway_embs:
+                                    if emb:
+                                        # Get top 2 spans per takeaway to build a comprehensive context
+                                        spans = search_spans(conn_str, ticker, emb, top_k=2)
+                                        context_spans.extend(spans)
                             
                             # Deduplicate spans while preserving order if possible
                             seen_spans = set()
@@ -408,7 +409,42 @@ def interactive_menu() -> None:
                                 print(f"[Error: {e}]", end="")
                             print("\n")
                                 
-                        topic = input("\nBased on these, what specific topic would you like to master? ").strip()
+                        # Jargon Extraction block
+                        from db.persistence import get_extracted_terms_for_ticker
+                        jargon_terms = get_extracted_terms_for_ticker(conn_str, ticker, limit=10)
+                        
+                        if not jargon_terms:
+                            # Fallback to tf-idf keywords if agentic pipeline wasn't run
+                            raw_keywords = get_keywords_for_ticker(conn_str, ticker, limit=10)
+                            jargon_terms = [(k, "A frequently used keyword in this call.") for k in raw_keywords]
+                            
+                        if jargon_terms:
+                            print("\nExtracting key financial jargon for beginners...")
+                            terms_str = "\n".join(f"- {term}: {definition}" for term, definition in jargon_terms)
+                            user_input = f"Here is a list of financial jargon and terms from the transcript:\n{terms_str}\n\nPlease explain the most important ones simply to a beginner."
+                            
+                            try:
+                                with open("prompts/feynman/00_beginner_jargon.md", "r") as f:
+                                    sys_prompt = f.read()
+                            except FileNotFoundError:
+                                sys_prompt = "You are a friendly mentor explaining financial jargon simply to a beginner. Explain these terms."
+                                
+                            print("\nTeacher: ", end="", flush=True)
+                            try:
+                                usage_stats = None
+                                for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
+                                    if isinstance(chunk, dict):
+                                        usage_stats = chunk
+                                        continue
+                                    print(chunk, end="", flush=True)
+                                
+                                if usage_stats:
+                                    print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
+                            except Exception as e:
+                                print(f"[Error: {e}]", end="")
+                            print("\n")
+                                
+                        topic = input("\nBased on these, would you like to explore any of these terms, or what specific topic would you like to master? ").strip()
                     else:
                         topic = input("\nWhat topic from the transcript would you like to master? ").strip()
                         

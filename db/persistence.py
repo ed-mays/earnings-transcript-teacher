@@ -190,6 +190,30 @@ def get_keywords_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list
     return keywords
 
 
+def get_extracted_terms_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[tuple[str, str]]:
+    """Retrieve the financial/industry jargon terms and their definitions for the latest call of a ticker."""
+    terms = []
+    try:
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT et.term, et.definition
+                    FROM extracted_terms et
+                    JOIN calls c ON et.call_id = c.id
+                    WHERE c.ticker = %s
+                    ORDER BY c.created_at DESC
+                    LIMIT %s
+                    """,
+                    (ticker, limit),
+                )
+                terms = cur.fetchall()
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not fetch extracted terms: {e}")
+    return terms
+
+
 def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     """Save the full call analysis result to the database.
 
