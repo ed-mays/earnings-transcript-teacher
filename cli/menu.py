@@ -128,7 +128,7 @@ def interactive_menu() -> None:
                                 if takeaways:
                                     print("\nAnalyzing key takeaways and their significance based on the transcript...")
                                     
-                                    takeaway_embs = get_embeddings(takeaways)
+                                    takeaway_embs = get_embeddings([t[0] for t in takeaways])
                                     context_spans = []
                                     if takeaway_embs:
                                         for emb in takeaway_embs:
@@ -144,7 +144,7 @@ def interactive_menu() -> None:
                                             seen_spans.add(span)
                                     
                                     context_str = "\n".join(f"- {span}" for span in unique_context)
-                                    takeaways_str = "\n".join(f"- {t}" for t in takeaways)
+                                    takeaways_str = "\n".join(f"- {t[0]}: {t[1]}" for t in takeaways)
                                     
                                     user_input = f"Here are the key takeaways:\n{takeaways_str}\n\n<transcript_context>\n{context_str}\n</transcript_context>\n\nPlease explain why these takeaways are significant."
                                     
@@ -302,9 +302,10 @@ def interactive_menu() -> None:
                         print(f"  {', '.join(unique_kw)}")
                             
                     if takeaways:
-                        print("\nTextRank Key Takeaways:")
-                        for text in takeaways:
+                        print("\nAgentic Key Takeaways:")
+                        for text, why in takeaways:
                             print(f"  - {text}")
+                            print(f"    Significance: {why}")
                             
                     if not any([topics, takeaways, keywords]):
                         print("\nNo detailed analysis found for this transcript.")
@@ -327,9 +328,9 @@ def interactive_menu() -> None:
                     
                     suggestions = []
                     if takeaways:
-                        suggestions.append(f"Can you explain why '{takeaways[0][:50]}...' is a key takeaway?")
+                        suggestions.append(f"Can you explain why '{takeaways[0][0][:50]}...' is a key takeaway?")
                         if len(takeaways) > 1:
-                            suggestions.append(f"What does the transcript say regarding '{takeaways[1][:50]}...'?")
+                            suggestions.append(f"What does the transcript say regarding '{takeaways[1][0][:50]}...'?")
                     if topics:
                         top_theme = ", ".join(topics[0][:3])
                         suggestions.append(f"Can you summarize the discussion around '{top_theme}'?")

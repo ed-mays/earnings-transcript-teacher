@@ -42,9 +42,13 @@ def display(result: CallAnalysis) -> None:
     for topic in result.topics:
         print(f"  Topic {topic.label + 1}: {', '.join(topic.terms)}")
 
-    print("\nKey Takeaways (TextRank)")
-    for i, t in enumerate(result.takeaways, 1):
-        print(f"  {i}. [{t.speaker_name}] {t.text}")
+    print("\nKey Takeaways (Agentic)")
+    agentic_takeaways = []
+    for chunk in getattr(result, "chunks", []):
+        agentic_takeaways.extend(getattr(chunk, "takeaways", []))
+    for i, t in enumerate(agentic_takeaways[:5], 1):
+        print(f"  {i}. {t.get('takeaway', '')}")
+        print(f"     Significance: {t.get('why_it_matters', '')}")
         
     print("\nSemantic Search")
     num_embeddings = sum(1 for s in result.spans if s.embedding is not None)

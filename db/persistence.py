@@ -23,7 +23,7 @@ def get_topics_for_ticker(conn_str: str, ticker: str, limit: int = 5) -> list[li
     repo = AnalysisRepository(conn_str)
     return repo.get_topics_for_ticker(ticker, limit)
 
-def get_takeaways_for_ticker(conn_str: str, ticker: str, limit: int = 3) -> list[str]:
+def get_takeaways_for_ticker(conn_str: str, ticker: str, limit: int = 5) -> list[tuple[str, str]]:
     repo = AnalysisRepository(conn_str)
     return repo.get_takeaways_for_ticker(ticker, limit)
 

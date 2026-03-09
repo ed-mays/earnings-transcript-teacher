@@ -103,23 +103,23 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch topics: {e}")
         return topics
 
-    def get_takeaways_for_ticker(self, ticker: str, limit: int = 3) -> list[str]:
+    def get_takeaways_for_ticker(self, ticker: str, limit: int = 5) -> list[tuple[str, str]]:
         takeaways = []
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT s.text
-                        FROM spans s
-                        JOIN calls c ON s.call_id = c.id
-                        WHERE c.ticker = %s AND s.textrank_score IS NOT NULL
-                        ORDER BY c.created_at DESC, s.textrank_score DESC
+                        SELECT et.takeaway, et.why_it_matters
+                        FROM extracted_takeaways et
+                        JOIN calls c ON et.call_id = c.id
+                        WHERE c.ticker = %s
+                        ORDER BY c.created_at DESC
                         LIMIT %s
                         """,
                         (ticker, limit),
                     )
-                    takeaways = [row[0] for row in cur.fetchall()]
+                    takeaways = cur.fetchall()
         except Exception as e:
             logger.warning(f"Could not fetch takeaways: {e}")
         return takeaways

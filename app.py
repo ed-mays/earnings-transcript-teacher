@@ -116,8 +116,8 @@ with left_col:
             
     with st.expander("💡 Key Takeaways", expanded=True):
         if takeaways:
-            for t in takeaways:
-                st.markdown(f"- {t}")
+            for t, why in takeaways:
+                st.markdown(f"- **{t}**\n  - *{why}*")
         else:
             st.info("No key takeaways extracted.")
             
