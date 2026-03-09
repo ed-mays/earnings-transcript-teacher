@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import psycopg
 from pgvector.psycopg import register_vector
 
-from transcript.embedder import get_embeddings
+from nlp.embedder import get_embeddings
 
 
 def semantic_search(query: str, top_k: int = 5) -> None:

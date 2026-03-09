@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from transcript.keywords import ALL_STOP_WORDS
+from nlp.keywords import ALL_STOP_WORDS
 
 # Extra stop words for theme extraction — structural / boilerplate language
 # that adds noise when NMF tries to form coherent topic clusters.

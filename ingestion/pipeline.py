@@ -2,7 +2,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
-from transcript.models import CallAnalysis
+from core.models import CallAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class IngestionPipeline:
     def __init__(self, tier1_threshold: int = 6):
         self.tier1_threshold = tier1_threshold
         # Initialize the LLM client wrapper
-        from ingestion.llm_clients import AgenticExtractor
+        from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
 
     def process(self, analysis: CallAnalysis) -> List[TranscriptChunk]:

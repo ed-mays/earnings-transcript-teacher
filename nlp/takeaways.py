@@ -16,7 +16,7 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from transcript.keywords import ALL_STOP_WORDS
+from nlp.keywords import ALL_STOP_WORDS
 
 # Speaker-turn pattern (same as themes.py — local copy to avoid coupling).
 _TURN_PATTERN: re.Pattern = re.compile(

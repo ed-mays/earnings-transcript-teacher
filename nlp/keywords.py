@@ -8,7 +8,7 @@ modelling, and extractive summarisation.
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from transcript.analysis import STOP_WORDS
+from nlp.analysis import STOP_WORDS
 
 # Additional stop words common in earnings-call boilerplate that add noise
 # to keyword results.  These supplement the general-purpose STOP_WORDS set

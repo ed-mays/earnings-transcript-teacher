@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from transcript.sections import SpeakerProfile
+from parsing.sections import SpeakerProfile
 
 # Local import to avoid circular dependency loop for now or we can use Any, 
 # but usually it's better to just structure these carefully.
