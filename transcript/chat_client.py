@@ -7,7 +7,7 @@ but can be easily adapted to Anthropic, base OpenAI, or local models.
 import os
 import json
 import logging
-from perplexity import Perplexity
+import requests
 
 def get_api_key() -> str | None:
     """Retrieve the Perplexity API key."""
@@ -33,22 +33,46 @@ def stream_chat(
     if not api_key:
         raise ValueError("PERPLEXITY_API_KEY environment variable is missing.")
         
-    client = Perplexity(api_key=api_key)
+    # Prepend the system prompt exactly once at the top of the context window
+    api_messages = [{"role": "system", "content": system_prompt}] + messages
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream"
+    }
+    
+    payload = {
+        "model": model,
+        "messages": api_messages,
+        "stream": True
+    }
     
     try:
-        response_stream = client.responses.create(
-            model=model,
-            instructions=system_prompt,
-            input=messages,
+        with requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers=headers,
+            json=payload,
             stream=True
-        )
-        
-        for chunk in response_stream:
-            # ResponseStreamChunk is a pydantic union.
-            chunk_dict = chunk.model_dump()
-            if chunk_dict.get("type") == "response.output_text.delta":
-                delta_text = chunk_dict.get("delta", "")
-                if delta_text:
-                    yield delta_text
+        ) as response:
+            response.raise_for_status()
+            
+            for line in response.iter_lines():
+                if line:
+                    line_str = line.decode('utf-8')
+                    if line_str.startswith("data: "):
+                        data_str = line_str[6:]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            # Parse JSON and extract delta content
+                            data_json = json.loads(data_str)
+                            if "choices" in data_json and len(data_json["choices"]) > 0:
+                                delta = data_json["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
     except Exception as e:
         yield f"\n[Error connecting to Perplexity API: {e}]"

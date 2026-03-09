@@ -3,3 +3,4 @@ psycopg[binary]>=3.1.18
 voyageai
 pgvector
 requests>=2.0
+perplexityai>=0.30
