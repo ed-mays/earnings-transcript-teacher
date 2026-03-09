@@ -216,3 +216,13 @@ CREATE TABLE misconceptions (
     correction        TEXT NOT NULL
 );
 
+CREATE TABLE call_synthesis (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id            UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE UNIQUE,
+    overall_sentiment  TEXT NOT NULL,
+    executive_tone     TEXT NOT NULL,
+    key_themes         TEXT[] NOT NULL,
+    strategic_shifts   TEXT NOT NULL,
+    analyst_sentiment  TEXT NOT NULL
+);
+

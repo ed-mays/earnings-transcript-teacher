@@ -99,6 +99,22 @@ class QAPairRecord:
 
 
 # ---------------------------------------------------------------------------
+# Synthesis record
+# ---------------------------------------------------------------------------
+
+@dataclass
+class CallSynthesisRecord:
+    """Mirrors the ``call_synthesis`` table."""
+    overall_sentiment: str
+    executive_tone: str
+    key_themes: list[str]
+    strategic_shifts: str
+    analyst_sentiment: str
+    call_id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid4)
+
+
+# ---------------------------------------------------------------------------
 # Top-level result
 # ---------------------------------------------------------------------------
 
@@ -116,3 +132,4 @@ class CallAnalysis:
     
     # NEW Agentic Ingestion Outputs
     chunks: list[Any] = field(default_factory=list) # List of TranscriptChunk
+    synthesis: CallSynthesisRecord | None = None

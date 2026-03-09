@@ -1,8 +1,9 @@
 import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+import concurrent.futures
 
-from core.models import CallAnalysis
+from core.models import CallAnalysis, CallSynthesisRecord
 
 logger = logging.getLogger(__name__)
 
@@ -120,26 +121,86 @@ class IngestionPipeline:
         logger.info(f"Created {len(chunks)} chunks ({prep_count} prep, {qa_count} qa)")
         print(f"\n🚀 Starting Agentic LLM Ingestion Pipeline ({len(chunks)} chunks)...")
         
-        # Phase 2: Tier 1 Extraction
-        for i, chunk in enumerate(chunks, 1):
-            print(f"  [{i}/{len(chunks)}] Analysing {chunk.chunk_id}... ")
-            t1_usage = self._run_tier1(chunk)
-            if t1_usage:
-                print(f"    ↳ Tier 1 [Model: {t1_usage['model']} | In: {t1_usage['prompt_tokens']} | Out: {t1_usage['completion_tokens']}]")
+        # Phase 2: Map Phase (Concurrent Extraction)
+        # Process chunks in parallel using a ThreadPoolExecutor
+        max_workers = min(10, len(chunks)) # Don't spin up more threads than we have chunks
+        print(f"\n[Map Phase] Running extraction on {len(chunks)} chunks with {max_workers} concurrent workers...")
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Map chunk indices to future objects so we know which is which when completed
+            future_to_chunk = {
+                executor.submit(self._process_single_chunk, chunk, i, len(chunks)): chunk 
+                for i, chunk in enumerate(chunks, 1)
+            }
             
-            # Phase 3: Tier 2 Deep Enrichment (Conditional routing)
-            if chunk.requires_deep_analysis and getattr(chunk, 'tier1_score', 0) >= self.tier1_threshold:
-                print(f"    ↳ Deep dive required (Score: {chunk.tier1_score}). Routing to Tier 2... ")
-                t2_usage = self._run_tier2(chunk)
-                if t2_usage:
-                    print(f"      ↳ Tier 2 [Model: {t2_usage['model']} | In: {t2_usage['prompt_tokens']} | Out: {t2_usage['completion_tokens']}]")
-                else:
-                    print("      ↳ Done.")
-            else:
-                print(f"    ↳ Skipping Tier 2 (Score: {getattr(chunk, 'tier1_score', 0)}).")
+            # Wait for all futures to complete
+            for future in concurrent.futures.as_completed(future_to_chunk):
+                try:
+                    # The chunk is updated in-place by _process_single_chunk, 
+                    # we just need to catch any unhandled exceptions
+                    future.result()
+                except Exception as exc:
+                    chunk = future_to_chunk[future]
+                    logger.error(f"Chunk {chunk.chunk_id} generated an exception: {exc}")
+                    print(f"❌ Chunk {chunk.chunk_id} failed: {exc}")
+
+        # Phase 3: Reduce Phase (Synthesis)
+        print(f"\n[Reduce Phase] Synthesizing insights across all {len(chunks)} chunks...")
+        synthesis_text_parts = []
+        for c in chunks:
+            part = f"### Chunk: {c.chunk_id} ({c.chunk_type})\n"
+            part += f"Terms: {c.extracted_terms}\n"
+            part += f"Concepts: {c.core_concepts}\n"
+            if c.takeaways:
+                part += f"Takeaways: {c.takeaways}\n"
+            if c.evasion_analysis:
+                part += f"Evasion: {c.evasion_analysis}\n"
+            if c.misconceptions:
+                part += f"Misconceptions: {c.misconceptions}\n"
+            synthesis_text_parts.append(part)
+            
+        aggregated_text = "\n\n".join(synthesis_text_parts)
+        
+        synthesis_data = self.extractor.extract_synthesis(aggregated_text)
+        
+        # Manually extract usage stats before creating the dataclass
+        usage = synthesis_data.pop("_usage_stats", None)
+        if usage:
+            print(f"    ↳ Synthesis [Model: {usage['model']} | In: {usage['prompt_tokens']} | Out: {usage['completion_tokens']}]")
+            
+        analysis.synthesis = CallSynthesisRecord(
+            overall_sentiment=synthesis_data.get("overall_sentiment", ""),
+            executive_tone=synthesis_data.get("executive_tone", ""),
+            key_themes=synthesis_data.get("key_themes", []),
+            strategic_shifts=synthesis_data.get("strategic_shifts", ""),
+            analyst_sentiment=synthesis_data.get("analyst_sentiment", "")
+        )
         
         print("✅ Agentic ingestion complete.\n")
         return chunks
+        
+    def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int) -> None:
+        """Helper method to process a single chunk, designed to run in a thread."""
+        logger.info(f"Processing chunk {chunk.chunk_id} [{index}/{total_chunks}]")
+        # print relies on thread-safety of the built-in print, but might interleave slightly in stdout.
+        # This is usually fine for a simple UI, but could be logged instead.
+        print(f"  [{index}/{total_chunks}] Analysing {chunk.chunk_id}... ")
+        
+        t1_usage = self._run_tier1(chunk)
+        if t1_usage:
+            logger.info(f"Chunk {chunk.chunk_id} - Tier 1 usage: {t1_usage}")
+            # print(f"    ↳ Tier 1 [Model: {t1_usage['model']} | In: {t1_usage['prompt_tokens']} | Out: {t1_usage['completion_tokens']}]")
+        
+        # Phase 3: Tier 2 Deep Enrichment (Conditional routing)
+        if chunk.requires_deep_analysis and getattr(chunk, 'tier1_score', 0) >= self.tier1_threshold:
+            print(f"    ↳ Deep dive required on {chunk.chunk_id} (Score: {chunk.tier1_score}). Routing to Tier 2... ")
+            t2_usage = self._run_tier2(chunk)
+            if t2_usage:
+                logger.info(f"Chunk {chunk.chunk_id} - Tier 2 usage: {t2_usage}")
+                # print(f"      ↳ Tier 2 [Model: {t2_usage['model']} | In: {t2_usage['prompt_tokens']} | Out: {t2_usage['completion_tokens']}]")
+        else:
+            logger.info(f"Chunk {chunk.chunk_id} - Skipping Tier 2 (Score: {getattr(chunk, 'tier1_score', 0)})")
+            # print(f"    ↳ Skipping Tier 2 for {chunk.chunk_id} (Score: {getattr(chunk, 'tier1_score', 0)}).")
         
     def _run_tier1(self, chunk: TranscriptChunk) -> Optional[Dict[str, Any]]:
         """Run fast, inexpensive extraction (OpenAI gpt-5-mini)."""

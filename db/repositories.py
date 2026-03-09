@@ -177,7 +177,34 @@ class AnalysisRepository:
                 self._save_keywords(cur, result.call.id, result.keywords)
                 self._save_qa_pairs(cur, result.call.id, result.qa_pairs)
                 self._save_agentic_chunks(cur, result.call.id, getattr(result, "chunks", []))
+                if getattr(result, "synthesis", None):
+                    self._save_call_synthesis(cur, result.call.id, result.synthesis)
             conn.commit()
+
+    def _save_call_synthesis(self, cur, call_id, synthesis):
+        cur.execute(
+            """
+            INSERT INTO call_synthesis (
+                id, call_id, overall_sentiment, executive_tone,
+                key_themes, strategic_shifts, analyst_sentiment
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (call_id) DO UPDATE SET
+                overall_sentiment = EXCLUDED.overall_sentiment,
+                executive_tone = EXCLUDED.executive_tone,
+                key_themes = EXCLUDED.key_themes,
+                strategic_shifts = EXCLUDED.strategic_shifts,
+                analyst_sentiment = EXCLUDED.analyst_sentiment
+            """,
+            (
+                str(synthesis.id),
+                str(call_id),
+                synthesis.overall_sentiment,
+                synthesis.executive_tone,
+                synthesis.key_themes,
+                synthesis.strategic_shifts,
+                synthesis.analyst_sentiment
+            )
+        )
 
     def _save_call(self, cur, call):
         fiscal_quarter = f"Q? {call.ticker}"
