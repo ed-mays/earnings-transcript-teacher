@@ -103,7 +103,7 @@ left_col, right_col = st.columns([3.5, 6.5])
 with left_col:
     st.subheader(f"📊 {st.session_state.active_ticker} Analysis")
     
-    with st.expander("📚 Vocabulary & Jargon", expanded=True):
+    with st.expander("📚 Vocabulary & Jargon", expanded=False):
         if jargon:
             for term, definition in jargon:
                 st.markdown(f"**{term.title()}**: {definition}")
@@ -114,14 +114,14 @@ with left_col:
             st.markdown("**Top Keywords (TF-IDF):**")
             st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
             
-    with st.expander("💡 Key Takeaways", expanded=True):
+    with st.expander("💡 Key Takeaways", expanded=False):
         if takeaways:
             for t, why in takeaways:
                 st.markdown(f"- **{t}**\n  - *{why}*")
         else:
             st.info("No key takeaways extracted.")
             
-    with st.expander("🧩 Extracted Themes", expanded=True):
+    with st.expander("🧩 Extracted Themes", expanded=False):
         if themes:
             for idx, t in enumerate(themes, 1):
                 st.markdown(f"**Theme {idx}:** {t}")
