@@ -24,7 +24,7 @@ import os
 import subprocess
 
 try:
-    from db.persistence import fetch_existing_embeddings, get_all_calls, search_spans
+    from db.persistence import fetch_existing_embeddings, get_all_calls, search_spans, get_topics_for_ticker, get_takeaways_for_ticker, get_keywords_for_ticker
 except ImportError:
     # If psycopg isn't installed or db module fails, stub it
     def fetch_existing_embeddings(conn_str, ticker, quarter):
@@ -32,6 +32,12 @@ except ImportError:
     def get_all_calls(conn_str):
         return []
     def search_spans(conn_str, ticker, query_vector, top_k=5):
+        return []
+    def get_topics_for_ticker(conn_str, ticker, limit=5):
+        return []
+    def get_takeaways_for_ticker(conn_str, ticker, limit=3):
+        return []
+    def get_keywords_for_ticker(conn_str, ticker, limit=15):
         return []
 
 try:
@@ -101,6 +107,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
             spans_to_embed.append(span)
 
     # 3. Call Voyage API only for the misses
+    new_embeddings = None
     if spans_to_embed:
         texts_to_embed = [s.text for s in spans_to_embed]
         new_embeddings = get_embeddings(texts_to_embed)
@@ -275,15 +282,17 @@ def interactive_menu() -> None:
     print("===========================================")
     
     conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+    from db.persistence import save_analysis, get_all_calls, get_topics_for_ticker, get_takeaways_for_ticker, get_keywords_for_ticker
     
     while True:
         print("\nMain Menu:")
-        print("1. Download and ingest a new transcript")
-        print("2. List transcripts in database")
-        print("3. Start a Feynman session")
-        print("4. Exit")
+        print("1. Download & Ingest a new transcript")
+        print("2. List transcripts in Database")
+        print("3. Start a Feynman learning session")
+        print("4. View saved transcript details (Themes/Takeaways)")
+        print("5. Exit")
         
-        choice = input("\nEnter your choice (1-4): ").strip()
+        choice = input("\nEnter your choice (1-5): ").strip()
         
         if choice == "1":
             ticker = input("Enter the ticker symbol (e.g. MSFT): ").strip().upper()
@@ -329,7 +338,26 @@ def interactive_menu() -> None:
                 else:
                     print(f"\nStarting Feynman session on {ticker}...")
                     
-                    topic = input("\nWhat topic from the transcript would you like to master? ").strip()
+                    level = input("\nWhat is your current knowledge level? (Beginner/Intermediate/Advanced): ").strip().lower()
+                    
+                    if level == "beginner":
+                        topics = get_topics_for_ticker(conn_str, ticker)
+                        takeaways = get_takeaways_for_ticker(conn_str, ticker)
+                        
+                        if topics or takeaways:
+                            print(f"\nSince you are a beginner, here are some key themes discussed in the {ticker} transcript:")
+                            for idx, t in enumerate(topics, 1):
+                                print(f"  {idx}. {', '.join(t)}")
+                                
+                            print("\nAnd here are a few key takeaways you might want to explore:")
+                            for text in takeaways:
+                                preview = text[:150] + "..." if len(text) > 150 else text
+                                print(f"  - {preview}")
+                                
+                        topic = input("\nBased on these, what specific topic would you like to master? ").strip()
+                    else:
+                        topic = input("\nWhat topic from the transcript would you like to master? ").strip()
+                        
                     if not topic:
                         continue
                         
@@ -413,11 +441,48 @@ def interactive_menu() -> None:
                             break
                         
         elif choice == "4":
+            ticker = input("Enter the ticker symbol to view: ").strip().upper()
+            if ticker:
+                calls = get_all_calls(conn_str)
+                saved_tickers = [c[0] for c in calls]
+                
+                if ticker not in saved_tickers:
+                    print(f"\nTranscript for {ticker} not found in the database.")
+                    print("Please use Option 1 to download and ingest it first.")
+                else:
+                    topics = get_topics_for_ticker(conn_str, ticker)
+                    takeaways = get_takeaways_for_ticker(conn_str, ticker)
+                    keywords = get_keywords_for_ticker(conn_str, ticker)
+                    
+                    print(f"\n--- Analysis Details for {ticker} ---")
+                    
+                    if topics:
+                        print("\nNMF Themes (Topic Clusters):")
+                        for idx, t in enumerate(topics, 1):
+                            print(f"  {idx}. {', '.join(t)}")
+                            
+                    if keywords:
+                        # De-duplicate keywords by converting to lowercase set but keeping order
+                        seen = set()
+                        unique_kw = [k for k in keywords if not (k.lower() in seen or seen.add(k.lower()))]
+                        print("\nTop TF-IDF Keywords:")
+                        # Print as a nice comma-separated list
+                        print(f"  {', '.join(unique_kw)}")
+                            
+                    if takeaways:
+                        print("\nTextRank Key Takeaways:")
+                        for text in takeaways:
+                            print(f"  - {text}")
+                            
+                    if not any([topics, takeaways, keywords]):
+                        print("\nNo detailed analysis found for this transcript.")
+                        
+        elif choice == "5":
             print("\nGoodbye!")
             break
             
         else:
-            print("\nInvalid choice. Please enter a number between 1 and 4.")
+            print("\nInvalid choice. Please enter a number between 1 and 5.")
 
 
 # ---------------------------------------------------------------------------

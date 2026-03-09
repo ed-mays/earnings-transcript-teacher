@@ -117,6 +117,79 @@ def search_spans(
     return results
 
 
+def get_topics_for_ticker(conn_str: str, ticker: str, limit: int = 5) -> list[list[str]]:
+    """Retrieve the top NLP themes extracted for the latest call of a ticker."""
+    topics = []
+    try:
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                # We order by calls.created_at DESC to get the latest transcript for this ticker
+                cur.execute(
+                    """
+                    SELECT ct.terms
+                    FROM call_topics ct
+                    JOIN calls c ON ct.call_id = c.id
+                    WHERE c.ticker = %s
+                    ORDER BY c.created_at DESC, ct.rank_order ASC
+                    LIMIT %s
+                    """,
+                    (ticker, limit),
+                )
+                topics = [row[0] for row in cur.fetchall()]
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not fetch topics: {e}")
+    return topics
+
+
+def get_takeaways_for_ticker(conn_str: str, ticker: str, limit: int = 3) -> list[str]:
+    """Retrieve the top TextRank sentences extracted for the latest call of a ticker."""
+    takeaways = []
+    try:
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT s.text
+                    FROM spans s
+                    JOIN calls c ON s.call_id = c.id
+                    WHERE c.ticker = %s AND s.textrank_score IS NOT NULL
+                    ORDER BY c.created_at DESC, s.textrank_score DESC
+                    LIMIT %s
+                    """,
+                    (ticker, limit),
+                )
+                takeaways = [row[0] for row in cur.fetchall()]
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not fetch takeaways: {e}")
+    return takeaways
+
+
+def get_keywords_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[str]:
+    """Retrieve the top TF-IDF keywords extracted for the latest call of a ticker."""
+    keywords = []
+    try:
+        with psycopg.connect(conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT sk.term
+                    FROM span_keywords sk
+                    JOIN calls c ON sk.call_id = c.id
+                    WHERE c.ticker = %s
+                    ORDER BY c.created_at DESC, sk.score DESC
+                    LIMIT %s
+                    """,
+                    (ticker, limit),
+                )
+                keywords = [row[0] for row in cur.fetchall()]
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not fetch keywords: {e}")
+    return keywords
+
+
 def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     """Save the full call analysis result to the database.
 
@@ -132,9 +205,16 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     with psycopg.connect(conn_str) as conn:
         register_vector(conn)
         with conn.cursor() as cur:
+            call = result.call
+            fiscal_quarter = f"Q? {call.ticker}"
+            
+            # 0. Delete any existing record for this transcript so re-ingestion is idempotent
+            cur.execute(
+                "DELETE FROM calls WHERE ticker = %s AND fiscal_quarter = %s",
+                (call.ticker, fiscal_quarter)
+            )
 
             # 1. Insert Call
-            call = result.call
             cur.execute(
                 """
                 INSERT INTO calls (
@@ -147,7 +227,7 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
                     str(call.id),
                     call.ticker,
                     None,  # company_name
-                    f"Q? {call.ticker}",  # placeholder until we parse it from transcript
+                    fiscal_quarter,
                     None,  # call_date
                     call.transcript_json,
                     call.transcript_text,
@@ -183,7 +263,15 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
                 )
 
             # 3. Insert Spans (including takeaways)
-            for span in result.spans:
+            # Takeaways might be standalone SpanRecord objects not in result.spans.
+            # Combine them, using a dictionary to guarantee we don't insert duplicates if
+            # modified in-place.
+            all_spans = {s.id: s for s in result.spans}
+            for t in result.takeaways:
+                if t.id not in all_spans:
+                    all_spans[t.id] = t
+                    
+            for span in all_spans.values():
                 speaker_id = speaker_ids.get(span.speaker_name)
                 cur.execute(
                     """
