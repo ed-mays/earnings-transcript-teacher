@@ -7,19 +7,33 @@ from cli.display import display
 from cli.menu import interactive_menu
 
 if __name__ == "__main__":
-    # If run without arguments, use interactive menu
-    if len(sys.argv) == 1:
+    # Setup argparse to handle both GUI and CLI modes
+    parser = argparse.ArgumentParser(description="Earnings Transcript Teacher")
+    parser.add_argument("--mode", choices=["cli", "gui"], default="cli",
+                        help="Choose the interface mode (default: cli)")
+    
+    # Optional positional argument for the legacy CLI direct-analysis mode
+    parser.add_argument("ticker", nargs="?", help="Ticker symbol (e.g., AAPL)")
+    parser.add_argument("--save", action="store_true", help="Save results to Postgres")
+    
+    args = parser.parse_args()
+
+    if args.mode == "gui":
+        print("Launching Earnings Transcript Teacher GUI...")
+        import subprocess
+        # Run streamlit pointing to app.py
+        subprocess.run(["streamlit", "run", "app.py"])
+        sys.exit(0)
+
+    # If run without arguments (and mode is cli), use interactive menu
+    if not args.ticker:
         try:
             interactive_menu()
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)
     else:
-        # Legacy CLI mode
-        parser = argparse.ArgumentParser(description="Analyze an earnings transcript.")
-        parser.add_argument("ticker", help="Ticker symbol (e.g., AAPL)")
-        parser.add_argument("--save", action="store_true", help="Save results to Postgres")
-        args = parser.parse_args()
+        # Legacy CLI direct-analysis mode
     
         result = analyze(args.ticker)
         display(result)

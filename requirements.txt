@@ -7,3 +7,4 @@ perplexityai>=0.30
 pytest
 pytest-cov
 pytest-mock
+streamlit>=1.33.0
