@@ -153,39 +153,29 @@ class AgenticExtractor:
         """
         user_prompt = f"### Chunk Type: {chunk_type}\n### Transcript Text:\n{text}\n\nExtract the requested JSON metadata."
         
-        try:
-            self.rate_limiter.wait()
-            response = self.client.responses.create(
-                model=self.tier1_model,
-                instructions=TIER_1_SYSTEM_PROMPT,
-                input=user_prompt
-            )
+        self.rate_limiter.wait()
+        response = self.client.responses.create(
+            model=self.tier1_model,
+            instructions=TIER_1_SYSTEM_PROMPT,
+            input=user_prompt
+        )
+        
+        content = response.output_text
+        # Basic cleanup in case the model wraps JSON in markdown blocks
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:-3].strip()
+        elif content.startswith("```"):
+            content = content[3:-3].strip()
             
-            content = response.output_text
-            # Basic cleanup in case the model wraps JSON in markdown blocks
-            content = content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-                
-            result = json.loads(content)
-            if hasattr(response, 'usage') and response.usage:
-                result["_usage_stats"] = {
-                    "model": response.model,
-                    "prompt_tokens": response.usage.input_tokens,
-                    "completion_tokens": response.usage.output_tokens
-                }
-            return result
-            
-        except Exception as e:
-            logger.error(f"Tier 1 Extraction failed: {e}")
-            return {
-                "extracted_terms": [],
-                "core_concepts": [],
-                "tier1_score": 0,
-                "requires_deep_analysis": False
+        result = json.loads(content)
+        if hasattr(response, 'usage') and response.usage:
+            result["_usage_stats"] = {
+                "model": response.model,
+                "prompt_tokens": response.usage.input_tokens,
+                "completion_tokens": response.usage.output_tokens
             }
+        return result
 
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60), 
@@ -199,37 +189,28 @@ class AgenticExtractor:
         """
         user_prompt = f"### Chunk Type: {chunk_type}\n### Transcript Text:\n{text}\n\nExtract the requested pedagogical JSON metadata."
         
-        try:
-            self.rate_limiter.wait()
-            response = self.client.responses.create(
-                model=self.tier2_model,
-                instructions=TIER_2_SYSTEM_PROMPT,
-                input=user_prompt
-            )
+        self.rate_limiter.wait()
+        response = self.client.responses.create(
+            model=self.tier2_model,
+            instructions=TIER_2_SYSTEM_PROMPT,
+            input=user_prompt
+        )
+        
+        content = response.output_text
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:-3].strip()
+        elif content.startswith("```"):
+            content = content[3:-3].strip()
             
-            content = response.output_text
-            content = content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-                
-            result = json.loads(content)
-            if hasattr(response, 'usage') and response.usage:
-                result["_usage_stats"] = {
-                    "model": response.model,
-                    "prompt_tokens": response.usage.input_tokens,
-                    "completion_tokens": response.usage.output_tokens
-                }
-            return result
-            
-        except Exception as e:
-            logger.error(f"Tier 2 Extraction failed: {e}")
-            return {
-                "takeaways": [],
-                "evasion_analysis": None,
-                "misconceptions": []
+        result = json.loads(content)
+        if hasattr(response, 'usage') and response.usage:
+            result["_usage_stats"] = {
+                "model": response.model,
+                "prompt_tokens": response.usage.input_tokens,
+                "completion_tokens": response.usage.output_tokens
             }
+        return result
 
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60), 
@@ -243,36 +224,25 @@ class AgenticExtractor:
         """
         user_prompt = f"### Aggregated Output from All Chunks:\n{aggregated_text}\n\nProduce the final pedagogical strategic synthesis."
         
-        try:
-            self.rate_limiter.wait()
-            response = self.client.responses.create(
-                model=self.tier2_model,  # Use the reasoning model for synthesis
-                instructions=TIER_3_SYNTHESIS_PROMPT,
-                input=user_prompt
-            )
+        self.rate_limiter.wait()
+        response = self.client.responses.create(
+            model=self.tier2_model,  # Use the reasoning model for synthesis
+            instructions=TIER_3_SYNTHESIS_PROMPT,
+            input=user_prompt
+        )
+        
+        content = response.output_text
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:-3].strip()
+        elif content.startswith("```"):
+            content = content[3:-3].strip()
             
-            content = response.output_text
-            content = content.strip()
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-                
-            result = json.loads(content)
-            if hasattr(response, 'usage') and response.usage:
-                result["_usage_stats"] = {
-                    "model": response.model,
-                    "prompt_tokens": response.usage.input_tokens,
-                    "completion_tokens": response.usage.output_tokens
-                }
-            return result
-            
-        except Exception as e:
-            logger.error(f"Synthesis Extraction failed: {e}")
-            return {
-                "overall_sentiment": "Synthesis failed.",
-                "executive_tone": "Synthesis failed.",
-                "key_themes": [],
-                "strategic_shifts": "Synthesis failed.",
-                "analyst_sentiment": "Synthesis failed."
+        result = json.loads(content)
+        if hasattr(response, 'usage') and response.usage:
+            result["_usage_stats"] = {
+                "model": response.model,
+                "prompt_tokens": response.usage.input_tokens,
+                "completion_tokens": response.usage.output_tokens
             }
+        return result

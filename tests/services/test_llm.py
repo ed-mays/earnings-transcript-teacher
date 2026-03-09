@@ -2,6 +2,7 @@ import pytest
 import json
 from unittest.mock import MagicMock
 from services.llm import stream_chat, AgenticExtractor
+from tenacity import RetryError
 
 def test_stream_chat_success(mocker, monkeypatch):
     monkeypatch.setenv("PERPLEXITY_API_KEY", "fake_key")
@@ -56,16 +57,20 @@ def test_agentic_extractor_tier1(mocker, monkeypatch):
 def test_agentic_extractor_tier2_failure(mocker, monkeypatch):
     monkeypatch.setenv("PERPLEXITY_API_KEY", "fake_key")
     
+    # Mock tenacity sleep to run instantly
+    mocker.patch("tenacity.BaseRetrying.sleep", return_value=None)
+    
     mock_perplexity = mocker.patch("services.llm.Perplexity")
     mock_instance = MagicMock()
     mock_perplexity.return_value = mock_instance
     
-    # Simulate an API error
+    # Simulate an API error repeatedly
     mock_instance.responses.create.side_effect = Exception("API Timeout")
     
     extractor = AgenticExtractor()
-    result = extractor.extract_tier2("Some text", "qa")
     
-    # Should safely handle the error and return default empty structure
-    assert result["takeaways"] == []
-    assert result["evasion_analysis"] is None
+    # After 5 retries, tenacity should raise a RetryError containing the original exception
+    with pytest.raises(RetryError) as exc_info:
+        extractor.extract_tier2("Some text", "qa")
+        
+    assert "API Timeout" in str(exc_info.value)
