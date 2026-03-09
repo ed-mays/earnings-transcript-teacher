@@ -160,3 +160,59 @@ CREATE TABLE concept_exercises (
     revised_explanation TEXT,
     confidence          TEXT CHECK (confidence IN ('low', 'medium', 'high'))
 );
+
+-- ============================================================
+-- Agentic Pipeline Outputs
+-- ============================================================
+
+CREATE TABLE transcript_chunks (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id          UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id         TEXT NOT NULL,
+    chunk_type       TEXT NOT NULL,
+    sequence_order   INTEGER NOT NULL,
+    tier1_score      INTEGER,
+    needs_deep_analysis BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE extracted_terms (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id    UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id   TEXT NOT NULL,
+    term       TEXT NOT NULL,
+    definition TEXT NOT NULL
+);
+
+CREATE TABLE core_concepts (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id    UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id   TEXT NOT NULL,
+    concept    TEXT NOT NULL
+);
+
+CREATE TABLE extracted_takeaways (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id          UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id         TEXT NOT NULL,
+    takeaway         TEXT NOT NULL,
+    why_it_matters   TEXT NOT NULL
+);
+
+CREATE TABLE evasion_analysis (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id             UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id            TEXT NOT NULL,
+    analyst_concern     TEXT NOT NULL,
+    defensiveness_score INTEGER NOT NULL,
+    evasion_explanation TEXT NOT NULL
+);
+
+CREATE TABLE misconceptions (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id           UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    chunk_id          TEXT NOT NULL,
+    fact              TEXT NOT NULL,
+    misinterpretation TEXT NOT NULL,
+    correction        TEXT NOT NULL
+);
+

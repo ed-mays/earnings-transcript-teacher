@@ -199,7 +199,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
                 answer_span_ids=a_ids,
             ))
 
-    return CallAnalysis(
+    analysis = CallAnalysis(
         call=call,
         speakers=speakers,
         spans=span_records,
@@ -208,6 +208,20 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
         takeaways=takeaway_spans,
         qa_pairs=qa_pairs,
     )
+
+    # -----------------------------------------------------------------------
+    # Agentic Ingestion (Optional Enhancement)
+    # -----------------------------------------------------------------------
+    try:
+        from ingestion.pipeline import IngestionPipeline
+        pipeline = IngestionPipeline()
+        chunks = pipeline.process(analysis)
+        analysis.chunks = chunks
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Agentic pipeline failed or skipped: {e}")
+
+    return analysis
 
 
 # ---------------------------------------------------------------------------

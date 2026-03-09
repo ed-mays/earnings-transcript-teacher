@@ -353,6 +353,83 @@ def save_analysis(conn_str: str, result: CallAnalysis) -> None:
                     )
                 )
 
+            # 7. Insert Agentic Pipeline Outputs (Transcript Chunks and Entities)
+            for chunk in getattr(result, "chunks", []):
+                cur.execute(
+                    """
+                    INSERT INTO transcript_chunks (
+                        call_id, chunk_id, chunk_type, sequence_order, tier1_score, needs_deep_analysis
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        str(call.id),
+                        chunk.chunk_id,
+                        chunk.chunk_type,
+                        chunk.sequence_order,
+                        getattr(chunk, "tier1_score", None),
+                        getattr(chunk, "requires_deep_analysis", False)
+                    )
+                )
+
+                # Tier 1: Extracted Terms
+                for term_data in getattr(chunk, "extracted_terms", []):
+                    cur.execute(
+                        """
+                        INSERT INTO extracted_terms (call_id, chunk_id, term, definition)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (str(call.id), chunk.chunk_id, term_data.get("term", ""), term_data.get("definition", ""))
+                    )
+
+                # Tier 1: Core Concepts
+                for concept in getattr(chunk, "core_concepts", []):
+                    cur.execute(
+                        """
+                        INSERT INTO core_concepts (call_id, chunk_id, concept)
+                        VALUES (%s, %s, %s)
+                        """,
+                        (str(call.id), chunk.chunk_id, concept)
+                    )
+
+                # Tier 2: Takeaways
+                for takeaway_data in getattr(chunk, "takeaways", []):
+                    cur.execute(
+                        """
+                        INSERT INTO extracted_takeaways (call_id, chunk_id, takeaway, why_it_matters)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (str(call.id), chunk.chunk_id, takeaway_data.get("takeaway", ""), takeaway_data.get("why_it_matters", ""))
+                    )
+
+                # Tier 2: Evasion Analysis
+                evasion = getattr(chunk, "evasion_analysis", None)
+                if evasion:
+                    cur.execute(
+                        """
+                        INSERT INTO evasion_analysis (
+                            call_id, chunk_id, analyst_concern, defensiveness_score, evasion_explanation
+                        ) VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (
+                            str(call.id),
+                            chunk.chunk_id,
+                            evasion.get("analyst_concern", ""),
+                            evasion.get("defensiveness_score", 0),
+                            evasion.get("evasion_explanation", "")
+                        )
+                    )
+
+                # Tier 2: Misconceptions
+                for gotcha in getattr(chunk, "misconceptions", []):
+                    cur.execute(
+                        """
+                        INSERT INTO misconceptions (
+                            call_id, chunk_id, fact, misinterpretation, correction
+                        ) VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (str(call.id), chunk.chunk_id, gotcha.get("fact", ""), gotcha.get("misinterpretation", ""), gotcha.get("correction", ""))
+                    )
+
         # Commit the transaction explicitly.
         conn.commit()
 

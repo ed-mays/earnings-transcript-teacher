@@ -5,20 +5,13 @@ but can be easily adapted to Anthropic, base OpenAI, or local models.
 """
 
 import os
-from openai import OpenAI
+import json
+import logging
+from perplexity import Perplexity
 
-
-def get_llm_client() -> OpenAI | None:
-    """Initialize the OpenAI-compatible client pointing to Perplexity."""
-    api_key = os.environ.get("PERPLEXITY_API_KEY")
-    if not api_key:
-        return None
-        
-    # The Perplexity API is fully compatible with OpenAI's SDK spec
-    return OpenAI(
-        api_key=api_key,
-        base_url="https://api.perplexity.ai"
-    )
+def get_api_key() -> str | None:
+    """Retrieve the Perplexity API key."""
+    return os.environ.get("PERPLEXITY_API_KEY")
 
 
 def stream_chat(
@@ -36,20 +29,26 @@ def stream_chat(
     Yields:
         String chunks of the assistant's response as they stream in.
     """
-    client = get_llm_client()
-    if not client:
+    api_key = get_api_key()
+    if not api_key:
         raise ValueError("PERPLEXITY_API_KEY environment variable is missing.")
         
-    # Prepend the system prompt exactly once at the top of the context window
-    api_messages = [{"role": "system", "content": system_prompt}] + messages
+    client = Perplexity(api_key=api_key)
     
-    response = client.chat.completions.create(
-        model=model,
-        messages=api_messages,
-        stream=True
-    )
-    
-    for chunk in response:
-        content = chunk.choices[0].delta.content
-        if content:
-            yield content
+    try:
+        response_stream = client.responses.create(
+            model=model,
+            instructions=system_prompt,
+            input=messages,
+            stream=True
+        )
+        
+        for chunk in response_stream:
+            # ResponseStreamChunk is a pydantic union.
+            chunk_dict = chunk.model_dump()
+            if chunk_dict.get("type") == "response.output_text.delta":
+                delta_text = chunk_dict.get("delta", "")
+                if delta_text:
+                    yield delta_text
+    except Exception as e:
+        yield f"\n[Error connecting to Perplexity API: {e}]"

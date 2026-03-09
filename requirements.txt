@@ -2,4 +2,4 @@ scikit-learn>=1.4
 psycopg[binary]>=3.1.18
 voyageai
 pgvector
-openai>=1.0
+requests>=2.0

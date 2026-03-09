@@ -13,6 +13,11 @@ from uuid import UUID, uuid4
 
 from transcript.sections import SpeakerProfile
 
+# Local import to avoid circular dependency loop for now or we can use Any, 
+# but usually it's better to just structure these carefully.
+# For simplicity, we can do:
+from typing import Any
+
 
 # ---------------------------------------------------------------------------
 # Core records
@@ -108,3 +113,6 @@ class CallAnalysis:
     topics: list[TopicRecord]
     takeaways: list[SpanRecord]     # subset of spans with textrank_score set
     qa_pairs: list[QAPairRecord]
+    
+    # NEW Agentic Ingestion Outputs
+    chunks: list[Any] = field(default_factory=list) # List of TranscriptChunk
