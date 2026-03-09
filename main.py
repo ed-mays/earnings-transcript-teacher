@@ -24,7 +24,15 @@ import os
 import subprocess
 
 try:
-    from db.persistence import fetch_existing_embeddings, get_all_calls, search_spans, get_topics_for_ticker, get_takeaways_for_ticker, get_keywords_for_ticker
+    from db.persistence import (
+        fetch_existing_embeddings,
+        get_all_calls,
+        search_spans,
+        get_topics_for_ticker,
+        get_takeaways_for_ticker,
+        get_keywords_for_ticker,
+        get_extracted_terms_for_ticker,
+    )
 except ImportError:
     # If psycopg isn't installed or db module fails, stub it
     def fetch_existing_embeddings(conn_str, ticker, quarter):
@@ -38,6 +46,8 @@ except ImportError:
     def get_takeaways_for_ticker(conn_str, ticker, limit=3):
         return []
     def get_keywords_for_ticker(conn_str, ticker, limit=15):
+        return []
+    def get_extracted_terms_for_ticker(conn_str, ticker, limit=15):
         return []
 
 try:
@@ -302,11 +312,12 @@ def interactive_menu() -> None:
         print("\nMain Menu:")
         print("1. Download & Ingest a new transcript")
         print("2. List transcripts in Database")
-        print("3. Start a Feynman learning session")
-        print("4. View saved transcript details (Themes/Takeaways)")
-        print("5. Exit")
+        print("3. Interactive Q&A (Open Exploration)")
+        print("4. Start a Feynman learning session")
+        print("5. View saved transcript details (Themes/Takeaways)")
+        print("6. Exit")
         
-        choice = input("\nEnter your choice (1-5): ").strip()
+        choice = input("\nEnter your choice (1-6): ").strip()
         
         if choice == "1":
             ticker = input("Enter the ticker symbol (e.g. MSFT): ").strip().upper()
@@ -340,7 +351,7 @@ def interactive_menu() -> None:
                 for ticker, quarter in calls:
                     print(f"  - {ticker} ({quarter})")
                     
-        elif choice == "3":
+        elif choice == "4":
             ticker = input("Enter the ticker symbol to study: ").strip().upper()
             if ticker:
                 calls = get_all_calls(conn_str)
@@ -358,93 +369,102 @@ def interactive_menu() -> None:
                         topics = get_topics_for_ticker(conn_str, ticker)
                         takeaways = get_takeaways_for_ticker(conn_str, ticker)
                         
-                        if topics:
-                            print(f"\nSince you are a beginner, here are some key themes discussed in the {ticker} transcript:")
-                            for idx, t in enumerate(topics, 1):
-                                print(f"  {idx}. {', '.join(t)}")
-                                
-                        if takeaways:
-                            print("\nAnalyzing key takeaways and their significance based on the transcript...")
+                        while True:
+                            print("\n--- Beginner Learning Options ---")
+                            print("1. Explore vocabulary and jargon")
+                            print("2. Analyze key takeaways")
+                            print("3. Continue to Feynman learning loop (Select a specific topic)")
                             
-                            takeaway_embs = get_embeddings(takeaways)
-                            context_spans = []
-                            if takeaway_embs:
-                                for emb in takeaway_embs:
-                                    if emb:
-                                        # Get top 2 spans per takeaway to build a comprehensive context
-                                        spans = search_spans(conn_str, ticker, emb, top_k=2)
-                                        context_spans.extend(spans)
+                            sub_choice = input("\nEnter your choice (1-3): ").strip()
                             
-                            # Deduplicate spans while preserving order if possible
-                            seen_spans = set()
-                            unique_context = []
-                            for span in context_spans:
-                                if span not in seen_spans:
-                                    unique_context.append(span)
-                                    seen_spans.add(span)
-                            
-                            context_str = "\n".join(f"- {span}" for span in unique_context)
-                            takeaways_str = "\n".join(f"- {t}" for t in takeaways)
-                            
-                            user_input = f"Here are the key takeaways:\n{takeaways_str}\n\n<transcript_context>\n{context_str}\n</transcript_context>\n\nPlease explain why these takeaways are significant."
-                            
-                            try:
-                                with open("prompts/feynman/00_beginner_takeaways.md", "r") as f:
-                                    sys_prompt = f.read()
-                            except FileNotFoundError:
-                                sys_prompt = "You are a helpful expert. Explain why the following key takeaways are significant based on the provided transcript context."
+                            if sub_choice == "1":
+                                jargon_terms = get_extracted_terms_for_ticker(conn_str, ticker, limit=10)
+                                if not jargon_terms:
+                                    raw_keywords = get_keywords_for_ticker(conn_str, ticker, limit=10)
+                                    jargon_terms = [(k, "A frequently used keyword in this call.") for k in raw_keywords]
+                                    
+                                if jargon_terms:
+                                    print("\nExtracting key financial jargon for beginners...")
+                                    terms_str = "\n".join(f"- {term}: {definition}" for term, definition in jargon_terms)
+                                    user_input = f"Here is a list of financial jargon and terms from the transcript:\n{terms_str}\n\nPlease explain the most important ones simply to a beginner."
+                                    
+                                    try:
+                                        with open("prompts/feynman/00_beginner_jargon.md", "r") as f:
+                                            sys_prompt = f.read()
+                                    except FileNotFoundError:
+                                        sys_prompt = "You are a friendly mentor explaining financial jargon simply to a beginner. Explain these terms."
+                                        
+                                    print("\nTeacher: ", end="", flush=True)
+                                    try:
+                                        usage_stats = None
+                                        for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
+                                            if isinstance(chunk, dict):
+                                                usage_stats = chunk
+                                                continue
+                                            print(chunk, end="", flush=True)
+                                        
+                                        if usage_stats:
+                                            print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
+                                    except Exception as e:
+                                        print(f"[Error: {e}]", end="")
+                                    print("\n")
+                                else:
+                                    print("\nNo jargon found for this transcript.")
+                            elif sub_choice == "2":
+                                if takeaways:
+                                    print("\nAnalyzing key takeaways and their significance based on the transcript...")
+                                    
+                                    takeaway_embs = get_embeddings(takeaways)
+                                    context_spans = []
+                                    if takeaway_embs:
+                                        for emb in takeaway_embs:
+                                            if emb:
+                                                spans = search_spans(conn_str, ticker, emb, top_k=2)
+                                                context_spans.extend(spans)
+                                    
+                                    seen_spans = set()
+                                    unique_context = []
+                                    for span in context_spans:
+                                        if span not in seen_spans:
+                                            unique_context.append(span)
+                                            seen_spans.add(span)
+                                    
+                                    context_str = "\n".join(f"- {span}" for span in unique_context)
+                                    takeaways_str = "\n".join(f"- {t}" for t in takeaways)
+                                    
+                                    user_input = f"Here are the key takeaways:\n{takeaways_str}\n\n<transcript_context>\n{context_str}\n</transcript_context>\n\nPlease explain why these takeaways are significant."
+                                    
+                                    try:
+                                        with open("prompts/feynman/00_beginner_takeaways.md", "r") as f:
+                                            sys_prompt = f.read()
+                                    except FileNotFoundError:
+                                        sys_prompt = "You are a helpful expert. Explain why the following key takeaways are significant based on the provided transcript context."
 
-                            print("\nTeacher: ", end="", flush=True)
-                            try:
-                                usage_stats = None
-                                for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
-                                    if isinstance(chunk, dict):
-                                        usage_stats = chunk
-                                        continue
-                                    print(chunk, end="", flush=True)
-                                
-                                if usage_stats:
-                                    print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
-                            except Exception as e:
-                                print(f"[Error: {e}]", end="")
-                            print("\n")
-                                
-                        # Jargon Extraction block
-                        from db.persistence import get_extracted_terms_for_ticker
-                        jargon_terms = get_extracted_terms_for_ticker(conn_str, ticker, limit=10)
-                        
-                        if not jargon_terms:
-                            # Fallback to tf-idf keywords if agentic pipeline wasn't run
-                            raw_keywords = get_keywords_for_ticker(conn_str, ticker, limit=10)
-                            jargon_terms = [(k, "A frequently used keyword in this call.") for k in raw_keywords]
-                            
-                        if jargon_terms:
-                            print("\nExtracting key financial jargon for beginners...")
-                            terms_str = "\n".join(f"- {term}: {definition}" for term, definition in jargon_terms)
-                            user_input = f"Here is a list of financial jargon and terms from the transcript:\n{terms_str}\n\nPlease explain the most important ones simply to a beginner."
-                            
-                            try:
-                                with open("prompts/feynman/00_beginner_jargon.md", "r") as f:
-                                    sys_prompt = f.read()
-                            except FileNotFoundError:
-                                sys_prompt = "You are a friendly mentor explaining financial jargon simply to a beginner. Explain these terms."
-                                
-                            print("\nTeacher: ", end="", flush=True)
-                            try:
-                                usage_stats = None
-                                for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
-                                    if isinstance(chunk, dict):
-                                        usage_stats = chunk
-                                        continue
-                                    print(chunk, end="", flush=True)
-                                
-                                if usage_stats:
-                                    print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
-                            except Exception as e:
-                                print(f"[Error: {e}]", end="")
-                            print("\n")
-                                
-                        topic = input("\nBased on these, would you like to explore any of these terms, or what specific topic would you like to master? ").strip()
+                                    print("\nTeacher: ", end="", flush=True)
+                                    try:
+                                        usage_stats = None
+                                        for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
+                                            if isinstance(chunk, dict):
+                                                usage_stats = chunk
+                                                continue
+                                            print(chunk, end="", flush=True)
+                                        
+                                        if usage_stats:
+                                            print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
+                                    except Exception as e:
+                                        print(f"[Error: {e}]", end="")
+                                    print("\n")
+                                else:
+                                    print("\nNo takeaways found for this transcript.")
+                            elif sub_choice == "3":
+                                if topics:
+                                    print(f"\nHere are some key themes discussed in the {ticker} transcript:")
+                                    for idx, t in enumerate(topics, 1):
+                                        print(f"  {idx}. {', '.join(t)}")
+                                topic = input("\nWhat specific topic would you like to master? ").strip()
+                                break
+                            else:
+                                print("\nInvalid choice. Please enter 1, 2, or 3.")
                     else:
                         topic = input("\nWhat topic from the transcript would you like to master? ").strip()
                         
@@ -538,7 +558,7 @@ def interactive_menu() -> None:
                             print("\n[System] Feynman Session Complete!")
                             break
                         
-        elif choice == "4":
+        elif choice == "5":
             ticker = input("Enter the ticker symbol to view: ").strip().upper()
             if ticker:
                 calls = get_all_calls(conn_str)
@@ -575,12 +595,107 @@ def interactive_menu() -> None:
                     if not any([topics, takeaways, keywords]):
                         print("\nNo detailed analysis found for this transcript.")
                         
-        elif choice == "5":
+        elif choice == "3":
+            ticker = input("Enter the ticker symbol to study: ").strip().upper()
+            if ticker:
+                calls = get_all_calls(conn_str)
+                saved_tickers = [c[0] for c in calls]
+                
+                if ticker not in saved_tickers:
+                    print(f"\nTranscript for {ticker} not found in the database.")
+                    print("Please use Option 1 to download and ingest it first.")
+                else:
+                    print(f"\nStarting Interactive Q&A on {ticker}...")
+                    
+                    # Generate some suggested questions
+                    topics = get_topics_for_ticker(conn_str, ticker, limit=2)
+                    takeaways = get_takeaways_for_ticker(conn_str, ticker, limit=2)
+                    
+                    suggestions = []
+                    if takeaways:
+                        suggestions.append(f"Can you explain why '{takeaways[0][:50]}...' is a key takeaway?")
+                        if len(takeaways) > 1:
+                            suggestions.append(f"What does the transcript say regarding '{takeaways[1][:50]}...'?")
+                    if topics:
+                        top_theme = ", ".join(topics[0][:3])
+                        suggestions.append(f"Can you summarize the discussion around '{top_theme}'?")
+                        
+                    suggestions.append("What financial jargon is used in this transcript?")
+                        
+                    if suggestions:
+                        print("\nHere are a few suggested questions to explore:")
+                        for idx, s in enumerate(suggestions, 1):
+                            print(f"  {idx}. {s}")
+                            
+                    try:
+                        with open("prompts/feynman/00_general_qa.md", "r") as f:
+                            system_prompt = f.read()
+                    except FileNotFoundError:
+                        system_prompt = "You are a helpful expert answering questions using the transcript context."
+                        
+                    messages = []
+                    print("\nType your questions below. Type 'exit' to return to the main menu.")
+                    
+                    while True:
+                        user_input = input("\nYou: ").strip()
+                        if user_input.lower() in ["exit", "quit"]:
+                            print("\nEnding session.")
+                            break
+                        if not user_input:
+                            continue
+                            
+                        # 1. RAG Retrieve
+                        query_embs = get_embeddings([user_input])
+                        context_spans = []
+                        if query_embs and query_embs[0]:
+                            context_spans = search_spans(conn_str, ticker, query_embs[0], top_k=4)
+                            
+                        # If user asks about jargon/vocabulary, explicitly inject it
+                        lower_input = user_input.lower()
+                        if any(w in lower_input for w in ["jargon", "vocabulary", "terms"]):
+                            jargon = get_extracted_terms_for_ticker(conn_str, ticker, limit=10)
+                            if jargon:
+                                jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {term}: {definition}" for term, definition in jargon])
+                                context_spans.append(jargon_str)
+                            
+                        # 2. Inject Context (Ephemeral)
+                        api_messages = list(messages)
+                        augmented_input = user_input
+                        if context_spans:
+                            context_str = "\n".join(f"- {span}" for span in context_spans)
+                            augmented_input = f"{user_input}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
+                            
+                        api_messages.append({"role": "user", "content": augmented_input})
+                        messages.append({"role": "user", "content": user_input})
+                        
+                        # 3. Stream Response
+                        print("\nTeacher: ", end="", flush=True)
+                        assistant_response = ""
+                        usage_stats = None
+                        try:
+                            for chunk in stream_chat(api_messages, system_prompt):
+                                if isinstance(chunk, dict):
+                                    usage_stats = chunk
+                                    continue
+                                    
+                                print(chunk, end="", flush=True)
+                                assistant_response += chunk
+                                
+                            if usage_stats:
+                                print(f"\n\n[Stats | Model: {usage_stats.get('model', 'Unknown')} | Input Tokens: {usage_stats.get('usage', {}).get('prompt_tokens', 0)} | Output Tokens: {usage_stats.get('usage', {}).get('completion_tokens', 0)}]")
+                        except Exception as e:
+                            print(f"[Error: {e}]", end="")
+                        print()
+                        
+                        # Add the raw response to history
+                        messages.append({"role": "assistant", "content": assistant_response})
+                        
+        elif choice == "6":
             print("\nGoodbye!")
             break
             
         else:
-            print("\nInvalid choice. Please enter a number between 1 and 5.")
+            print("\nInvalid choice. Please enter a number between 1 and 6.")
 
 
 # ---------------------------------------------------------------------------
