@@ -344,15 +344,48 @@ def interactive_menu() -> None:
                         topics = get_topics_for_ticker(conn_str, ticker)
                         takeaways = get_takeaways_for_ticker(conn_str, ticker)
                         
-                        if topics or takeaways:
+                        if topics:
                             print(f"\nSince you are a beginner, here are some key themes discussed in the {ticker} transcript:")
                             for idx, t in enumerate(topics, 1):
                                 print(f"  {idx}. {', '.join(t)}")
                                 
-                            print("\nAnd here are a few key takeaways you might want to explore:")
-                            for text in takeaways:
-                                preview = text[:150] + "..." if len(text) > 150 else text
-                                print(f"  - {preview}")
+                        if takeaways:
+                            print("\nAnalyzing key takeaways and their significance based on the transcript...")
+                            
+                            takeaway_embs = get_embeddings(takeaways)
+                            context_spans = []
+                            for emb in takeaway_embs:
+                                if emb:
+                                    # Get top 2 spans per takeaway to build a comprehensive context
+                                    spans = search_spans(conn_str, ticker, emb, top_k=2)
+                                    context_spans.extend(spans)
+                            
+                            # Deduplicate spans while preserving order if possible
+                            seen_spans = set()
+                            unique_context = []
+                            for span in context_spans:
+                                if span not in seen_spans:
+                                    unique_context.append(span)
+                                    seen_spans.add(span)
+                            
+                            context_str = "\n".join(f"- {span}" for span in unique_context)
+                            takeaways_str = "\n".join(f"- {t}" for t in takeaways)
+                            
+                            user_input = f"Here are the key takeaways:\n{takeaways_str}\n\n<transcript_context>\n{context_str}\n</transcript_context>\n\nPlease explain why these takeaways are significant."
+                            
+                            try:
+                                with open("prompts/feynman/00_beginner_takeaways.md", "r") as f:
+                                    sys_prompt = f.read()
+                            except FileNotFoundError:
+                                sys_prompt = "You are a helpful expert. Explain why the following key takeaways are significant based on the provided transcript context."
+
+                            print("\nTeacher: ", end="", flush=True)
+                            try:
+                                for chunk in stream_chat([{"role": "user", "content": user_input}], sys_prompt):
+                                    print(chunk, end="", flush=True)
+                            except Exception as e:
+                                print(f"[Error: {e}]", end="")
+                            print("\n")
                                 
                         topic = input("\nBased on these, what specific topic would you like to master? ").strip()
                     else:
