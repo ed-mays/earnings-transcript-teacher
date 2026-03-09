@@ -3,7 +3,7 @@ import streamlit as st
 
 from db.persistence import (
     get_all_calls,
-    get_topics_for_ticker,
+    get_themes_for_ticker,
     get_takeaways_for_ticker,
     get_keywords_for_ticker,
     get_extracted_terms_for_ticker,
@@ -42,7 +42,7 @@ def load_transcripts():
 @st.cache_data
 def load_metadata(ticker):
     """Fetch metadata for a given transcript."""
-    topics = get_topics_for_ticker(CONN_STR, ticker)
+    themes = get_themes_for_ticker(CONN_STR, ticker)
     takeaways = get_takeaways_for_ticker(CONN_STR, ticker)
     keywords = get_keywords_for_ticker(CONN_STR, ticker)
     terms = get_extracted_terms_for_ticker(CONN_STR, ticker, limit=10)
@@ -55,7 +55,7 @@ def load_metadata(ticker):
             unique_keywords.append(kw)
             seen.add(kw.lower())
             
-    return topics, takeaways, unique_keywords, terms
+    return themes, takeaways, unique_keywords, terms
 
 def reset_chat():
     """Clear the chat history."""
@@ -95,7 +95,7 @@ with st.sidebar:
 # ------------- Main App -------------
 
 # Load data for the active transcript
-topics, takeaways, keywords, jargon = load_metadata(st.session_state.active_ticker)
+themes, takeaways, keywords, jargon = load_metadata(st.session_state.active_ticker)
 
 # Layout: 35% left column (Metadata), 65% right column (Chat)
 left_col, right_col = st.columns([3.5, 6.5])
@@ -122,9 +122,9 @@ with left_col:
             st.info("No key takeaways extracted.")
             
     with st.expander("🧩 Extracted Themes", expanded=True):
-        if topics:
-            for idx, t in enumerate(topics, 1):
-                st.markdown(f"**Theme {idx}:** {', '.join(t)}")
+        if themes:
+            for idx, t in enumerate(themes, 1):
+                st.markdown(f"**Theme {idx}:** {t}")
         else:
             st.info("No themes extracted.")
 

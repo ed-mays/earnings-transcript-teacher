@@ -38,9 +38,10 @@ def display(result: CallAnalysis) -> None:
     for kw in result.keywords:
         print(f"  {kw.score:.4f}  {kw.term}")
 
-    print("\nTheme Extraction (NMF)")
-    for topic in result.topics:
-        print(f"  Topic {topic.label + 1}: {', '.join(topic.terms)}")
+    print("\nTheme Extraction (Agentic)")
+    themes = getattr(result.synthesis, "key_themes", []) if getattr(result, "synthesis", None) else []
+    for i, t in enumerate(themes, 1):
+        print(f"  Theme {i}: {t}")
 
     print("\nKey Takeaways (Agentic)")
     agentic_takeaways = []

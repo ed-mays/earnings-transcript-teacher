@@ -103,6 +103,28 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch topics: {e}")
         return topics
 
+    def get_themes_for_ticker(self, ticker: str) -> list[str]:
+        themes = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT cs.key_themes
+                        FROM call_synthesis cs
+                        JOIN calls c ON cs.call_id = c.id
+                        WHERE c.ticker = %s
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        # key_themes is a TEXT[] array in postgres, psycopg maps it to a py list
+                        themes = row[0]
+        except Exception as e:
+            logger.warning(f"Could not fetch themes: {e}")
+        return themes
+
     def get_takeaways_for_ticker(self, ticker: str, limit: int = 5) -> list[tuple[str, str]]:
         takeaways = []
         try:

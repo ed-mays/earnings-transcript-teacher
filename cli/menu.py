@@ -5,7 +5,7 @@ import subprocess
 from db.persistence import (
     save_analysis,
     get_all_calls,
-    get_topics_for_ticker,
+    get_themes_for_ticker,
     get_takeaways_for_ticker,
     get_keywords_for_ticker,
     get_extracted_terms_for_ticker,
@@ -80,7 +80,7 @@ def interactive_menu() -> None:
                     level = input("\nWhat is your current knowledge level? (Beginner/Intermediate/Advanced): ").strip().lower()
                     
                     if level == "beginner":
-                        topics = get_topics_for_ticker(conn_str, ticker)
+                        themes = get_themes_for_ticker(conn_str, ticker)
                         takeaways = get_takeaways_for_ticker(conn_str, ticker)
                         
                         while True:
@@ -171,10 +171,10 @@ def interactive_menu() -> None:
                                 else:
                                     print("\nNo takeaways found for this transcript.")
                             elif sub_choice == "3":
-                                if topics:
+                                if themes:
                                     print(f"\nHere are some key themes discussed in the {ticker} transcript:")
-                                    for idx, t in enumerate(topics, 1):
-                                        print(f"  {idx}. {', '.join(t)}")
+                                    for idx, t in enumerate(themes, 1):
+                                        print(f"  {idx}. {t}")
                                 topic = input("\nWhat specific topic would you like to master? ").strip()
                                 break
                             else:
@@ -282,16 +282,16 @@ def interactive_menu() -> None:
                      print(f"\nTranscript for {ticker} not found in the database.")
                      print("Please use Option 1 to download and ingest it first.")
                 else:
-                    topics = get_topics_for_ticker(conn_str, ticker)
+                    themes = get_themes_for_ticker(conn_str, ticker)
                     takeaways = get_takeaways_for_ticker(conn_str, ticker)
                     keywords = get_keywords_for_ticker(conn_str, ticker)
                     
                     print(f"\n--- Analysis Details for {ticker} ---")
                     
-                    if topics:
-                        print("\nNMF Themes (Topic Clusters):")
-                        for idx, t in enumerate(topics, 1):
-                            print(f"  {idx}. {', '.join(t)}")
+                    if themes:
+                        print("\nAgentic Themes:")
+                        for idx, t in enumerate(themes, 1):
+                            print(f"  {idx}. {t}")
                             
                     if keywords:
                         # De-duplicate keywords by converting to lowercase set but keeping order
@@ -307,7 +307,7 @@ def interactive_menu() -> None:
                             print(f"  - {text}")
                             print(f"    Significance: {why}")
                             
-                    if not any([topics, takeaways, keywords]):
+                    if not any([themes, takeaways, keywords]):
                         print("\nNo detailed analysis found for this transcript.")
                         
         elif choice == "3":
@@ -323,7 +323,7 @@ def interactive_menu() -> None:
                     print(f"\nStarting Interactive Q&A on {ticker}...")
                     
                     # Generate some suggested questions
-                    topics = get_topics_for_ticker(conn_str, ticker, limit=2)
+                    themes = get_themes_for_ticker(conn_str, ticker)
                     takeaways = get_takeaways_for_ticker(conn_str, ticker, limit=2)
                     
                     suggestions = []
@@ -331,9 +331,9 @@ def interactive_menu() -> None:
                         suggestions.append(f"Can you explain why '{takeaways[0][0][:50]}...' is a key takeaway?")
                         if len(takeaways) > 1:
                             suggestions.append(f"What does the transcript say regarding '{takeaways[1][0][:50]}...'?")
-                    if topics:
-                        top_theme = ", ".join(topics[0][:3])
-                        suggestions.append(f"Can you summarize the discussion around '{top_theme}'?")
+                    if themes:
+                        top_theme = themes[0][:50]
+                        suggestions.append(f"Can you summarize the discussion around '{top_theme}...'?")
                         
                     suggestions.append("What financial jargon is used in this transcript?")
                         
