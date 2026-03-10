@@ -345,14 +345,17 @@ class AnalysisRepository:
                 )
             )
             for term_data in getattr(chunk, "extracted_terms", []):
+                term = term_data.get("term")
+                if not term: continue
                 cur.execute(
                     """
                     INSERT INTO extracted_terms (call_id, chunk_id, term, definition)
                     VALUES (%s, %s, %s, %s)
                     """,
-                    (str(call_id), chunk.chunk_id, term_data.get("term", ""), term_data.get("definition", ""))
+                    (str(call_id), chunk.chunk_id, term, term_data.get("definition") or "")
                 )
             for concept in getattr(chunk, "core_concepts", []):
+                if not concept: continue
                 cur.execute(
                     """
                     INSERT INTO core_concepts (call_id, chunk_id, concept)
@@ -361,15 +364,17 @@ class AnalysisRepository:
                     (str(call_id), chunk.chunk_id, concept)
                 )
             for takeaway_data in getattr(chunk, "takeaways", []):
+                takeaway = takeaway_data.get("takeaway")
+                if not takeaway: continue
                 cur.execute(
                     """
                     INSERT INTO extracted_takeaways (call_id, chunk_id, takeaway, why_it_matters)
                     VALUES (%s, %s, %s, %s)
                     """,
-                    (str(call_id), chunk.chunk_id, takeaway_data.get("takeaway", ""), takeaway_data.get("why_it_matters", ""))
+                    (str(call_id), chunk.chunk_id, takeaway, takeaway_data.get("why_it_matters") or "")
                 )
             evasion = getattr(chunk, "evasion_analysis", None)
-            if evasion:
+            if evasion and evasion.get("analyst_concern"):
                 cur.execute(
                     """
                     INSERT INTO evasion_analysis (
@@ -377,16 +382,18 @@ class AnalysisRepository:
                     ) VALUES (%s, %s, %s, %s, %s)
                     """,
                     (
-                        str(call_id), chunk.chunk_id, evasion.get("analyst_concern", ""),
-                        evasion.get("defensiveness_score", 0), evasion.get("evasion_explanation", "")
+                        str(call_id), chunk.chunk_id, evasion.get("analyst_concern"),
+                        evasion.get("defensiveness_score") or 0, evasion.get("evasion_explanation") or ""
                     )
                 )
             for gotcha in getattr(chunk, "misconceptions", []):
+                fact = gotcha.get("fact")
+                if not fact: continue
                 cur.execute(
                     """
                     INSERT INTO misconceptions (
                         call_id, chunk_id, fact, misinterpretation, correction
                     ) VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (str(call_id), chunk.chunk_id, gotcha.get("fact", ""), gotcha.get("misinterpretation", ""), gotcha.get("correction", ""))
+                    (str(call_id), chunk.chunk_id, fact, gotcha.get("misinterpretation") or "", gotcha.get("correction") or "")
                 )
