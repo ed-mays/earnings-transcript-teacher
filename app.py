@@ -7,7 +7,6 @@ from db.persistence import (
     get_takeaways_for_ticker,
     get_keywords_for_ticker,
     get_extracted_terms_for_ticker,
-    get_extracted_terms_for_ticker,
     update_term_definition,
     update_term_explanation,
     search_spans
@@ -299,7 +298,7 @@ with right_col:
                 # Inject jargon if user asked about it
                 if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
                     if jargon:
-                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d in jargon])
+                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in jargon])
                         context_spans.append(jargon_str)
                         
                 # Format final API messages
