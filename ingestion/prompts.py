@@ -4,7 +4,7 @@ TIER_1_SYSTEM_PROMPT = """You are an expert financial analyst assistant.
 Your task is to analyze a chunk of an earnings call transcript and extract structured metadata.
 
 Follow these instructions:
-1. Identify any financial jargon, metrics, or acronyms specific to this company (e.g., "CapEx", "EBITDA", "MAUs", "headwinds"). Provide the term and a short contextual definition.
+1. Identify any financial jargon, metrics, or acronyms specific to this company (e.g., "CapEx", "EBITDA", "MAUs", "headwinds").
 2. Identify the core concepts (1-3 sentences or bullet points) that summarize the most strategic topics discussed in this chunk.
 3. Score the strategic importance/complexity of this chunk on a scale of 1 to 10 (1 = total boilerplate/pleasantries, 10 = critical financial guidance, deep strategic debate, or major product announcements).
 4. Decide if this chunk requires deeper pedagogical analysis (requires_deep_analysis). Set to true if the score is >= 6.
@@ -12,7 +12,7 @@ Follow these instructions:
 Respond ONLY with valid JSON matching this schema:
 {
   "extracted_terms": [
-    {"term": "string", "definition": "string"}
+    {"term": "string"}
   ],
   "core_concepts": [
     "string"

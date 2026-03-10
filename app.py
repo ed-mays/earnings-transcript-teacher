@@ -7,6 +7,9 @@ from db.persistence import (
     get_takeaways_for_ticker,
     get_keywords_for_ticker,
     get_extracted_terms_for_ticker,
+    get_extracted_terms_for_ticker,
+    update_term_definition,
+    update_term_explanation,
     search_spans
 )
 from nlp.embedder import get_embeddings
@@ -40,26 +43,120 @@ def load_transcripts():
     return [c[0] for c in calls] if calls else []
 
 @st.cache_data
+def auto_migrate():
+    """Ensure database schema is up to date."""
+    try:
+        import psycopg
+        with psycopg.connect(CONN_STR) as conn:
+            with conn.cursor() as cur:
+                cur.execute("ALTER TABLE extracted_terms ADD COLUMN IF NOT EXISTS explanation TEXT DEFAULT '';")
+            conn.commit()
+    except Exception as e:
+        print(f"Auto-migrate failed: {e}")
+
+# Run migration once per Streamlit session
+auto_migrate()
+
+@st.cache_data
 def load_metadata(ticker):
     """Fetch metadata for a given transcript."""
-    themes = get_themes_for_ticker(CONN_STR, ticker)
-    takeaways = get_takeaways_for_ticker(CONN_STR, ticker)
-    keywords = get_keywords_for_ticker(CONN_STR, ticker)
-    terms = get_extracted_terms_for_ticker(CONN_STR, ticker, limit=10)
-    
-    # Deduplicate keywords for cleaner display
-    unique_keywords = []
-    seen = set()
-    for kw in keywords:
-        if kw.lower() not in seen:
-            unique_keywords.append(kw)
-            seen.add(kw.lower())
-            
-    return themes, takeaways, unique_keywords, terms
+    try:
+        themes = get_themes_for_ticker(CONN_STR, ticker)
+        takeaways = get_takeaways_for_ticker(CONN_STR, ticker)
+        keywords = get_keywords_for_ticker(CONN_STR, ticker)
+        terms = get_extracted_terms_for_ticker(CONN_STR, ticker, limit=10)
+        
+        # Deduplicate keywords for cleaner display
+        unique_keywords = []
+        seen = set()
+        for kw in keywords:
+            if kw.lower() not in seen:
+                unique_keywords.append(kw)
+                seen.add(kw.lower())
+                
+        return themes, takeaways, unique_keywords, terms
+    except Exception as e:
+        import traceback
+        with open("streamlit_db_error.txt", "w") as f:
+            f.write(traceback.format_exc())
+            f.write(f"\nConn str: {CONN_STR}")
+        raise e
 
 def reset_chat():
     """Clear the chat history."""
     st.session_state.messages = []
+
+def handle_define_click(ticker: str, term: str, current_def: str):
+    if not current_def or not current_def.strip():
+        success = generate_definition(ticker, term)
+        if success:
+            st.session_state[f"show_def_{ticker}_{term}"] = True
+        else:
+            st.session_state[f"show_def_{ticker}_{term}"] = False
+    else:
+        st.session_state[f"show_def_{ticker}_{term}"] = True
+
+def handle_explain_click(ticker: str, term: str, current_exp: str):
+    if not current_exp or not current_exp.strip():
+        success = generate_explanation(ticker, term)
+        if success:
+            st.session_state[f"show_exp_{ticker}_{term}"] = True
+        else:
+            st.session_state[f"show_exp_{ticker}_{term}"] = False
+    else:
+        st.session_state[f"show_exp_{ticker}_{term}"] = True
+
+def generate_definition(ticker: str, term: str) -> bool:
+    """Call the LLM to generate a general dictionary definition, then save it."""
+    with st.spinner(f"Defining {term}..."):
+        try:
+            system_prompt = "You are a precise financial dictionary. Define the provided term generally in 1-2 sentences. Return ONLY the definition text."
+            messages = [{"role": "user", "content": f"Term: {term}"}]
+            
+            definition = ""
+            for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
+                if isinstance(chunk, str):
+                    definition += chunk
+            
+            if definition:
+                update_term_definition(CONN_STR, ticker, term, definition.strip())
+                # Clear cache so next render shows the new definition
+                load_metadata.clear()
+                return True
+            return False
+        except Exception as e:
+            st.error(f"Error defining term: {e}")
+            return False
+
+def generate_explanation(ticker: str, term: str) -> bool:
+    """Call the LLM to generate a contextual explanation using RAG, then save it."""
+    with st.spinner(f"Explaining {term}..."):
+        try:
+            # 1. Retrieve Context (RAG)
+            query_embs = get_embeddings([term])
+            context_spans = []
+            if query_embs and query_embs[0]:
+                context_spans = search_spans(CONN_STR, ticker, query_embs[0], top_k=4)
+                
+            context_str = "\n".join(f"- {span}" for span in context_spans)
+            
+            # 2. Call LLM
+            system_prompt = "You are an expert financial explainer. Explain why the given term is relevant in the context of the provided transcript snippets. Return ONLY the explanation, 1-2 sentences maximum."
+            messages = [{"role": "user", "content": f"Company: {ticker}\nTerm: {term}\n\n<transcript_context>\n{context_str}\n</transcript_context>"}]
+            
+            explanation = ""
+            for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
+                if isinstance(chunk, str):
+                    explanation += chunk
+            
+            if explanation:
+                update_term_explanation(CONN_STR, ticker, term, explanation.strip())
+                load_metadata.clear()
+                return True
+            return False
+        except Exception as e:
+            st.error(f"Error explaining term: {e}")
+            return False
 
 # ------------- Sidebar -------------
 
@@ -105,8 +202,37 @@ with left_col:
     
     with st.expander("📚 Vocabulary & Jargon", expanded=False):
         if jargon:
-            for term, definition in jargon:
-                st.markdown(f"**{term.title()}**: {definition}")
+            for term, definition, explanation in jargon:
+                st.markdown(f"**{term.title()}**")
+                
+                # Place buttons side-by-side below the term
+                btn_col1, btn_col2, _ = st.columns([0.5, 0.5, .1])
+                
+                with btn_col1:
+                    st.button(
+                        "Define", 
+                        key=f"def_btn_{st.session_state.active_ticker}_{term}", 
+                        on_click=handle_define_click, 
+                        args=(st.session_state.active_ticker, term, definition)
+                    )
+                with btn_col2:
+                    st.button(
+                        "Explain",
+                        key=f"exp_btn_{st.session_state.active_ticker}_{term}",
+                        on_click=handle_explain_click,
+                        args=(st.session_state.active_ticker, term, explanation)
+                    )
+                    
+                # Show definitions/explanations only if their show state is True
+                show_def = st.session_state.get(f"show_def_{st.session_state.active_ticker}_{term}", False)
+                show_exp = st.session_state.get(f"show_exp_{st.session_state.active_ticker}_{term}", False)
+                
+                if show_def:
+                    st.markdown(f"📘 **Definition:** {definition if definition else '*(Generating...)*'}")
+                if show_exp:
+                    st.markdown(f"💡 **Context:** {explanation if explanation else '*(Generating...)*'}")
+                    
+                st.divider()
         else:
             st.info("No specific jargon extracted for this transcript.")
             

@@ -180,7 +180,8 @@ CREATE TABLE extracted_terms (
     call_id    UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
     chunk_id   TEXT NOT NULL,
     term       TEXT NOT NULL,
-    definition TEXT NOT NULL
+    definition TEXT NOT NULL,
+    explanation TEXT DEFAULT ''
 );
 
 CREATE TABLE core_concepts (

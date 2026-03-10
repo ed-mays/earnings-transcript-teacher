@@ -35,9 +35,17 @@ def get_keywords_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list
     repo = AnalysisRepository(conn_str)
     return repo.get_keywords_for_ticker(ticker, limit)
 
-def get_extracted_terms_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[tuple[str, str]]:
+def get_extracted_terms_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
     repo = AnalysisRepository(conn_str)
     return repo.get_extracted_terms_for_ticker(ticker, limit)
+
+def update_term_definition(conn_str: str, ticker: str, term: str, definition: str) -> bool:
+    repo = AnalysisRepository(conn_str)
+    return repo.update_term_definition(ticker, term, definition)
+
+def update_term_explanation(conn_str: str, ticker: str, term: str, explanation: str) -> bool:
+    repo = AnalysisRepository(conn_str)
+    return repo.update_term_explanation(ticker, term, explanation)
 
 def save_analysis(conn_str: str, result: CallAnalysis) -> None:
     repo = AnalysisRepository(conn_str)

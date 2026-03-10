@@ -136,7 +136,7 @@ class AnalysisRepository:
                         FROM extracted_takeaways et
                         JOIN calls c ON et.call_id = c.id
                         WHERE c.ticker = %s
-                        ORDER BY c.created_at DESC
+                        ORDER BY c.created_at DESC, et.id ASC
                         LIMIT %s
                         """,
                         (ticker, limit),
@@ -167,18 +167,18 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch keywords: {e}")
         return keywords
 
-    def get_extracted_terms_for_ticker(self, ticker: str, limit: int = 15) -> list[tuple[str, str]]:
+    def get_extracted_terms_for_ticker(self, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
         terms = []
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT et.term, et.definition
+                        SELECT et.term, et.definition, COALESCE(et.explanation, '')
                         FROM extracted_terms et
                         JOIN calls c ON et.call_id = c.id
                         WHERE c.ticker = %s
-                        ORDER BY c.created_at DESC
+                        ORDER BY c.created_at DESC, et.term ASC
                         LIMIT %s
                         """,
                         (ticker, limit),
@@ -187,6 +187,50 @@ class AnalysisRepository:
         except Exception as e:
             logger.warning(f"Could not fetch extracted terms: {e}")
         return terms
+
+    def update_term_definition(self, ticker: str, term: str, definition: str) -> bool:
+        """Update the definition for a specific term belonging to a given ticker."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE extracted_terms
+                        SET definition = %s
+                        FROM calls c
+                        WHERE extracted_terms.call_id = c.id
+                          AND c.ticker = %s
+                          AND extracted_terms.term = %s
+                        """,
+                        (definition, ticker, term)
+                    )
+                    conn.commit()
+                    return cur.rowcount > 0
+        except Exception as e:
+            logger.warning(f"Could not update term definition: {e}")
+            return False
+
+    def update_term_explanation(self, ticker: str, term: str, explanation: str) -> bool:
+        """Update the contextual explanation for a specific term belonging to a given ticker."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE extracted_terms
+                        SET explanation = %s
+                        FROM calls c
+                        WHERE extracted_terms.call_id = c.id
+                          AND c.ticker = %s
+                          AND extracted_terms.term = %s
+                        """,
+                        (explanation, ticker, term)
+                    )
+                    conn.commit()
+                    return cur.rowcount > 0
+        except Exception as e:
+            logger.warning(f"Could not update term explanation: {e}")
+            return False
 
     def save_analysis(self, result: CallAnalysis) -> None:
         with psycopg.connect(self.conn_str) as conn:
@@ -349,10 +393,10 @@ class AnalysisRepository:
                 if not term: continue
                 cur.execute(
                     """
-                    INSERT INTO extracted_terms (call_id, chunk_id, term, definition)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO extracted_terms (call_id, chunk_id, term, definition, explanation)
+                    VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (str(call_id), chunk.chunk_id, term, term_data.get("definition") or "")
+                    (str(call_id), chunk.chunk_id, term, term_data.get("definition") or "", term_data.get("explanation") or "")
                 )
             for concept in getattr(chunk, "core_concepts", []):
                 if not concept: continue
