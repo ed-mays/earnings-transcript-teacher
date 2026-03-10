@@ -28,28 +28,83 @@ class TranscriptChunk(BaseModel):
     evasion_analysis: Optional[Dict[str, Any]] = None
     misconceptions: List[Dict[str, str]] = Field(default_factory=list)
 
-def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000) -> List[TranscriptChunk]:
+from typing import Tuple, Set
+
+def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000, overlap_chars: int = 500) -> List[TranscriptChunk]:
     """
     Convert the deterministic output (spans and qa exchanges) into standard chunks for LLMs.
     
-    Prepared remarks are chunked by length (max_chars).
-    Q&A exchanges are kept intact, with each exchange forming one chunk.
+    Prepared remarks are chunked by length (max_chars) with a sliding window (overlap_chars).
+    Extremely long single spans are split into smaller pieces to avoid exceeding max_chars.
+    Q&A exchanges are kept intact when possible, but will also be chunked if they exceed max_chars.
     """
     chunks = []
+    chunk_idx = 0
     
+    # We split spans into smaller pieces first so that overlap can pick granularly
+    # rather than taking a massive chunk of text.
+    MAX_PIECE_LEN = min(max_chars // 2, 1000)
+
+    def split_span(speaker: str, text: str) -> List[str]:
+        """Splits a single large text block into smaller pieces under MAX_PIECE_LEN."""
+        words = text.split()
+        pieces = []
+        curr = []
+        curr_len = 0
+        prefix = f"{speaker}: "
+        prefix_len = len(prefix)
+        
+        for w in words:
+            word_len = len(w) + 1 # +1 for space
+            if curr_len + word_len + prefix_len > MAX_PIECE_LEN and curr:
+                pieces.append(prefix + " ".join(curr))
+                curr = [w]
+                curr_len = len(w)
+            else:
+                curr.append(w)
+                curr_len += len(w) if not curr_len else word_len
+        if curr:
+            pieces.append(prefix + " ".join(curr))
+        return pieces
+        
+    def add_overlap(current_texts: List[str]) -> Tuple[List[str], Set[str], int]:
+        """Calculates the overlapping portion from the end of current_texts."""
+        overlap_text = []
+        overlap_speakers = set()
+        overlap_chars_count = 0
+        
+        for past_text in reversed(current_texts):
+            if overlap_chars_count + len(past_text) > overlap_chars:
+                if overlap_chars_count == 0:
+                    overlap_text.insert(0, past_text)
+                    speaker_name = past_text.split(":", 1)[0]
+                    overlap_speakers.add(speaker_name)
+                    overlap_chars_count += len(past_text)
+                break
+            
+            overlap_text.insert(0, past_text)
+            speaker_name = past_text.split(":", 1)[0]
+            overlap_speakers.add(speaker_name)
+            overlap_chars_count += len(past_text)
+            
+        new_chars = sum(len(t) for t in overlap_text) + (max(0, len(overlap_text) - 1) * 2)
+        return overlap_text, overlap_speakers, new_chars
+
     # Part 1: Chunking Prepared Remarks
+    prepared_spans = [s for s in analysis.spans if s.section == 'prepared']
+    text_blocks = []
+    
+    for span in prepared_spans:
+        span_pieces = split_span(span.speaker_name, span.text)
+        for piece in span_pieces:
+            text_blocks.append((span.speaker_name, piece))
+
     current_prepared_text = []
     current_prepared_speakers = set()
     current_prepared_chars = 0
-    chunk_idx = 0
     
-    prepared_spans = [s for s in analysis.spans if s.section == 'prepared']
-    
-    for span in prepared_spans:
-        span_text = f"{span.speaker_name}: {span.text}"
-        
-        # If adding this span exceeds max_chars and we already have some text, yield the current chunk.
-        if current_prepared_chars + len(span_text) > max_chars and current_prepared_chars > 0:
+    for speaker, piece in text_blocks:
+        if current_prepared_chars + len(piece) > max_chars and current_prepared_text:
             chunks.append(TranscriptChunk(
                 chunk_id=f"prep_{chunk_idx}",
                 chunk_type="prepared",
@@ -58,13 +113,12 @@ def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000) -
                 sequence_order=chunk_idx
             ))
             chunk_idx += 1
-            current_prepared_text = []
-            current_prepared_speakers = set()
-            current_prepared_chars = 0
             
-        current_prepared_text.append(span_text)
-        current_prepared_speakers.add(span.speaker_name)
-        current_prepared_chars += len(span_text)
+            current_prepared_text, current_prepared_speakers, current_prepared_chars = add_overlap(current_prepared_text)
+
+        current_prepared_text.append(piece)
+        current_prepared_speakers.add(speaker)
+        current_prepared_chars += len(piece) + (2 if len(current_prepared_text) > 1 else 0)
         
     if current_prepared_text:
         chunks.append(TranscriptChunk(
@@ -81,27 +135,68 @@ def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000) -
     
     qa_idx = 0
     for pair in analysis.qa_pairs:
-        speakers = set()
-        
-        # Combine question spans and answer spans in chronological order
         all_ids = pair.question_span_ids + pair.answer_span_ids
         exchange_spans_objs = [span_lookup[sid] for sid in all_ids if sid in span_lookup]
         exchange_spans_objs.sort(key=lambda s: s.sequence_order)
         
         exchange_texts = []
-        for s in exchange_spans_objs:
-            exchange_texts.append(f"{s.speaker_name}: {s.text}")
-            speakers.add(s.speaker_name)
-            
-        chunks.append(TranscriptChunk(
-            chunk_id=f"qa_{qa_idx}",
-            chunk_type="qa",
-            text="\n\n".join(exchange_texts),
-            speakers=list(speakers),
-            sequence_order=chunk_idx + qa_idx
-        ))
-        qa_idx += 1
+        speakers = set()
+        exchange_chars = 0
         
+        for s in exchange_spans_objs:
+            piece_text = f"{s.speaker_name}: {s.text}"
+            exchange_texts.append(piece_text)
+            speakers.add(s.speaker_name)
+            exchange_chars += len(piece_text) + (2 if exchange_texts else 0)
+            
+        if exchange_chars > max_chars:
+            qa_blocks = []
+            for s in exchange_spans_objs:
+                for piece in split_span(s.speaker_name, s.text):
+                    qa_blocks.append((s.speaker_name, piece))
+                    
+            curr_text = []
+            curr_speakers = set()
+            curr_chars = 0
+            sub_idx = 0
+            
+            for speaker, piece in qa_blocks:
+                if curr_chars + len(piece) > max_chars and curr_text:
+                    chunks.append(TranscriptChunk(
+                        chunk_id=f"qa_{qa_idx}_{sub_idx}",
+                        chunk_type="qa",
+                        text="\n\n".join(curr_text),
+                        speakers=list(curr_speakers),
+                        sequence_order=chunk_idx + qa_idx
+                    ))
+                    sub_idx += 1
+                    
+                    curr_text, curr_speakers, curr_chars = add_overlap(curr_text)
+                    
+                curr_text.append(piece)
+                curr_speakers.add(speaker)
+                curr_chars += len(piece) + (2 if curr_text else 0)
+                
+            if curr_text:
+                chunks.append(TranscriptChunk(
+                    chunk_id=f"qa_{qa_idx}_{sub_idx}",
+                    chunk_type="qa",
+                    text="\n\n".join(curr_text),
+                    speakers=list(curr_speakers),
+                    sequence_order=chunk_idx + qa_idx
+                ))
+            qa_idx += 1
+            
+        else:
+            chunks.append(TranscriptChunk(
+                chunk_id=f"qa_{qa_idx}",
+                chunk_type="qa",
+                text="\n\n".join(exchange_texts),
+                speakers=list(speakers),
+                sequence_order=chunk_idx + qa_idx
+            ))
+            qa_idx += 1
+            
     return chunks
 
 class IngestionPipeline:
