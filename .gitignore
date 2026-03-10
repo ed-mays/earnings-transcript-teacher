@@ -46,3 +46,6 @@ htmlcov/
 
 # Transcripts data (local only – fetched at runtime)
 transcripts/
+
+# Local environment variables
+set_env.sh
