@@ -15,8 +15,19 @@ if [ -z "${API_NINJAS_KEY:-}" ]; then
   exit 1
 fi
 
-curl -s -X GET "https://api.api-ninjas.com/v1/earningstranscript?ticker=${TICKER}" \
-  -H "X-Api-Key: ${API_NINJAS_KEY}" \
-  -o "${SCRIPT_DIR}/transcripts/${TICKER}.json"
+mkdir -p "${SCRIPT_DIR}/transcripts"
+OUT_FILE="${SCRIPT_DIR}/transcripts/${TICKER}.json"
 
-echo "Saved to ${SCRIPT_DIR}/transcripts/${TICKER}.json"
+HTTP_STATUS=$(curl -s -o "${OUT_FILE}" -w "%{http_code}" -X GET "https://api.api-ninjas.com/v1/earningstranscript?ticker=${TICKER}" \
+  -H "X-Api-Key: ${API_NINJAS_KEY}")
+
+if [ "$HTTP_STATUS" -ne 200 ]; then
+  echo "Error downloading transcript: HTTP ${HTTP_STATUS}" >&2
+  if [ -s "${OUT_FILE}" ]; then
+    echo "Details: $(cat "${OUT_FILE}")" >&2
+  fi
+  rm -f "${OUT_FILE}"
+  exit 1
+fi
+
+echo "Saved to ${OUT_FILE}"
