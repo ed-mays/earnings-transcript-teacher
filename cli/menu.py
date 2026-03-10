@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import subprocess
 
@@ -15,6 +16,11 @@ from nlp.embedder import get_embeddings
 from services.llm import stream_chat
 from services.orchestrator import analyze
 from cli.display import display
+
+def _validate_ticker(ticker: str) -> bool:
+    """Return True if ticker is 1-5 uppercase alphabetical characters (e.g. AAPL, MSFT)."""
+    return bool(re.match(r'^[A-Z]{1,5}$', ticker))
+
 
 def interactive_menu() -> None:
     """Run the interactive CLI menu loop."""
@@ -36,7 +42,8 @@ def interactive_menu() -> None:
         
         if choice == "1":
             ticker = input("Enter the ticker symbol (e.g. MSFT): ").strip().upper()
-            if not ticker:
+            if not _validate_ticker(ticker):
+                print("Invalid ticker. Please enter 1-5 letters (e.g. MSFT, AAPL).")
                 continue
                 
             print(f"\nDownloading transcript for {ticker}...")
@@ -67,13 +74,15 @@ def interactive_menu() -> None:
                     
         elif choice == "4":
             ticker = input("Enter the ticker symbol to study: ").strip().upper()
-            if ticker:
+            if not _validate_ticker(ticker):
+                print("Invalid ticker. Please enter 1-5 letters (e.g. MSFT, AAPL).")
+            else:
                 calls = get_all_calls(conn_str)
                 saved_tickers = [c[0] for c in calls]
                 
                 if ticker not in saved_tickers:
-                     print(f"\nTranscript for {ticker} not found in the database.")
-                     print("Please use Option 1 to download and ingest it first.")
+                    print(f"\nTranscript for {ticker} not found in the database.")
+                    print("Please use Option 1 to download and ingest it first.")
                 else:
                     print(f"\nStarting Feynman session on {ticker}...")
                     
@@ -274,13 +283,15 @@ def interactive_menu() -> None:
                         
         elif choice == "5":
             ticker = input("Enter the ticker symbol to view: ").strip().upper()
-            if ticker:
+            if not _validate_ticker(ticker):
+                print("Invalid ticker. Please enter 1-5 letters (e.g. MSFT, AAPL).")
+            else:
                 calls = get_all_calls(conn_str)
                 saved_tickers = [c[0] for c in calls]
                 
                 if ticker not in saved_tickers:
-                     print(f"\nTranscript for {ticker} not found in the database.")
-                     print("Please use Option 1 to download and ingest it first.")
+                    print(f"\nTranscript for {ticker} not found in the database.")
+                    print("Please use Option 1 to download and ingest it first.")
                 else:
                     themes = get_themes_for_ticker(conn_str, ticker)
                     takeaways = get_takeaways_for_ticker(conn_str, ticker)
@@ -312,13 +323,15 @@ def interactive_menu() -> None:
                         
         elif choice == "3":
             ticker = input("Enter the ticker symbol to study: ").strip().upper()
-            if ticker:
+            if not _validate_ticker(ticker):
+                print("Invalid ticker. Please enter 1-5 letters (e.g. MSFT, AAPL).")
+            else:
                 calls = get_all_calls(conn_str)
                 saved_tickers = [c[0] for c in calls]
                 
                 if ticker not in saved_tickers:
-                     print(f"\nTranscript for {ticker} not found in the database.")
-                     print("Please use Option 1 to download and ingest it first.")
+                    print(f"\nTranscript for {ticker} not found in the database.")
+                    print("Please use Option 1 to download and ingest it first.")
                 else:
                     print(f"\nStarting Interactive Q&A on {ticker}...")
                     
