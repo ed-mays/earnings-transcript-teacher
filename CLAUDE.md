@@ -108,3 +108,9 @@ Name Claude Code sessions descriptively so you can find them later:
 - `docs: readme/cleanup` — for documentation
 
 Each session should have a **single, well-scoped goal**. If a conversation grows large (500+ lines), start a new session for the next feature.
+
+---
+
+## Commit and PR message conventions
+
+- Do **not** add `Co-Authored-By` trailers or any other attribution to Claude in commit or PR messages.
