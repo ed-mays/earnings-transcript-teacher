@@ -7,6 +7,7 @@ from db.persistence import (
     get_takeaways_for_ticker,
     get_keywords_for_ticker,
     get_extracted_terms_for_ticker,
+    get_spans_for_ticker,
     update_term_definition,
     update_term_explanation,
     search_spans
@@ -55,6 +56,11 @@ def auto_migrate():
 
 # Run migration once per Streamlit session
 auto_migrate()
+
+@st.cache_data
+def load_transcript_spans(ticker: str) -> list[tuple[str, str, str]]:
+    """Fetch all speaker turns for a transcript from the database."""
+    return get_spans_for_ticker(CONN_STR, ticker)
 
 @st.cache_data
 def load_metadata(ticker):
@@ -354,12 +360,26 @@ with right_col:
                 if 'usage' in usage_stats:
                     stats_dict['prompt_tokens'] = usage_stats['usage'].get('prompt_tokens', 0)
                     stats_dict['completion_tokens'] = usage_stats['usage'].get('completion_tokens', 0)
-                    
+
                 st.session_state.messages.append({
-                    "role": "assistant", 
+                    "role": "assistant",
                     "content": full_response,
                     "stats": stats_dict,
                     "display": True
                 })
                 # Trigger a rerun so the final markdown renders cleanly without the cursor
                 st.rerun()
+
+    st.divider()
+
+    with st.expander("📄 Transcript Browser", expanded=False):
+        spans = load_transcript_spans(st.session_state.active_ticker)
+        if spans:
+            import re
+            def _escape(t: str) -> str:
+                return re.sub(r'([\\`*_{}[\]()#+\-!|~>$])', r'\\\1', t)
+            lines = [f"**{speaker}:** {_escape(text)}" for speaker, _, text in spans]
+            with st.container(height=500):
+                st.markdown("\n\n".join(lines))
+        else:
+            st.info("No transcript data available.")

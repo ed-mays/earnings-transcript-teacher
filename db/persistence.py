@@ -23,6 +23,10 @@ def get_topics_for_ticker(conn_str: str, ticker: str, limit: int = 5) -> list[li
     repo = AnalysisRepository(conn_str)
     return repo.get_topics_for_ticker(ticker, limit)
 
+def get_spans_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, str, str]]:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_spans_for_ticker(ticker)
+
 def get_themes_for_ticker(conn_str: str, ticker: str) -> list[str]:
     repo = AnalysisRepository(conn_str)
     return repo.get_themes_for_ticker(ticker)

@@ -178,6 +178,28 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch keywords: {e}")
         return keywords
 
+    def get_spans_for_ticker(self, ticker: str) -> list[tuple[str, str, str]]:
+        """Return all speaker turns for a ticker in transcript order as (speaker, section, text) tuples."""
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COALESCE(sp.name, 'Unknown'), s.section, s.text
+                        FROM spans s
+                        JOIN calls c ON s.call_id = c.id
+                        LEFT JOIN speakers sp ON s.speaker_id = sp.id
+                        WHERE c.ticker = %s AND s.span_type = 'turn'
+                        ORDER BY s.sequence_order ASC
+                        """,
+                        (ticker,),
+                    )
+                    rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch spans: {e}")
+        return rows
+
     def get_extracted_terms_for_ticker(self, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
         terms = []
         try:
