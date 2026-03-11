@@ -6,6 +6,17 @@ from core.models import CallAnalysis
 
 logger = logging.getLogger(__name__)
 
+def reset_all_data(conn_str: str) -> None:
+    """Delete all application data from the database, preserving the schema."""
+    # Deleting from calls cascades to all dependent tables via ON DELETE CASCADE.
+    # learning_sessions and concept_exercises are not linked to calls so are truncated separately.
+    with psycopg.connect(conn_str) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM learning_sessions")
+            cur.execute("DELETE FROM calls")
+        conn.commit()
+
+
 class CallRepository:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str

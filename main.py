@@ -15,8 +15,23 @@ if __name__ == "__main__":
     # Optional positional argument for the legacy CLI direct-analysis mode
     parser.add_argument("ticker", nargs="?", help="Ticker symbol (e.g., AAPL)")
     parser.add_argument("--save", action="store_true", help="Save results to Postgres")
-    
+    parser.add_argument("--reset-db", action="store_true",
+                        help="Delete all database data (transcripts on disk are preserved)")
+
     args = parser.parse_args()
+
+    if args.reset_db:
+        conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+        print("This will permanently delete all data from the database.")
+        print("Downloaded transcript files will not be affected.")
+        confirm = input("Type 'yes' to confirm: ").strip().lower()
+        if confirm == "yes":
+            from db.repositories import reset_all_data
+            reset_all_data(conn_str)
+            print("Database reset complete.")
+        else:
+            print("Aborted.")
+        sys.exit(0)
 
     if args.mode == "gui":
         print("Launching Earnings Transcript Teacher GUI...")
