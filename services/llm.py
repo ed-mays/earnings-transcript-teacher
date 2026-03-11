@@ -6,8 +6,7 @@ import time
 from typing import Dict, Any
 from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_if_exception_type
 
-from perplexity import Perplexity
-from httpx import HTTPStatusError
+import anthropic
 from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -121,128 +120,84 @@ class RateLimiter:
         self.second_allowance -= 1.0
 
 class AgenticExtractor:
-    def __init__(self, rpm_limit: int = 50, rps_limit: int = 1):
-        # The prompt says: "Assuming I will be using the Perplexity Agent API, I will have access to both Anthropic and OpenAI models."
-        self.api_key = get_api_key()
-        if not self.api_key:
-            logger.warning("PERPLEXITY_API_KEY environment variable is not set. LLM extraction will fail.")
-            self.api_key = "dummy-key"
-            
-        self.client = Perplexity(api_key=self.api_key)
+    def __init__(self, rpm_limit: int = 50, rps_limit: int = 5):
+        self.client = anthropic.Anthropic()
+        self.tier1_model = "claude-haiku-4-5-20251001"
+        self.tier2_model = "claude-sonnet-4-5"
+        self.tier3_model = "claude-haiku-4-5-20251001"
         self.rate_limiter = RateLimiter(requests_per_minute=rpm_limit, requests_per_second=rps_limit)
-        
-        # Define the dynamic routing models described in the plan
-        self.tier1_model = "openai/gpt-5-mini"         # Cheap, fast router
-        self.tier2_model = "anthropic/claude-sonnet-4-5"  # Expensive, deep analysis
 
     def _should_retry_error(exception):
         """Determine if an exception should trigger a retry."""
-        if isinstance(exception, HTTPStatusError):
-            return exception.response.status_code in [429, 500, 502, 503, 504]
+        if isinstance(exception, anthropic.APIStatusError):
+            return exception.status_code in [429, 500, 502, 503, 504]
         return False
 
+    def _parse_response(self, message) -> Dict[str, Any]:
+        """Parse an Anthropic message response into a result dict with usage stats."""
+        content = message.content[0].text.strip()
+        if content.startswith("```json"):
+            content = content[7:-3].strip()
+        elif content.startswith("```"):
+            content = content[3:-3].strip()
+        result = json.loads(content)
+        result["_usage_stats"] = {
+            "model": message.model,
+            "prompt_tokens": message.usage.input_tokens,
+            "completion_tokens": message.usage.output_tokens
+        }
+        return result
+
     @retry(
-        wait=wait_exponential_jitter(initial=2, max=60), 
+        wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(Exception),
+        retry=retry_if_exception_type(anthropic.APIStatusError),
         reraise=True
     )
     def extract_tier1(self, text: str, chunk_type: str) -> Dict[str, Any]:
-        """
-        Run Tier 1 extraction for glossary, core concepts, and complexity score.
-        """
+        """Run Tier 1 extraction for glossary, core concepts, and complexity score."""
         user_prompt = f"### Chunk Type: {chunk_type}\n### Transcript Text:\n{text}\n\nExtract the requested JSON metadata."
-        
         self.rate_limiter.wait()
-        response = self.client.responses.create(
+        message = self.client.messages.create(
             model=self.tier1_model,
-            instructions=TIER_1_SYSTEM_PROMPT,
-            input=user_prompt
+            max_tokens=4096,
+            system=TIER_1_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}]
         )
-        
-        content = response.output_text
-        # Basic cleanup in case the model wraps JSON in markdown blocks
-        content = content.strip()
-        if content.startswith("```json"):
-            content = content[7:-3].strip()
-        elif content.startswith("```"):
-            content = content[3:-3].strip()
-            
-        result = json.loads(content)
-        if hasattr(response, 'usage') and response.usage:
-            result["_usage_stats"] = {
-                "model": response.model,
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens
-            }
-        return result
+        return self._parse_response(message)
 
     @retry(
-        wait=wait_exponential_jitter(initial=2, max=60), 
+        wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(Exception),
+        retry=retry_if_exception_type(anthropic.APIStatusError),
         reraise=True
     )
     def extract_tier2(self, text: str, chunk_type: str) -> Dict[str, Any]:
-        """
-        Run Tier 2 extraction for takeaways, evasion analysis, and misconceptions.
-        """
+        """Run Tier 2 extraction for takeaways, evasion analysis, and misconceptions."""
         user_prompt = f"### Chunk Type: {chunk_type}\n### Transcript Text:\n{text}\n\nExtract the requested pedagogical JSON metadata."
-        
         self.rate_limiter.wait()
-        response = self.client.responses.create(
+        message = self.client.messages.create(
             model=self.tier2_model,
-            instructions=TIER_2_SYSTEM_PROMPT,
-            input=user_prompt
+            max_tokens=4096,
+            system=TIER_2_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}]
         )
-        
-        content = response.output_text
-        content = content.strip()
-        if content.startswith("```json"):
-            content = content[7:-3].strip()
-        elif content.startswith("```"):
-            content = content[3:-3].strip()
-            
-        result = json.loads(content)
-        if hasattr(response, 'usage') and response.usage:
-            result["_usage_stats"] = {
-                "model": response.model,
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens
-            }
-        return result
+        return self._parse_response(message)
 
     @retry(
-        wait=wait_exponential_jitter(initial=2, max=60), 
+        wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(Exception),
+        retry=retry_if_exception_type(anthropic.APIStatusError),
         reraise=True
     )
     def extract_synthesis(self, aggregated_text: str) -> Dict[str, Any]:
-        """
-        Run Tier 3 extraction: overall strategic synthesis across all chunks.
-        """
+        """Run Tier 3 extraction: overall strategic synthesis across all chunks."""
         user_prompt = f"### Aggregated Output from All Chunks:\n{aggregated_text}\n\nProduce the final pedagogical strategic synthesis."
-        
         self.rate_limiter.wait()
-        response = self.client.responses.create(
-            model=self.tier2_model,  # Use the reasoning model for synthesis
-            instructions=TIER_3_SYNTHESIS_PROMPT,
-            input=user_prompt
+        message = self.client.messages.create(
+            model=self.tier3_model,
+            max_tokens=1024,
+            system=TIER_3_SYNTHESIS_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}]
         )
-        
-        content = response.output_text
-        content = content.strip()
-        if content.startswith("```json"):
-            content = content[7:-3].strip()
-        elif content.startswith("```"):
-            content = content[3:-3].strip()
-            
-        result = json.loads(content)
-        if hasattr(response, 'usage') and response.usage:
-            result["_usage_stats"] = {
-                "model": response.model,
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens
-            }
-        return result
+        return self._parse_response(message)

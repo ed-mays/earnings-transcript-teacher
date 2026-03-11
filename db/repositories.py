@@ -379,13 +379,14 @@ class AnalysisRepository:
             cur.execute(
                 """
                 INSERT INTO transcript_chunks (
-                    call_id, chunk_id, chunk_type, sequence_order, tier1_score, needs_deep_analysis
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    call_id, chunk_id, chunk_type, sequence_order, tier1_score, needs_deep_analysis, chunk_text
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     str(call_id), chunk.chunk_id, chunk.chunk_type,
                     chunk.sequence_order, getattr(chunk, "tier1_score", None),
-                    getattr(chunk, "requires_deep_analysis", False)
+                    getattr(chunk, "requires_deep_analysis", False),
+                    chunk.text
                 )
             )
             for term_data in getattr(chunk, "extracted_terms", []):

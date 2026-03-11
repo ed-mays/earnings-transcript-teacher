@@ -201,23 +201,23 @@ with left_col:
     
     with st.expander("📚 Vocabulary & Jargon", expanded=False):
         if jargon:
-            for term, definition, explanation in jargon:
+            for i, (term, definition, explanation) in enumerate(jargon):
                 st.markdown(f"**{term.title()}**")
-                
+
                 # Place buttons side-by-side below the term
                 btn_col1, btn_col2, _ = st.columns([0.5, 0.5, .1])
-                
+
                 with btn_col1:
                     st.button(
-                        "Define", 
-                        key=f"def_btn_{st.session_state.active_ticker}_{term}", 
-                        on_click=handle_define_click, 
+                        "Define",
+                        key=f"def_btn_{st.session_state.active_ticker}_{i}_{term}",
+                        on_click=handle_define_click,
                         args=(st.session_state.active_ticker, term, definition)
                     )
                 with btn_col2:
                     st.button(
                         "Explain",
-                        key=f"exp_btn_{st.session_state.active_ticker}_{term}",
+                        key=f"exp_btn_{st.session_state.active_ticker}_{i}_{term}",
                         on_click=handle_explain_click,
                         args=(st.session_state.active_ticker, term, explanation)
                     )

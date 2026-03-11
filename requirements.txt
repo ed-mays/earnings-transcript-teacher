@@ -4,6 +4,7 @@ voyageai
 pgvector
 requests>=2.0
 perplexityai>=0.30
+anthropic
 pytest
 pytest-cov
 pytest-mock

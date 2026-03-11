@@ -172,7 +172,8 @@ CREATE TABLE transcript_chunks (
     chunk_type       TEXT NOT NULL,
     sequence_order   INTEGER NOT NULL,
     tier1_score      INTEGER,
-    needs_deep_analysis BOOLEAN DEFAULT FALSE
+    needs_deep_analysis BOOLEAN DEFAULT FALSE,
+    chunk_text       TEXT
 );
 
 CREATE TABLE extracted_terms (

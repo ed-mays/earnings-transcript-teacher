@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -241,20 +242,21 @@ class IngestionPipeline:
 
         # Phase 3: Reduce Phase (Synthesis)
         print(f"\n[Reduce Phase] Synthesizing insights across all {len(chunks)} chunks...")
-        synthesis_text_parts = []
+        compact_summaries = []
         for c in chunks:
-            part = f"### Chunk: {c.chunk_id} ({c.chunk_type})\n"
-            part += f"Terms: {c.extracted_terms}\n"
-            part += f"Concepts: {c.core_concepts}\n"
-            if c.takeaways:
-                part += f"Takeaways: {c.takeaways}\n"
+            summary = {
+                "chunk_id": c.chunk_id,
+                "type": c.chunk_type,
+                "score": c.tier1_score,
+                "top_terms": [t["term"] for t in c.extracted_terms[:5]],
+                "top_concept": c.core_concepts[0] if c.core_concepts else "",
+                "top_takeaway": c.takeaways[0]["takeaway"] if c.takeaways else "",
+            }
             if c.evasion_analysis:
-                part += f"Evasion: {c.evasion_analysis}\n"
-            if c.misconceptions:
-                part += f"Misconceptions: {c.misconceptions}\n"
-            synthesis_text_parts.append(part)
-            
-        aggregated_text = "\n\n".join(synthesis_text_parts)
+                summary["evasion_score"] = c.evasion_analysis.get("score")
+            compact_summaries.append(summary)
+
+        aggregated_text = json.dumps(compact_summaries, indent=2)
         
         synthesis_data = self.extractor.extract_synthesis(aggregated_text)
         
