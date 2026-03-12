@@ -182,7 +182,8 @@ CREATE TABLE extracted_terms (
     chunk_id   TEXT NOT NULL,
     term       TEXT NOT NULL,
     definition TEXT NOT NULL,
-    explanation TEXT DEFAULT ''
+    explanation TEXT DEFAULT '',
+    category   TEXT NOT NULL DEFAULT 'industry'
 );
 
 CREATE TABLE core_concepts (

@@ -43,6 +43,14 @@ def get_extracted_terms_for_ticker(conn_str: str, ticker: str, limit: int = 15) 
     repo = AnalysisRepository(conn_str)
     return repo.get_extracted_terms_for_ticker(ticker, limit)
 
+def get_industry_terms_for_ticker(conn_str: str, ticker: str, limit: int = 30) -> list[tuple[str, str, str]]:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_industry_terms_for_ticker(ticker, limit)
+
+def get_financial_terms_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, str, str]]:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_financial_terms_for_ticker(ticker)
+
 def update_term_definition(conn_str: str, ticker: str, term: str, definition: str) -> bool:
     repo = AnalysisRepository(conn_str)
     return repo.update_term_definition(ticker, term, definition)

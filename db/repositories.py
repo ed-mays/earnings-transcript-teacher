@@ -200,18 +200,62 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch spans: {e}")
         return rows
 
-    def get_extracted_terms_for_ticker(self, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
+    def get_industry_terms_for_ticker(self, ticker: str, limit: int = 30) -> list[tuple[str, str, str]]:
+        """Return deduplicated industry-specific terms for a ticker as (term, definition, explanation)."""
         terms = []
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT et.term, et.definition, COALESCE(et.explanation, '')
+                        SELECT DISTINCT ON (et.term) et.term, et.definition, COALESCE(et.explanation, '')
+                        FROM extracted_terms et
+                        JOIN calls c ON et.call_id = c.id
+                        WHERE c.ticker = %s AND et.category = 'industry'
+                        ORDER BY et.term ASC
+                        LIMIT %s
+                        """,
+                        (ticker, limit),
+                    )
+                    terms = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch industry terms: {e}")
+        return terms
+
+    def get_financial_terms_for_ticker(self, ticker: str) -> list[tuple[str, str, str]]:
+        """Return deduplicated financial terms found in a transcript as (term, definition, explanation)."""
+        terms = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT ON (et.term) et.term, et.definition, COALESCE(et.explanation, '')
+                        FROM extracted_terms et
+                        JOIN calls c ON et.call_id = c.id
+                        WHERE c.ticker = %s AND et.category = 'financial'
+                        ORDER BY et.term ASC
+                        """,
+                        (ticker,),
+                    )
+                    terms = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch financial terms: {e}")
+        return terms
+
+    def get_extracted_terms_for_ticker(self, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
+        """Return deduplicated terms of all categories for a ticker (legacy method)."""
+        terms = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT ON (et.term) et.term, et.definition, COALESCE(et.explanation, '')
                         FROM extracted_terms et
                         JOIN calls c ON et.call_id = c.id
                         WHERE c.ticker = %s
-                        ORDER BY c.created_at DESC, et.term ASC
+                        ORDER BY et.term ASC
                         LIMIT %s
                         """,
                         (ticker, limit),
@@ -427,10 +471,11 @@ class AnalysisRepository:
                 if not term: continue
                 cur.execute(
                     """
-                    INSERT INTO extracted_terms (call_id, chunk_id, term, definition, explanation)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO extracted_terms (call_id, chunk_id, term, definition, explanation, category)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                    (str(call_id), chunk.chunk_id, term, term_data.get("definition") or "", term_data.get("explanation") or "")
+                    (str(call_id), chunk.chunk_id, term, term_data.get("definition") or "",
+                     term_data.get("explanation") or "", term_data.get("category") or "industry")
                 )
             for concept in getattr(chunk, "core_concepts", []):
                 if not concept: continue

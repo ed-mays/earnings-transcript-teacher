@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 import concurrent.futures
 
 from core.models import CallAnalysis, CallSynthesisRecord
+from parsing.financial_terms import scan_chunk
 
 logger = logging.getLogger(__name__)
 
@@ -300,14 +301,20 @@ class IngestionPipeline:
             # print(f"    ↳ Skipping Tier 2 for {chunk.chunk_id} (Score: {getattr(chunk, 'tier1_score', 0)}).")
         
     def _run_tier1(self, chunk: TranscriptChunk) -> Optional[Dict[str, Any]]:
-        """Run fast, inexpensive extraction (OpenAI gpt-5-mini)."""
+        """Run Tier 1 extraction: LLM for industry terms + CSV scan for financial terms."""
         tier1_data = self.extractor.extract_tier1(chunk.text, chunk.chunk_type)
-        
-        chunk.extracted_terms = tier1_data.get("extracted_terms", [])
+
+        industry_terms = [
+            {**t, "category": "industry"}
+            for t in tier1_data.get("extracted_terms", [])
+        ]
+        financial_terms = scan_chunk(chunk.text)
+
+        chunk.extracted_terms = industry_terms + financial_terms
         chunk.core_concepts = tier1_data.get("core_concepts", [])
         chunk.tier1_score = tier1_data.get("tier1_score", 0)
         chunk.requires_deep_analysis = tier1_data.get("requires_deep_analysis", False)
-        
+
         return tier1_data.get("_usage_stats")
         
     def _run_tier2(self, chunk: TranscriptChunk) -> Optional[Dict[str, Any]]:

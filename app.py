@@ -6,7 +6,8 @@ from db.persistence import (
     get_themes_for_ticker,
     get_takeaways_for_ticker,
     get_keywords_for_ticker,
-    get_extracted_terms_for_ticker,
+    get_industry_terms_for_ticker,
+    get_financial_terms_for_ticker,
     get_spans_for_ticker,
     update_term_definition,
     update_term_explanation,
@@ -69,8 +70,9 @@ def load_metadata(ticker):
         themes = get_themes_for_ticker(CONN_STR, ticker)
         takeaways = get_takeaways_for_ticker(CONN_STR, ticker)
         keywords = get_keywords_for_ticker(CONN_STR, ticker)
-        terms = get_extracted_terms_for_ticker(CONN_STR, ticker, limit=10)
-        
+        industry_terms = get_industry_terms_for_ticker(CONN_STR, ticker)
+        financial_terms = get_financial_terms_for_ticker(CONN_STR, ticker)
+
         # Deduplicate keywords for cleaner display
         unique_keywords = []
         seen = set()
@@ -78,8 +80,8 @@ def load_metadata(ticker):
             if kw.lower() not in seen:
                 unique_keywords.append(kw)
                 seen.add(kw.lower())
-                
-        return themes, takeaways, unique_keywords, terms
+
+        return themes, takeaways, unique_keywords, industry_terms, financial_terms
     except Exception as e:
         import traceback
         with open("streamlit_db_error.txt", "w") as f:
@@ -197,7 +199,7 @@ with st.sidebar:
 # ------------- Main App -------------
 
 # Load data for the active transcript
-themes, takeaways, keywords, jargon = load_metadata(st.session_state.active_ticker)
+themes, takeaways, keywords, industry_terms, financial_terms = load_metadata(st.session_state.active_ticker)
 
 # Layout: 35% left column (Metadata), 65% right column (Chat)
 left_col, right_col = st.columns([3.5, 6.5])
@@ -205,42 +207,45 @@ left_col, right_col = st.columns([3.5, 6.5])
 with left_col:
     st.subheader(f"📊 {st.session_state.active_ticker} Analysis")
     
-    with st.expander("📚 Vocabulary & Jargon", expanded=False):
-        if jargon:
-            for i, (term, definition, explanation) in enumerate(jargon):
-                st.markdown(f"**{term.title()}**")
+    def _render_term_list(terms, key_prefix):
+        """Render a list of (term, definition, explanation) rows with Define/Explain buttons."""
+        for i, (term, definition, explanation) in enumerate(terms):
+            st.markdown(f"**{term.title()}**")
+            btn_col1, btn_col2, _ = st.columns([0.5, 0.5, .1])
+            with btn_col1:
+                st.button(
+                    "Define",
+                    key=f"{key_prefix}_def_{i}_{term}",
+                    on_click=handle_define_click,
+                    args=(st.session_state.active_ticker, term, definition)
+                )
+            with btn_col2:
+                st.button(
+                    "Explain",
+                    key=f"{key_prefix}_exp_{i}_{term}",
+                    on_click=handle_explain_click,
+                    args=(st.session_state.active_ticker, term, explanation)
+                )
+            show_def = st.session_state.get(f"show_def_{st.session_state.active_ticker}_{term}", False)
+            show_exp = st.session_state.get(f"show_exp_{st.session_state.active_ticker}_{term}", False)
+            if show_def:
+                st.markdown(f"📘 **Definition:** {definition if definition else '*(Generating...)*'}")
+            if show_exp:
+                st.markdown(f"💡 **Context:** {explanation if explanation else '*(Generating...)*'}")
+            st.divider()
 
-                # Place buttons side-by-side below the term
-                btn_col1, btn_col2, _ = st.columns([0.5, 0.5, .1])
-
-                with btn_col1:
-                    st.button(
-                        "Define",
-                        key=f"def_btn_{st.session_state.active_ticker}_{i}_{term}",
-                        on_click=handle_define_click,
-                        args=(st.session_state.active_ticker, term, definition)
-                    )
-                with btn_col2:
-                    st.button(
-                        "Explain",
-                        key=f"exp_btn_{st.session_state.active_ticker}_{i}_{term}",
-                        on_click=handle_explain_click,
-                        args=(st.session_state.active_ticker, term, explanation)
-                    )
-                    
-                # Show definitions/explanations only if their show state is True
-                show_def = st.session_state.get(f"show_def_{st.session_state.active_ticker}_{term}", False)
-                show_exp = st.session_state.get(f"show_exp_{st.session_state.active_ticker}_{term}", False)
-                
-                if show_def:
-                    st.markdown(f"📘 **Definition:** {definition if definition else '*(Generating...)*'}")
-                if show_exp:
-                    st.markdown(f"💡 **Context:** {explanation if explanation else '*(Generating...)*'}")
-                    
-                st.divider()
+    with st.expander("🏦 Financial Jargon", expanded=False):
+        if financial_terms:
+            _render_term_list(financial_terms, key_prefix=f"fin_{st.session_state.active_ticker}")
         else:
-            st.info("No specific jargon extracted for this transcript.")
-            
+            st.info("No financial terms found in this transcript.")
+
+    with st.expander("🏭 Industry Jargon", expanded=False):
+        if industry_terms:
+            _render_term_list(industry_terms, key_prefix=f"ind_{st.session_state.active_ticker}")
+        else:
+            st.info("No industry-specific terms extracted.")
+
         if keywords:
             st.markdown("**Top Keywords (TF-IDF):**")
             st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
@@ -303,8 +308,9 @@ with right_col:
                     
                 # Inject jargon if user asked about it
                 if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
-                    if jargon:
-                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in jargon])
+                    all_terms = financial_terms + industry_terms
+                    if all_terms:
+                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
                         context_spans.append(jargon_str)
                         
                 # Format final API messages
