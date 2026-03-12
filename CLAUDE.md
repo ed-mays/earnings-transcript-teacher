@@ -69,6 +69,7 @@ pytest --cov=.
 - **Ask before making architectural changes** (e.g., renaming modules, restructuring packages).
 - **Don't add error handling for impossible cases.** Only validate at real boundaries (user input, external API calls).
 - **No docstrings or comments on code you didn't touch.**
+- **Keep `README.md` up to date.** When adding or changing user-facing features, setup steps, CLI flags, environment variables, or architecture, update the README in the same session. Don't leave it describing a state that no longer exists.
 
 ---
 
