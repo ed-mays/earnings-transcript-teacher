@@ -213,7 +213,7 @@ class AnalysisRepository:
                         FROM spans s
                         JOIN calls c ON s.call_id = c.id
                         LEFT JOIN speakers sp ON s.speaker_id = sp.id
-                        WHERE c.ticker = %s AND s.span_type = 'turn'
+                        WHERE c.ticker = %s AND s.span_type = 'turn' AND s.sequence_order >= 0
                         ORDER BY s.sequence_order ASC
                         """,
                         (ticker,),
