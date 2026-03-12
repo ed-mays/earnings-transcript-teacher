@@ -289,120 +289,7 @@ with left_col:
             st.info("No themes extracted.")
 
 with right_col:
-    st.subheader("💬 Chat Interface")
-    
-    # Display existing chat messages
-    for msg in st.session_state.messages:
-        # Don't show system/hidden messages in the UI
-        if msg["role"] != "system" and not msg["content"].startswith("*[Proceeding to"):
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-                if "stats" in msg:
-                    st.caption(f"Model: {msg['stats'].get('model')} • Tokens: In {msg['stats'].get('prompt_tokens', 0)} / Out {msg['stats'].get('completion_tokens', 0)}")
-
-    # Chat Input
-    if prompt := st.chat_input(f"Ask about {st.session_state.active_ticker}..."):
-        
-        # 1. Display user message exactly as typed
-        with st.chat_message("user"):
-            st.markdown(prompt)
-            
-        # 2. Add to session history
-        st.session_state.messages.append({"role": "user", "content": prompt, "display": True})
-        
-        # 3. Retrieve Context (RAG)
-        query_embs = get_embeddings([prompt])
-        context_spans = []
-        if query_embs and query_embs[0]:
-            context_spans = search_spans(CONN_STR, st.session_state.active_ticker, query_embs[0], top_k=4)
-            
-        # 4. Handle System Prompts & Custom Logic based on mode
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            full_response = ""
-            usage_stats = {}
-            
-            if chat_mode == "General Q&A":
-                # Load prompt
-                try:
-                    with open("prompts/feynman/00_general_qa.md", "r") as f:
-                        sys_prompt = f.read()
-                except FileNotFoundError:
-                    sys_prompt = "You are a helpful expert answering questions using the transcript context."
-                    
-                # Inject jargon if user asked about it
-                if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
-                    all_terms = financial_terms + industry_terms
-                    if all_terms:
-                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
-                        context_spans.append(jargon_str)
-                        
-                # Format final API messages
-                api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if "display" in m]
-                
-                # Augment the last user message with the RAG context
-                if context_spans:
-                    context_str = "\n".join(f"- {span}" for span in context_spans)
-                    augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
-                    api_messages[-1]["content"] = augmented_input
-                    
-                # Stream Response
-                try:
-                    for chunk in stream_chat(api_messages, sys_prompt):
-                        if isinstance(chunk, dict):
-                            usage_stats = chunk
-                            continue
-                        full_response += chunk
-                        response_placeholder.markdown(full_response + "▌")
-                    response_placeholder.markdown(full_response)
-                except Exception as e:
-                    response_placeholder.error(f"Error connecting to LLM: {e}")
-                    
-            elif chat_mode == "Feynman Loop":
-                # Basic Feynman implementation for GUI MVP
-                try:
-                    with open("prompts/feynman/01_initial_explanation.md", "r") as f:
-                        sys_prompt = f.read()
-                except FileNotFoundError:
-                    sys_prompt = "You are a Feynman method tutor. Evaluate the user's understanding."
-                    
-                api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if "display" in m]
-                
-                if context_spans:
-                    context_str = "\n".join(f"- {span}" for span in context_spans)
-                    augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
-                    api_messages[-1]["content"] = augmented_input
-                    
-                try:
-                    for chunk in stream_chat(api_messages, sys_prompt):
-                        if isinstance(chunk, dict):
-                            usage_stats = chunk
-                            continue
-                        full_response += chunk
-                        response_placeholder.markdown(full_response + "▌")
-                    response_placeholder.markdown(full_response)
-                except Exception as e:
-                    response_placeholder.error(f"Error connecting to LLM: {e}")
-
-            # 5. Save the assistant response and stats to history
-            if full_response:
-                stats_dict = {'model': usage_stats.get('model', 'Unknown')}
-                if 'usage' in usage_stats:
-                    stats_dict['prompt_tokens'] = usage_stats['usage'].get('prompt_tokens', 0)
-                    stats_dict['completion_tokens'] = usage_stats['usage'].get('completion_tokens', 0)
-
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": full_response,
-                    "stats": stats_dict,
-                    "display": True
-                })
-                # Trigger a rerun so the final markdown renders cleanly without the cursor
-                st.rerun()
-
-    st.divider()
-
-    with st.expander("📄 Transcript Browser", expanded=False):
+    with st.expander("📄 Transcript Browser", expanded=True):
         spans = load_transcript_spans(st.session_state.active_ticker)
         if spans:
             import html as _html
@@ -553,3 +440,117 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
             _components.html(component_html, height=550, scrolling=False)
         else:
             st.info("No transcript data available.")
+
+    st.divider()
+
+    st.subheader("💬 Chat Interface")
+    
+    # Display existing chat messages
+    for msg in st.session_state.messages:
+        # Don't show system/hidden messages in the UI
+        if msg["role"] != "system" and not msg["content"].startswith("*[Proceeding to"):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                if "stats" in msg:
+                    st.caption(f"Model: {msg['stats'].get('model')} • Tokens: In {msg['stats'].get('prompt_tokens', 0)} / Out {msg['stats'].get('completion_tokens', 0)}")
+
+    # Chat Input
+    if prompt := st.chat_input(f"Ask about {st.session_state.active_ticker}..."):
+        
+        # 1. Display user message exactly as typed
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            
+        # 2. Add to session history
+        st.session_state.messages.append({"role": "user", "content": prompt, "display": True})
+        
+        # 3. Retrieve Context (RAG)
+        query_embs = get_embeddings([prompt])
+        context_spans = []
+        if query_embs and query_embs[0]:
+            context_spans = search_spans(CONN_STR, st.session_state.active_ticker, query_embs[0], top_k=4)
+            
+        # 4. Handle System Prompts & Custom Logic based on mode
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            full_response = ""
+            usage_stats = {}
+            
+            if chat_mode == "General Q&A":
+                # Load prompt
+                try:
+                    with open("prompts/feynman/00_general_qa.md", "r") as f:
+                        sys_prompt = f.read()
+                except FileNotFoundError:
+                    sys_prompt = "You are a helpful expert answering questions using the transcript context."
+                    
+                # Inject jargon if user asked about it
+                if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
+                    all_terms = financial_terms + industry_terms
+                    if all_terms:
+                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
+                        context_spans.append(jargon_str)
+                        
+                # Format final API messages
+                api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if "display" in m]
+                
+                # Augment the last user message with the RAG context
+                if context_spans:
+                    context_str = "\n".join(f"- {span}" for span in context_spans)
+                    augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
+                    api_messages[-1]["content"] = augmented_input
+                    
+                # Stream Response
+                try:
+                    for chunk in stream_chat(api_messages, sys_prompt):
+                        if isinstance(chunk, dict):
+                            usage_stats = chunk
+                            continue
+                        full_response += chunk
+                        response_placeholder.markdown(full_response + "▌")
+                    response_placeholder.markdown(full_response)
+                except Exception as e:
+                    response_placeholder.error(f"Error connecting to LLM: {e}")
+                    
+            elif chat_mode == "Feynman Loop":
+                # Basic Feynman implementation for GUI MVP
+                try:
+                    with open("prompts/feynman/01_initial_explanation.md", "r") as f:
+                        sys_prompt = f.read()
+                except FileNotFoundError:
+                    sys_prompt = "You are a Feynman method tutor. Evaluate the user's understanding."
+                    
+                api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if "display" in m]
+                
+                if context_spans:
+                    context_str = "\n".join(f"- {span}" for span in context_spans)
+                    augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
+                    api_messages[-1]["content"] = augmented_input
+                    
+                try:
+                    for chunk in stream_chat(api_messages, sys_prompt):
+                        if isinstance(chunk, dict):
+                            usage_stats = chunk
+                            continue
+                        full_response += chunk
+                        response_placeholder.markdown(full_response + "▌")
+                    response_placeholder.markdown(full_response)
+                except Exception as e:
+                    response_placeholder.error(f"Error connecting to LLM: {e}")
+
+            # 5. Save the assistant response and stats to history
+            if full_response:
+                stats_dict = {'model': usage_stats.get('model', 'Unknown')}
+                if 'usage' in usage_stats:
+                    stats_dict['prompt_tokens'] = usage_stats['usage'].get('prompt_tokens', 0)
+                    stats_dict['completion_tokens'] = usage_stats['usage'].get('completion_tokens', 0)
+
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": full_response,
+                    "stats": stats_dict,
+                    "display": True
+                })
+                # Trigger a rerun so the final markdown renders cleanly without the cursor
+                st.rerun()
+
