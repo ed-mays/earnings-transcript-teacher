@@ -178,6 +178,29 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch keywords: {e}")
         return keywords
 
+    def get_speakers_for_ticker(self, ticker: str) -> list[tuple[str, str, str | None, str | None]]:
+        """Return speakers for a ticker as (name, role, title, firm) ordered by role then name."""
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT sp.name, sp.role, sp.title, sp.firm
+                        FROM speakers sp
+                        JOIN calls c ON sp.call_id = c.id
+                        WHERE c.ticker = %s AND sp.role != 'operator'
+                        ORDER BY
+                            CASE sp.role WHEN 'executive' THEN 0 WHEN 'analyst' THEN 1 ELSE 2 END,
+                            sp.name ASC
+                        """,
+                        (ticker,),
+                    )
+                    rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch speakers: {e}")
+        return rows
+
     def get_spans_for_ticker(self, ticker: str) -> list[tuple[str, str, str]]:
         """Return all speaker turns for a ticker in transcript order as (speaker, section, text) tuples."""
         rows = []

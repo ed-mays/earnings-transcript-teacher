@@ -133,15 +133,28 @@ def _parse_analyst_introductions(transcript: str) -> dict[str, str | None]:
             continue
         for am in _ANALYST_INTRO_PATTERN.finditer(m.group("text")):
             name = am.group("name").strip()
-            # Strip firm if pattern over-captured it into the name field
-            # (re.IGNORECASE makes [A-Z] match lowercase prepositions like 'with').
-            for sep in (" with ", " at ", " from "):
-                idx = name.lower().find(sep)
-                if idx != -1:
-                    name = name[:idx].strip()
-                    break
             firm_raw = am.group("firm")
-            result[name] = firm_raw.strip().rstrip(".") if firm_raw else None
+
+            # re.IGNORECASE makes [A-Z] match lowercase, so prepositions like
+            # "with" get swallowed into the name group. When that happens the
+            # firm group is empty; recover both pieces from the over-captured name.
+            if not firm_raw:
+                for sep in (" with ", " at ", " from "):
+                    idx = name.lower().find(sep)
+                    if idx != -1:
+                        firm_raw = name[idx + len(sep):].strip().rstrip(".")
+                        name = name[:idx].strip()
+                        break
+            else:
+                # firm was captured correctly; still clean the name just in case
+                for sep in (" with ", " at ", " from "):
+                    idx = name.lower().find(sep)
+                    if idx != -1:
+                        name = name[:idx].strip()
+                        break
+                firm_raw = firm_raw.strip().rstrip(".")
+
+            result[name] = firm_raw if firm_raw else None
     return result
 
 
@@ -251,14 +264,33 @@ def enrich_speakers(
         name = m.group("speaker").strip()
         seen[name] = seen.get(name, 0) + 1
 
+    # Pre-build last-name indexes for fuzzy fallback matching.
+    # Operators sometimes use a nickname ("CJ", "Joe") while the transcript
+    # speaker label uses the full legal name ("Christopher", "Joseph").
+    analyst_by_last: dict[str, tuple[str, str | None]] = {
+        intro_name.split()[-1].lower(): (intro_name, firm)
+        for intro_name, firm in analyst_firm_map.items()
+    }
+    exec_by_last: dict[str, str] = {
+        intro_name.split()[-1].lower(): title
+        for intro_name, title in exec_title_map.items()
+    }
+
     profiles: list[SpeakerProfile] = []
     for name, turn_count in seen.items():
+        last = name.split()[-1].lower()
         if name.lower() == "operator":
             role, title, firm = "operator", None, None
         elif name in analyst_firm_map:
             role, title, firm = "analyst", None, analyst_firm_map[name]
+        elif last in analyst_by_last:
+            # Nickname/abbreviation mismatch — match on last name.
+            _, firm = analyst_by_last[last]
+            role, title = "analyst", None
         elif name in exec_title_map:
             role, title, firm = "executive", exec_title_map[name], None
+        elif last in exec_by_last:
+            role, title, firm = "executive", exec_by_last[last], None
         else:
             sections = _speaker_sections(name, prepared_remarks, qa)
             if "qa" in sections and "prepared" not in sections:

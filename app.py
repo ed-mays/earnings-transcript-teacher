@@ -8,6 +8,7 @@ from db.persistence import (
     get_keywords_for_ticker,
     get_industry_terms_for_ticker,
     get_financial_terms_for_ticker,
+    get_speakers_for_ticker,
     get_spans_for_ticker,
     update_term_definition,
     update_term_explanation,
@@ -57,6 +58,11 @@ def auto_migrate():
 
 # Run migration once per Streamlit session
 auto_migrate()
+
+@st.cache_data
+def load_speakers(ticker: str) -> list[tuple[str, str, str | None, str | None]]:
+    """Fetch enriched speaker profiles for a transcript from the database."""
+    return get_speakers_for_ticker(CONN_STR, ticker)
 
 @st.cache_data
 def load_transcript_spans(ticker: str) -> list[tuple[str, str, str]]:
@@ -250,6 +256,24 @@ with left_col:
             st.markdown("**Top Keywords (TF-IDF):**")
             st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
             
+    with st.expander("🎙️ Speakers", expanded=False):
+        speakers = load_speakers(st.session_state.active_ticker)
+        if speakers:
+            executives = [(n, r, t, f) for n, r, t, f in speakers if r == "executive"]
+            analysts = [(n, r, t, f) for n, r, t, f in speakers if r == "analyst"]
+            if executives:
+                st.markdown("**Executives**")
+                for name, _, title, _ in executives:
+                    subtitle = f"*{title}*" if title else ""
+                    st.markdown(f"- {name}{' — ' + subtitle if subtitle else ''}")
+            if analysts:
+                st.markdown("**Analysts**")
+                for name, _, _, firm in analysts:
+                    subtitle = f"*{firm}*" if firm else ""
+                    st.markdown(f"- {name}{' — ' + subtitle if subtitle else ''}")
+        else:
+            st.info("No speaker data available.")
+
     with st.expander("💡 Key Takeaways", expanded=False):
         if takeaways:
             for t, why in takeaways:
