@@ -1,0 +1,12 @@
+# Copy this file to set_env.ps1 and fill in your API keys.
+# set_env.ps1 is gitignored and will never be committed.
+#
+# Usage: . .\set_env.ps1
+
+$env:API_NINJAS_KEY     = "your_api_ninjas_key"         # api-ninjas.com
+$env:VOYAGE_API_KEY     = "your_voyage_api_key"         # voyageai.com
+$env:PERPLEXITY_API_KEY = "your_perplexity_api_key"     # perplexity.ai
+$env:ANTHROPIC_API_KEY  = "your_anthropic_api_key"      # console.anthropic.com
+
+# Pre-filled to match the Docker container created by setup.ps1
+$env:DATABASE_URL = "host=localhost port=5432 dbname=earnings_teacher user=postgres password=postgres"
