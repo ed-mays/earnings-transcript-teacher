@@ -21,11 +21,19 @@ from core.models import (
 )
 from nlp.embedder import get_embeddings
 from db.persistence import fetch_existing_embeddings
+from db.repositories import SchemaRepository, OutdatedSchemaError
 
 logger = logging.getLogger(__name__)
 
 def analyze(ticker: str = "MSFT") -> CallAnalysis:
     """Run the full analysis pipeline and return structured results."""
+    # Safety Check: Fail fast if schema is out of date
+    conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+    schema_repo = SchemaRepository(conn_str)
+    is_ok, error_msg = schema_repo.check_health()
+    if not is_ok:
+        raise OutdatedSchemaError(error_msg)
+
     ticker = ticker.upper()
     file_path = f"./transcripts/{ticker}.json"
     content = read_text_file(file_path)

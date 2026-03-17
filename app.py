@@ -47,18 +47,40 @@ def load_transcripts():
 
 @st.cache_data
 def auto_migrate():
-    """Ensure database schema is up to date."""
+    """Ensure database schema is up to date and check version."""
     try:
         import psycopg
+        from db.repositories import SchemaRepository
+        
+        # Original simple migration
         with psycopg.connect(CONN_STR) as conn:
             with conn.cursor() as cur:
                 cur.execute("ALTER TABLE extracted_terms ADD COLUMN IF NOT EXISTS explanation TEXT DEFAULT '';")
+                # Also ensure schema_version table exists for version 1 initialization
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS schema_version (
+                        version     INTEGER PRIMARY KEY,
+                        installed_at TIMESTAMPTZ DEFAULT now()
+                    );
+                """)
+                cur.execute("INSERT INTO schema_version (version) VALUES (1) ON CONFLICT DO NOTHING;")
             conn.commit()
+            
+        # Version check
+        schema_repo = SchemaRepository(CONN_STR)
+        is_ok, error_msg = schema_repo.check_health()
+        if not is_ok:
+            st.error(f"⚠️ {error_msg}")
+            # We don't st.stop() here because the user might just want to browse existing data,
+            # but ingestion should still fail if they try it.
+            return False
+        return True
     except Exception as e:
-        print(f"Auto-migrate failed: {e}")
+        st.warning(f"Auto-migrate/Health check failed: {e}")
+        return False
 
-# Run migration once per Streamlit session
-auto_migrate()
+# Run migration and check once per Streamlit session
+schema_is_ok = auto_migrate()
 
 @st.cache_data
 def load_speakers(ticker: str) -> list[tuple[str, str, str | None, str | None]]:

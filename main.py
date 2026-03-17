@@ -2,7 +2,7 @@ import sys
 import argparse
 import os
 
-from services.orchestrator import analyze
+from services.orchestrator import analyze, OutdatedSchemaError
 from cli.display import display
 from cli.menu import interactive_menu
 
@@ -50,8 +50,12 @@ if __name__ == "__main__":
     else:
         # Legacy CLI direct-analysis mode
     
-        result = analyze(args.ticker)
-        display(result)
+        try:
+            result = analyze(args.ticker)
+            display(result)
+        except OutdatedSchemaError as e:
+            print(f"\n❌ ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
     
         if args.save:
             from db.persistence import save_analysis
