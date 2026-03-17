@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("ticker", nargs="?", help="Ticker symbol (e.g., AAPL)")
     parser.add_argument("--save", action="store_true", help="Save results to Postgres")
     parser.add_argument("--reset-db", action="store_true",
-                        help="Delete all database data (transcripts on disk are preserved)")
+                        help="Delete all database data (schema is preserved, transcripts on disk are preserved). For a full schema reset, use ./reset_db.sh")
 
     args = parser.parse_args()
 

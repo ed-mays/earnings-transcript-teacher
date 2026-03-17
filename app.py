@@ -5,6 +5,7 @@ from db.persistence import (
     get_all_calls,
     get_themes_for_ticker,
     get_takeaways_for_ticker,
+    get_synthesis_for_ticker,
     get_keywords_for_ticker,
     get_industry_terms_for_ticker,
     get_financial_terms_for_ticker,
@@ -75,6 +76,7 @@ def load_metadata(ticker):
     try:
         themes = get_themes_for_ticker(CONN_STR, ticker)
         takeaways = get_takeaways_for_ticker(CONN_STR, ticker)
+        synthesis = get_synthesis_for_ticker(CONN_STR, ticker)
         keywords = get_keywords_for_ticker(CONN_STR, ticker)
         industry_terms = get_industry_terms_for_ticker(CONN_STR, ticker)
         financial_terms = get_financial_terms_for_ticker(CONN_STR, ticker)
@@ -87,7 +89,7 @@ def load_metadata(ticker):
                 unique_keywords.append(kw)
                 seen.add(kw.lower())
 
-        return themes, takeaways, unique_keywords, industry_terms, financial_terms
+        return themes, takeaways, synthesis, unique_keywords, industry_terms, financial_terms
     except Exception as e:
         import traceback
         with open("streamlit_db_error.txt", "w") as f:
@@ -205,7 +207,7 @@ with st.sidebar:
 # ------------- Main App -------------
 
 # Load data for the active transcript
-themes, takeaways, keywords, industry_terms, financial_terms = load_metadata(st.session_state.active_ticker)
+themes, takeaways, synthesis, keywords, industry_terms, financial_terms = load_metadata(st.session_state.active_ticker)
 
 # Layout: 35% left column (Metadata), 65% right column (Chat)
 left_col, right_col = st.columns([3.5, 6.5])
@@ -239,6 +241,15 @@ with left_col:
             if show_exp:
                 st.markdown(f"💡 **Context:** {explanation if explanation else '*(Generating...)*'}")
             st.divider()
+
+    with st.expander("🎭 Sentiment Analysis", expanded=True):
+        if synthesis:
+            overall, exec_tone, analyst_sent = synthesis
+            st.markdown(f"**Overall Sentiment:** {overall}")
+            st.markdown(f"**Executive Tone:** {exec_tone}")
+            st.markdown(f"**Analyst Sentiment:** {analyst_sent}")
+        else:
+            st.info("No sentiment analysis available for this call.")
 
     with st.expander("🏦 Financial Jargon", expanded=False):
         if financial_terms:
