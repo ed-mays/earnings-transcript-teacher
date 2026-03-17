@@ -76,3 +76,15 @@ def test_get_topics_for_ticker(mock_psycopg_connect):
     
     assert len(topics) == 2
     assert topics[0] == ["cloud", "azure", "growth"]
+
+def test_get_synthesis_for_ticker(mock_psycopg_connect):
+    m_connect, m_cursor = mock_psycopg_connect
+    
+    m_cursor.fetchone.return_value = ("Positive", "Confident", "Bullish")
+    
+    repo = AnalysisRepository("fake_connection_string")
+    synthesis = repo.get_synthesis_for_ticker("MSFT")
+    
+    assert synthesis == ("Positive", "Confident", "Bullish")
+    m_cursor.execute.assert_called_once()
+    assert "call_synthesis" in m_cursor.execute.call_args[0][0]

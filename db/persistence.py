@@ -39,6 +39,10 @@ def get_takeaways_for_ticker(conn_str: str, ticker: str, limit: int = 5) -> list
     repo = AnalysisRepository(conn_str)
     return repo.get_takeaways_for_ticker(ticker, limit)
 
+def get_synthesis_for_ticker(conn_str: str, ticker: str) -> tuple[str, str, str] | None:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_synthesis_for_ticker(ticker)
+
 def get_keywords_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[str]:
     repo = AnalysisRepository(conn_str)
     return repo.get_keywords_for_ticker(ticker, limit)

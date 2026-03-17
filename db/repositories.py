@@ -136,6 +136,25 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch themes: {e}")
         return themes
 
+    def get_synthesis_for_ticker(self, ticker: str) -> tuple[str, str, str] | None:
+        """Return (overall_sentiment, executive_tone, analyst_sentiment) for a ticker."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT cs.overall_sentiment, cs.executive_tone, cs.analyst_sentiment
+                        FROM call_synthesis cs
+                        JOIN calls c ON cs.call_id = c.id
+                        WHERE c.ticker = %s
+                        """,
+                        (ticker,),
+                    )
+                    return cur.fetchone()
+        except Exception as e:
+            logger.warning(f"Could not fetch synthesis for {ticker}: {e}")
+        return None
+
     def get_takeaways_for_ticker(self, ticker: str, limit: int = 5) -> list[tuple[str, str]]:
         takeaways = []
         try:
