@@ -7,6 +7,15 @@
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- Schema versioning
+CREATE TABLE schema_version (
+    version     INTEGER PRIMARY KEY,
+    installed_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Initialize version
+INSERT INTO schema_version (version) VALUES (1) ON CONFLICT DO NOTHING;
+
 
 -- One row per earnings call
 CREATE TABLE calls (
