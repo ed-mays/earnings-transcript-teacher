@@ -50,3 +50,6 @@ transcripts/
 # Local environment variables
 set_env.sh
 set_env.ps1
+
+# Claude
+.claude/worktrees/

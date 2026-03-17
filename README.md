@@ -147,6 +147,25 @@ python3 db/search.py "AI infrastructure capital expenditures" -k 5
 
 ---
 
+## Database management
+
+The application uses PostgreSQL with `pgvector`.
+
+### Clearing data
+To delete all stored analysis while keeping the database schema intact:
+```bash
+python3 main.py --reset-db
+```
+
+### Full reset (Schema changes)
+If the database schema has changed or the database is in an inconsistent state, you can perform a full reset. This will drop the database and recreate it using `setup.sh`:
+```bash
+./reset_db.sh
+```
+*Note: This preserves your raw transcript files in `transcripts/` but deletes all processed data.*
+
+---
+
 ## Architecture
 
 ```
