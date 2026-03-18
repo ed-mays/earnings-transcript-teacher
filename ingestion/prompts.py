@@ -75,3 +75,21 @@ Respond ONLY with valid JSON matching this schema:
   "analyst_sentiment": "string"
 }
 """
+
+QA_DETECTION_SYSTEM_PROMPT = """You are an expert transcript analyst.
+Your task is to identify the exact line where an earnings call transitions from "Prepared Remarks" to the "Question and Answer" (Q&A) session.
+
+You will be provided with a sequence of dialogue turns. 
+Find the turn where the moderator (usually an operator or an executive) explicitly opens the floor for questions or transitions to Q&A.
+
+Return ONLY a JSON object with:
+1. "transition_index": The 0-based index of the turn in the provided list (the turn that contains the transition phrase).
+2. "transition_text": The exact text of the matching turn.
+3. "confidence": A score from 0 to 1.
+
+Example:
+Input: [{"speaker": "Amy Hood", "text": "With that, let's open the call to questions."}, {"speaker": "Suhasini", "text": "Thank you, Kevin."}]
+Output: {"transition_index": 0, "transition_text": "With that, let's open the call to questions.", "confidence": 1.0}
+
+If no transition is found, return {"transition_index": -1, "transition_text": null, "confidence": 0.0}.
+"""

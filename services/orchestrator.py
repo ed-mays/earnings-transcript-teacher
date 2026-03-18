@@ -10,6 +10,7 @@ from parsing.sections import (
     extract_qa_exchanges,
     extract_spans,
     enrich_speakers,
+    TURN_PATTERN,
 )
 from core.models import (
     CallAnalysis,
@@ -44,6 +45,39 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
 
     # Sections
     prepared_remarks, qa = extract_transcript_sections(raw_text)
+
+    # Fallback to LLM if both Regex and Heuristics failed to find a Q&A section
+    if not qa.strip():
+        try:
+            from services.llm import AgenticExtractor
+            extractor = AgenticExtractor()
+            
+            # Extract turns from the transcript
+            turns_metadata = [
+                {"speaker": m.group("speaker"), "text": m.group("text")}
+                for m in TURN_PATTERN.finditer(raw_text)
+            ]
+            
+            # Usually Q&A starts in the middle to late half. Look at 20% to 90%.
+            start_num = int(len(turns_metadata) * 0.2)
+            end_num = int(len(turns_metadata) * 0.9)
+            candidate_turns = turns_metadata[start_num:end_num]
+            
+            if candidate_turns:
+                print(f"  ↳ Deterministic Q&A detection failed. Triggering LLM fallback...")
+                result = extractor.detect_qa_transition(candidate_turns)
+                
+                t_idx = result.get("transition_index", -1)
+                if t_idx != -1 and result.get("confidence", 0) > 0.5:
+                    abs_idx = start_num + t_idx
+                    all_turns = list(TURN_PATTERN.finditer(raw_text))
+                    if abs_idx < len(all_turns):
+                        split_point = all_turns[abs_idx].start()
+                        prepared_remarks = raw_text[:split_point]
+                        qa = raw_text[split_point:]
+                        print(f"    ↳ LLM identified Q&A start at turn {abs_idx} (Confidence: {result['confidence']}).")
+        except Exception as e:
+            logger.warning(f"LLM Q&A detection fallback failed: {e}")
 
     # Call record
     call = CallRecord(

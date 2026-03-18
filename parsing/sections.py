@@ -29,17 +29,17 @@ _QA_TRANSITION_PATTERN: re.Pattern = re.compile(
     # "let's open it up / the floor / the call for questions"
     r"(?:let(?:'s|us)\s+)?open\s+(?:it\s+up|(?:the\s+)?(?:floor|call|line)s?)\s+(?:up\s+)?(?:to|for)\s+(?:your\s+)?questions?"
 
-    # "now we'll take / we will take / I'll take your questions"
-    r"|(?:now\s+)?(?:we(?:'ll|'re|\s+will|\s+are)|i(?:'ll|\s+will))\s+(?:now\s+)?(?:take|open\s+(?:it\s+)?up\s+for|begin\s+(?:taking\s+)?|move\s+to)\s+(?:your\s+|any\s+|some\s+)?questions?"
+    # "now we'll take / we will take / we're going to head over to questions / Q&A"
+    r"|(?:now\s+)?(?:we|i)\s*(?:'ll|'re|'m|will|are|am)?\s*(?:going\s+to)?\s*(?:now\s+)?(?:take|open\s+(?:it\s+)?up\s+for|begin\s+(?:taking\s+)?|move\s+to|head\s+over\s+to|transition\s+to|proceed\s+to|go\s+to)\s+(?:the\s+|your\s+|any\s+|some\s+|investor\s+|analyst\s+)?(?:q\s*(?:&|and)\s*a|questions?)"
 
     # "ready / happy / pleased to take your questions"
-    r"|(?:ready|happy|pleased)\s+to\s+(?:take|answer|address)\s+(?:your\s+|any\s+)?questions?"
+    r"|(?:ready|happy|pleased)\s+to\s+(?:take|answer|address|field)\s+(?:your\s+|any\s+|some\s+)?questions?"
 
     # "turn it over for questions", "turn the call over to Q&A"
     r"|turn\s+(?:it|the\s+call)?\s*over\s+(?:to\s+)?(?:the\s+)?(?:q\s*&\s*a|questions?)"
 
     # "move on/over to the/your Q&A / questions portion", incl. "let's move on to your questions"
-    r"|(?:let(?:'s|us)\s+)?move\s+(?:on|over)?\s*to\s+(?:the\s+|your\s+|any\s+|some\s+)?(?:q\s*(?:&|and)\s*a|questions?\s*(?:portion|section|part)?)"
+    r"|(?:let(?:'s|us)\s+)?(?:move|go|head)\s+(?:on|over)?\s*to\s+(?:the\s+|your\s+|any\s+|some\s+|investor\s+|analyst\s+)?(?:q\s*(?:&|and)\s*a|questions?\s*(?:portion|section|part)?)"
 
     # "start / begin the Q&A", "start taking questions"
     r"|(?:start|begin)\s+(?:the\s+)?(?:q\s*&\s*a|(?:taking\s+)?questions?)",
@@ -58,7 +58,7 @@ QA_PATTERN: re.Pattern = re.compile(
 # ---------------------------------------------------------------------------
 
 # Matches "First Last: text..." at the start of a line.
-_TURN_PATTERN: re.Pattern = re.compile(
+TURN_PATTERN: re.Pattern = re.compile(
     r"^(?P<speaker>[A-Z][a-zA-Z\-'.]+(?:\s+[A-Z][a-zA-Z\-'.]+)*)\s*:\s*(?P<text>.+?)(?=\n[A-Z]|\Z)",
     re.MULTILINE | re.DOTALL,
 )
@@ -128,7 +128,7 @@ def _parse_analyst_introductions(transcript: str) -> dict[str, str | None]:
     for suffix-based matching to handle these mismatches.
     """
     result: dict[str, str | None] = {}
-    for m in _TURN_PATTERN.finditer(transcript):
+    for m in TURN_PATTERN.finditer(transcript):
         if m.group("speaker").strip().lower() != "operator":
             continue
         for am in _ANALYST_INTRO_PATTERN.finditer(m.group("text")):
@@ -201,6 +201,59 @@ def _is_questioner(speaker: str, known_executives: set[str]) -> bool:
 # Speaker profiles
 # ---------------------------------------------------------------------------
 
+def _find_qa_start_heuristic(transcript: str) -> int | None:
+    """Fallback detection using speaker roles and moderator tracking.
+    
+    Used when regex-based heading/transition detection fails.
+    """
+    turns = list(_TURN_PATTERN.finditer(transcript))
+    if not turns:
+        return None
+
+    # Heuristic 1: First Analyst Detection
+    # The Q&A section usually starts when the first analyst is introduced.
+    first_analyst_idx = -1
+    for i, m in enumerate(turns):
+        speaker = m.group("speaker").strip()
+        text = m.group("text")
+        
+        # Check if speaker label itself identifies an analyst/investor
+        if _QUESTIONER_PATTERN.search(speaker):
+            first_analyst_idx = i
+            break
+            
+        # Check if the operator is currently introducing an analyst
+        if speaker.lower() == "operator" and _ANALYST_INTRO_PATTERN.search(text):
+            first_analyst_idx = i
+            break
+            
+    if first_analyst_idx != -1:
+        # Search backward from the first analyst turn to find the transition point.
+        # Usually it's in the turn immediately preceding the analyst (the operator)
+        # or just before that (the executive handing over).
+        for i in range(first_analyst_idx, max(-1, first_analyst_idx - 4), -1):
+            turn_text = turns[i].group("text")
+            if re.search(r"questions?|q\s*(?:&|and)\s*a", turn_text, re.I):
+                return turns[i].start()
+        # Fallback: start at the analyst's introduction
+        return turns[first_analyst_idx].start()
+
+    # Heuristic 2: Moderator Tracking
+    # The moderator (first speaker) usually gives the prepared remarks and then
+    # transitions to Q&A. Their last turn mentioning 'questions' is a good signal.
+    moderator_name = turns[0].group("speaker").strip()
+    last_mod_q_idx = -1
+    for i, m in enumerate(turns):
+        if m.group("speaker").strip() == moderator_name:
+            if re.search(r"questions?|q\s*(?:&|and)\s*a", m.group("text"), re.I):
+                last_mod_q_idx = i
+    
+    if last_mod_q_idx != -1:
+        return turns[last_mod_q_idx].start()
+
+    return None
+
+
 @dataclass
 class SpeakerProfile:
     """Enriched metadata for a single transcript speaker."""
@@ -225,7 +278,7 @@ def extract_speakers(transcript: str) -> list[tuple[str, int]]:
         List of (speaker_name, turn_count) tuples, ordered by first appearance.
     """
     seen: dict[str, int] = {}
-    for m in _TURN_PATTERN.finditer(transcript):
+    for m in TURN_PATTERN.finditer(transcript):
         speaker = m.group("speaker").strip()
         seen[speaker] = seen.get(speaker, 0) + 1
     return list(seen.items())
@@ -260,7 +313,7 @@ def enrich_speakers(
 
     # Collect speakers in first-appearance order with turn counts.
     seen: dict[str, int] = {}
-    for m in _TURN_PATTERN.finditer(transcript):
+    for m in TURN_PATTERN.finditer(transcript):
         name = m.group("speaker").strip()
         seen[name] = seen.get(name, 0) + 1
 
@@ -334,6 +387,15 @@ def extract_transcript_sections(
     all_qa_matches = list(qa_pattern.finditer(transcript))
     qa_match = all_qa_matches[-1] if all_qa_matches else None
 
+    # Try heuristic fallback if regex fails
+    if not qa_match:
+        heuristic_start = _find_qa_start_heuristic(transcript)
+        if heuristic_start is not None:
+            # We don't have a 'match' object, so we manually split
+            prepared_remarks = transcript[prepared_match.end():heuristic_start] if prepared_match else transcript[:heuristic_start]
+            qa = transcript[heuristic_start:]
+            return prepared_remarks, qa
+
     if not prepared_match and not qa_match:
         # No section markers found at all — return the full transcript.
         return transcript, ""
@@ -390,7 +452,7 @@ def extract_qa_exchanges(
     """
     turns: list[Turn] = [
         (m.group("speaker").strip(), m.group("text").strip())
-        for m in _TURN_PATTERN.finditer(qa_text)
+        for m in TURN_PATTERN.finditer(qa_text)
     ]
 
     if executive_names is None:
@@ -400,7 +462,7 @@ def extract_qa_exchanges(
     if prepared_remarks:
         pr_speakers = {
             m.group("speaker").strip()
-            for m in _TURN_PATTERN.finditer(prepared_remarks)
+            for m in TURN_PATTERN.finditer(prepared_remarks)
         }
         executive_names = executive_names | pr_speakers
 
@@ -490,7 +552,7 @@ def extract_spans(
     spans: list[RawSpan] = []
     order = 0
 
-    for m in _TURN_PATTERN.finditer(transcript):
+    for m in TURN_PATTERN.finditer(transcript):
         speaker = m.group("speaker").strip()
         text = m.group("text").strip()
         if not text:
