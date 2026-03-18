@@ -7,7 +7,7 @@ from typing import Dict, Any
 from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_if_exception_type
 
 import anthropic
-from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT
+from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +198,28 @@ class AgenticExtractor:
             model=self.tier3_model,
             max_tokens=1024,
             system=TIER_3_SYNTHESIS_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+        return self._parse_response(message)
+    @retry(
+        wait=wait_exponential_jitter(initial=2, max=60),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception_type(anthropic.APIStatusError),
+        reraise=True
+    )
+    def detect_qa_transition(self, turns: list[dict[str, str]]) -> dict[str, Any]:
+        """Use LLM to identify the exact turn where Q&A begins.
+        
+        Args:
+            turns: List of {"speaker": "...", "text": "..."} turns.
+                  Should be a subset of the transcript (e.g. the middle 60%).
+        """
+        user_prompt = f"### Transcript Turns:\n{json.dumps(turns, indent=2)}\n\nIdentify the transition index."
+        self.rate_limiter.wait()
+        message = self.client.messages.create(
+            model=self.tier3_model, # Use cheaper model (Haiku) for this
+            max_tokens=512,
+            system=QA_DETECTION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
         return self._parse_response(message)
