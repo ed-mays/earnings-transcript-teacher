@@ -14,43 +14,35 @@ def display(result: CallAnalysis) -> None:
     print(f"Prepared Remarks: {call.prepared_len} chars")
     print(f"Q&A: {call.qa_len} chars")
 
-    print("\nSpeaker Identification")
-    print(f"Speakers ({len(result.speakers)} unique):")
-    for p in result.speakers:
-        detail = p.title or p.firm or ""
-        detail_str = f", {detail}" if detail else ""
-        print(f"  [{p.role:<10}] {p.name}{detail_str} ({p.turn_count} turn{'s' if p.turn_count != 1 else ''})")
-
-    print("\nQ&A Exchange Extraction")
-    print(f"\nQ&A exchanges found: {len(result.qa_pairs)}")
-    # Show first 3 exchanges using span data
-    exec_names = {p.name for p in result.speakers if p.role == "executive"}
-    span_by_id = {s.id: s for s in result.spans}
-    for pair in result.qa_pairs[:3]:
-        all_ids = pair.question_span_ids + pair.answer_span_ids
-        turns = [(span_by_id[sid].speaker_name, span_by_id[sid].text)
-                 for sid in all_ids if sid in span_by_id]
-        print(f"\n--- Exchange {pair.exchange_order} ({len(turns)} turns) ---")
-        for speaker, text in turns:
-            print(f"  {speaker}: {text}")
-
-    print("\nKeyword Extraction (TF-IDF)")
-    for kw in result.keywords:
-        print(f"  {kw.score:.4f}  {kw.term}")
-
-    print("\nTheme Extraction (Agentic)")
-    themes = getattr(result.synthesis, "key_themes", []) if getattr(result, "synthesis", None) else []
-    for i, t in enumerate(themes, 1):
-        print(f"  Theme {i}: {t}")
-
-    print("\nKey Takeaways (Agentic)")
-    agentic_takeaways = []
+    print("\nAI Insights")
+    print("-" * 11)
+    
+    # Count takeaways across all chunks
+    takeaways_count = 0
+    industry_jargon_count = 0
     for chunk in getattr(result, "chunks", []):
-        agentic_takeaways.extend(getattr(chunk, "takeaways", []))
-    for i, t in enumerate(agentic_takeaways[:5], 1):
-        print(f"  {i}. {t.get('takeaway', '')}")
-        print(f"     Significance: {t.get('why_it_matters', '')}")
-        
+        takeaways_count += len(getattr(chunk, "takeaways", []))
+        industry_jargon_count += len([t for t in getattr(chunk, "extracted_terms", []) if t.get("category") == "industry"])
+    
+    themes_count = len(result.synthesis.key_themes) if result.synthesis else 0
+    
+    print(f"  AI identified {takeaways_count} key takeaways")
+    print(f"  AI identified {themes_count} key themes")
+    print(f"  AI identified and defined {industry_jargon_count} relevant industry jargon terms")
+
+    print("\nExtraction & Analysis")
+    print("-" * 21)
+    
+    # Count financial jargon across all chunks
+    financial_jargon_count = 0
+    for chunk in getattr(result, "chunks", []):
+        financial_jargon_count += len([t for t in getattr(chunk, "extracted_terms", []) if t.get("category") == "financial"])
+
+    print(f"  TF-IDF analysis identified {len(result.keywords)} relevant keywords")
+    print(f"  Identified {financial_jargon_count} relevant financial jargon terms")
+    print(f"  Identified {len(result.speakers)} speakers")
+    print(f"  Identified {len(result.qa_pairs)} Q&A exchanges")
+
     print("\nSemantic Search")
     num_embeddings = sum(1 for s in result.spans if s.embedding is not None)
     if num_embeddings > 0:
