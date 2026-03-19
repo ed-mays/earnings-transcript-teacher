@@ -17,6 +17,7 @@ from db.persistence import (
 )
 from nlp.embedder import get_embeddings
 from services.llm import stream_chat
+from db.repositories import AnalysisRepository
 
 # ------------- Configuration -------------
 
@@ -63,7 +64,7 @@ def auto_migrate():
                         installed_at TIMESTAMPTZ DEFAULT now()
                     );
                 """)
-                cur.execute("INSERT INTO schema_version (version) VALUES (1) ON CONFLICT DO NOTHING;")
+                cur.execute("INSERT INTO schema_version (version) VALUES (2) ON CONFLICT DO NOTHING;")
             conn.commit()
             
         # Version check
@@ -144,11 +145,22 @@ def handle_explain_click(ticker: str, term: str, current_exp: str):
         st.session_state[f"show_exp_{ticker}_{term}"] = True
 
 def generate_definition(ticker: str, term: str) -> bool:
-    """Call the LLM to generate a general dictionary definition, then save it."""
+    """Call the LLM to generate a company-grounded definition, then save it."""
     with st.spinner(f"Defining {term}..."):
         try:
-            system_prompt = "You are a precise financial dictionary. Define the provided term generally in 1-2 sentences. Return ONLY the definition text."
-            messages = [{"role": "user", "content": f"Term: {term}"}]
+            repo = AnalysisRepository(CONN_STR)
+            company_name, industry = repo.get_company_info(ticker)
+            if company_name and industry:
+                context = f"{company_name} ({ticker}) — {industry}"
+            elif company_name:
+                context = f"{company_name} ({ticker})"
+            else:
+                context = ticker
+            system_prompt = (
+                f"You are a precise financial analyst. Define the provided term in the context of "
+                f"{context}. Return ONLY the definition, 1-2 sentences."
+            )
+            messages = [{"role": "user", "content": f"Company: {context}\nTerm: {term}"}]
             
             definition = ""
             for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):

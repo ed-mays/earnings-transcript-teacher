@@ -34,6 +34,8 @@ class CallRecord:
     prepared_len: int
     qa_len: int
     id: UUID = field(default_factory=uuid4)
+    company_name: str = ""
+    industry: str = ""
 
 
 @dataclass

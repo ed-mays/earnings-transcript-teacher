@@ -55,6 +55,51 @@ def test_agentic_extractor_tier1(mocker, monkeypatch):
     assert result["tier1_score"] == 8
     assert result["requires_deep_analysis"] is True
 
+
+def test_agentic_extractor_tier1_includes_company_context(mocker, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake_key")
+
+    mock_anthropic = mocker.patch("services.llm.anthropic.Anthropic")
+    mock_instance = MagicMock()
+    mock_anthropic.return_value = mock_instance
+
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(text='{"tier1_score": 5, "requires_deep_analysis": false}')]
+    mock_message.model = "claude-haiku-4-5-20251001"
+    mock_message.usage.input_tokens = 100
+    mock_message.usage.output_tokens = 50
+    mock_instance.messages.create.return_value = mock_message
+
+    extractor = AgenticExtractor()
+    extractor.extract_tier1("Some transcript text", "prepared_remarks", company_context="Tesla, Inc. (TSLA) — Motor Vehicles")
+
+    call_kwargs = mock_instance.messages.create.call_args
+    user_message = call_kwargs[1]["messages"][0]["content"]
+    assert "### Company: Tesla, Inc. (TSLA) — Motor Vehicles" in user_message
+
+
+def test_agentic_extractor_tier1_no_company_context_header(mocker, monkeypatch):
+    """When company_context is empty, no ### Company header should appear."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake_key")
+
+    mock_anthropic = mocker.patch("services.llm.anthropic.Anthropic")
+    mock_instance = MagicMock()
+    mock_anthropic.return_value = mock_instance
+
+    mock_message = MagicMock()
+    mock_message.content = [MagicMock(text='{"tier1_score": 3, "requires_deep_analysis": false}')]
+    mock_message.model = "claude-haiku-4-5-20251001"
+    mock_message.usage.input_tokens = 50
+    mock_message.usage.output_tokens = 20
+    mock_instance.messages.create.return_value = mock_message
+
+    extractor = AgenticExtractor()
+    extractor.extract_tier1("Some transcript text", "prepared_remarks")
+
+    call_kwargs = mock_instance.messages.create.call_args
+    user_message = call_kwargs[1]["messages"][0]["content"]
+    assert "### Company:" not in user_message
+
 def test_agentic_extractor_tier2_failure(mocker, monkeypatch):
     import anthropic as anthropic_lib
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake_key")

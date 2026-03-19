@@ -154,9 +154,10 @@ class AgenticExtractor:
         retry=retry_if_exception_type(anthropic.APIStatusError),
         reraise=True
     )
-    def extract_tier1(self, text: str, chunk_type: str) -> Dict[str, Any]:
+    def extract_tier1(self, text: str, chunk_type: str, company_context: str = "") -> Dict[str, Any]:
         """Run Tier 1 extraction for glossary, core concepts, and complexity score."""
-        user_prompt = f"### Chunk Type: {chunk_type}\n### Transcript Text:\n{text}\n\nExtract the requested JSON metadata."
+        company_header = f"### Company: {company_context}\n" if company_context else ""
+        user_prompt = f"{company_header}### Chunk Type: {chunk_type}\n### Transcript Text:\n{text}\n\nExtract the requested JSON metadata."
         self.rate_limiter.wait()
         message = self.client.messages.create(
             model=self.tier1_model,

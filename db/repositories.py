@@ -11,7 +11,7 @@ class OutdatedSchemaError(Exception):
     """Exception raised when the database schema is out of date."""
     pass
 
-REQUIRED_SCHEMA_VERSION = 1
+REQUIRED_SCHEMA_VERSION = 2
 
 
 def reset_all_data(conn_str: str) -> None:
@@ -58,6 +58,22 @@ class SchemaRepository:
 class CallRepository:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str
+
+    def get_company_info(self, ticker: str) -> tuple[str, str]:
+        """Return (company_name, industry) for a ticker, or empty strings if not found."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT company_name, industry FROM calls WHERE ticker = %s LIMIT 1",
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        return (row[0] or "", row[1] or "")
+        except Exception as e:
+            logger.warning(f"Could not fetch company info for {ticker}: {e}")
+        return ("", "")
 
     def get_all_calls(self) -> list[tuple[str, str]]:
         calls = []
@@ -438,15 +454,16 @@ class AnalysisRepository:
         cur.execute(
             """
             INSERT INTO calls (
-                id, ticker, company_name, fiscal_quarter, call_date,
+                id, ticker, company_name, industry, fiscal_quarter, call_date,
                 transcript_json, transcript_text, token_count,
                 prepared_len, qa_len
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 str(call.id),
                 call.ticker,
-                None,  # company_name
+                call.company_name or None,
+                call.industry or None,
                 fiscal_quarter,
                 None,  # call_date
                 call.transcript_json,

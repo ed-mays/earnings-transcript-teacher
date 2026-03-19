@@ -207,11 +207,21 @@ class IngestionPipeline:
         # Initialize the LLM client wrapper
         from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
+        self.company_context: str = ""
 
     def process(self, analysis: CallAnalysis) -> List[TranscriptChunk]:
         """Run the full ingestion pipeline on a parsed CallAnalysis."""
         logger.info(f"Starting agentic ingestion for {analysis.call.ticker}")
-        
+
+        # Build company context string for LLM prompts
+        call = analysis.call
+        if call.company_name and call.industry:
+            self.company_context = f"{call.company_name} ({call.ticker}) — {call.industry}"
+        elif call.company_name:
+            self.company_context = f"{call.company_name} ({call.ticker})"
+        else:
+            self.company_context = call.ticker
+
         chunks = create_chunks_from_analysis(analysis)
         prep_count = sum(1 for c in chunks if c.chunk_type == 'prepared')
         qa_count = sum(1 for c in chunks if c.chunk_type == 'qa')
@@ -226,7 +236,7 @@ class IngestionPipeline:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Map chunk indices to future objects so we know which is which when completed
             future_to_chunk = {
-                executor.submit(self._process_single_chunk, chunk, i, len(chunks)): chunk 
+                executor.submit(self._process_single_chunk, chunk, i, len(chunks), self.company_context): chunk
                 for i, chunk in enumerate(chunks, 1)
             }
             
@@ -277,14 +287,14 @@ class IngestionPipeline:
         print("✅ Agentic ingestion complete.\n")
         return chunks
         
-    def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int) -> None:
+    def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int, company_context: str = "") -> None:
         """Helper method to process a single chunk, designed to run in a thread."""
         logger.info(f"Processing chunk {chunk.chunk_id} [{index}/{total_chunks}]")
         # print relies on thread-safety of the built-in print, but might interleave slightly in stdout.
         # This is usually fine for a simple UI, but could be logged instead.
         print(f"  [{index}/{total_chunks}] Analysing {chunk.chunk_id}... ")
-        
-        t1_usage = self._run_tier1(chunk)
+
+        t1_usage = self._run_tier1(chunk, company_context)
         if t1_usage:
             logger.info(f"Chunk {chunk.chunk_id} - Tier 1 usage: {t1_usage}")
             # print(f"    ↳ Tier 1 [Model: {t1_usage['model']} | In: {t1_usage['prompt_tokens']} | Out: {t1_usage['completion_tokens']}]")
@@ -300,9 +310,9 @@ class IngestionPipeline:
             logger.info(f"Chunk {chunk.chunk_id} - Skipping Tier 2 (Score: {getattr(chunk, 'tier1_score', 0)})")
             # print(f"    ↳ Skipping Tier 2 for {chunk.chunk_id} (Score: {getattr(chunk, 'tier1_score', 0)}).")
         
-    def _run_tier1(self, chunk: TranscriptChunk) -> Optional[Dict[str, Any]]:
+    def _run_tier1(self, chunk: TranscriptChunk, company_context: str = "") -> Optional[Dict[str, Any]]:
         """Run Tier 1 extraction: LLM for industry terms + CSV scan for financial terms."""
-        tier1_data = self.extractor.extract_tier1(chunk.text, chunk.chunk_type)
+        tier1_data = self.extractor.extract_tier1(chunk.text, chunk.chunk_type, company_context)
 
         industry_terms = [
             {**t, "category": "industry"}

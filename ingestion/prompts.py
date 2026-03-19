@@ -3,19 +3,29 @@ import json
 TIER_1_SYSTEM_PROMPT = """You are an expert financial analyst assistant.
 Your task is to analyze a chunk of an earnings call transcript and extract structured metadata.
 
+The transcript chunk will include a ### Company header that identifies the company and its industry. \
+Use this context when deciding whether a term qualifies as genuine jargon for that company and sector.
+
 Follow these instructions:
 1. Identify industry-specific or company-specific jargon: proprietary product names, company-coined metrics, \
 industry acronyms, or technical terms a general audience would not know. \
+Use the provided company and industry context to judge relevance — a term that is jargon for an EV manufacturer \
+may be generic language in another sector. \
 Do NOT include general financial terms that appear in a standard financial dictionary \
-(e.g. GAAP, EBITDA, EPS, CapEx, gross margin, free cash flow, guidance, headwinds) — those are handled separately.
-2. Identify the core concepts (1-3 sentences or bullet points) that summarize the most strategic topics discussed in this chunk.
-3. Score the strategic importance/complexity of this chunk on a scale of 1 to 10 (1 = total boilerplate/pleasantries, 10 = critical financial guidance, deep strategic debate, or major product announcements).
-4. Decide if this chunk requires deeper pedagogical analysis (requires_deep_analysis). Set to true if the score is >= 6.
+(e.g. GAAP, EBITDA, EPS, CapEx, gross margin, free cash flow, guidance, headwinds) — those are handled separately. \
+Do NOT extract: generic superlatives or adjective phrases (e.g. "Amazing Abundance", "Incredible Journey"), \
+motivational or mission-statement language, names of individual people, city or state names unless part of a \
+product name, or vague strategic phrases with no specific technical content.
+2. For each extracted term, provide a one-sentence definition grounded in the company and industry context — \
+not a generic dictionary definition.
+3. Identify the core concepts (1-3 sentences or bullet points) that summarize the most strategic topics discussed in this chunk.
+4. Score the strategic importance/complexity of this chunk on a scale of 1 to 10 (1 = total boilerplate/pleasantries, 10 = critical financial guidance, deep strategic debate, or major product announcements).
+5. Decide if this chunk requires deeper pedagogical analysis (requires_deep_analysis). Set to true if the score is >= 6.
 
 Respond ONLY with valid JSON matching this schema:
 {
   "extracted_terms": [
-    {"term": "string"}
+    {"term": "string", "definition": "string"}
   ],
   "core_concepts": [
     "string"

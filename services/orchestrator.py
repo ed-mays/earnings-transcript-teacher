@@ -1,3 +1,4 @@
+import json
 import os
 import logging
 from parsing.loader import read_text_file, extract_transcript_text
@@ -39,6 +40,11 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     file_path = f"./transcripts/{ticker}.json"
     content = read_text_file(file_path)
     raw_text = extract_transcript_text(content)
+
+    # Look up company name and industry from SEC EDGAR using the CIK in the transcript JSON
+    from services.company_info import fetch_company_info
+    cik = json.loads(content).get("cik", "")
+    company_name, industry = fetch_company_info(cik) if cik else ("", "")
 
     # Basic stats
     tokens = tokenize(clean_text(raw_text))
@@ -87,6 +93,8 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
         token_count=len(tokens),
         prepared_len=len(prepared_remarks),
         qa_len=len(qa),
+        company_name=company_name,
+        industry=industry,
     )
 
     # Speakers
