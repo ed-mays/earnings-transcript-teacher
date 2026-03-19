@@ -14,7 +14,7 @@ CREATE TABLE schema_version (
 );
 
 -- Initialize version
-INSERT INTO schema_version (version) VALUES (1) ON CONFLICT DO NOTHING;
+INSERT INTO schema_version (version) VALUES (2) ON CONFLICT DO NOTHING;
 
 
 -- One row per earnings call
@@ -22,6 +22,7 @@ CREATE TABLE calls (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ticker          TEXT NOT NULL,
     company_name    TEXT,
+    industry        TEXT,
     fiscal_quarter  TEXT,                              -- e.g. 'Q3 2025'
     call_date       DATE,
     transcript_json TEXT,                              -- raw API response
