@@ -3,7 +3,7 @@ import logging
 import psycopg
 import psycopg.errors
 from pgvector.psycopg import register_vector
-from core.models import CallAnalysis
+from core.models import CallAnalysis, TranscriptChunk
 
 logger = logging.getLogger(__name__)
 
@@ -549,7 +549,7 @@ class AnalysisRepository:
                 (str(call_id), pair.exchange_order, q_id, a_id)
             )
 
-    def _save_agentic_chunks(self, cur, call_id, chunks):
+    def _save_agentic_chunks(self, cur, call_id, chunks: list[TranscriptChunk]) -> None:
         """Persist all LLM-extracted data for each chunk."""
         for chunk in chunks:
             self._save_chunk_record(cur, call_id, chunk)
@@ -559,7 +559,7 @@ class AnalysisRepository:
             self._save_chunk_evasion(cur, call_id, chunk)
             self._save_chunk_misconceptions(cur, call_id, chunk)
 
-    def _save_chunk_record(self, cur, call_id, chunk) -> None:
+    def _save_chunk_record(self, cur, call_id, chunk: TranscriptChunk) -> None:
         """Insert the transcript_chunks row for one chunk."""
         cur.execute(
             """
@@ -569,15 +569,15 @@ class AnalysisRepository:
             """,
             (
                 str(call_id), chunk.chunk_id, chunk.chunk_type,
-                chunk.sequence_order, getattr(chunk, "tier1_score", None),
-                getattr(chunk, "requires_deep_analysis", False),
+                chunk.sequence_order, chunk.tier1_score,
+                chunk.requires_deep_analysis,
                 chunk.text,
             ),
         )
 
-    def _save_chunk_terms(self, cur, call_id, chunk) -> None:
+    def _save_chunk_terms(self, cur, call_id, chunk: TranscriptChunk) -> None:
         """Insert extracted_terms rows for one chunk."""
-        for term_data in getattr(chunk, "extracted_terms", []):
+        for term_data in chunk.extracted_terms:
             term = term_data.get("term")
             if not term:
                 continue
@@ -594,9 +594,9 @@ class AnalysisRepository:
                 ),
             )
 
-    def _save_chunk_concepts(self, cur, call_id, chunk) -> None:
+    def _save_chunk_concepts(self, cur, call_id, chunk: TranscriptChunk) -> None:
         """Insert core_concepts rows for one chunk."""
-        for concept in getattr(chunk, "core_concepts", []):
+        for concept in chunk.core_concepts:
             if not concept:
                 continue
             cur.execute(
@@ -604,9 +604,9 @@ class AnalysisRepository:
                 (str(call_id), chunk.chunk_id, concept),
             )
 
-    def _save_chunk_takeaways(self, cur, call_id, chunk) -> None:
+    def _save_chunk_takeaways(self, cur, call_id, chunk: TranscriptChunk) -> None:
         """Insert extracted_takeaways rows for one chunk."""
-        for takeaway_data in getattr(chunk, "takeaways", []):
+        for takeaway_data in chunk.takeaways:
             takeaway = takeaway_data.get("takeaway")
             if not takeaway:
                 continue
@@ -618,9 +618,9 @@ class AnalysisRepository:
                 (str(call_id), chunk.chunk_id, takeaway, takeaway_data.get("why_it_matters") or ""),
             )
 
-    def _save_chunk_evasion(self, cur, call_id, chunk) -> None:
+    def _save_chunk_evasion(self, cur, call_id, chunk: TranscriptChunk) -> None:
         """Insert evasion_analysis row for one chunk if present."""
-        evasion = getattr(chunk, "evasion_analysis", None)
+        evasion = chunk.evasion_analysis
         if not evasion or not evasion.get("analyst_concern"):
             return
         cur.execute(
@@ -636,9 +636,9 @@ class AnalysisRepository:
             ),
         )
 
-    def _save_chunk_misconceptions(self, cur, call_id, chunk) -> None:
+    def _save_chunk_misconceptions(self, cur, call_id, chunk: TranscriptChunk) -> None:
         """Insert misconceptions rows for one chunk."""
-        for gotcha in getattr(chunk, "misconceptions", []):
+        for gotcha in chunk.misconceptions:
             fact = gotcha.get("fact")
             if not fact:
                 continue

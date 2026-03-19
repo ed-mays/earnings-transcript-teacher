@@ -21,8 +21,8 @@ from db.persistence import (
 )
 from nlp.embedder import get_embeddings
 from services.llm import stream_chat
+from services.company_info import build_company_context
 from db.repositories import AnalysisRepository, CallRepository
-from ingestion.pipeline import _build_company_context
 
 # ------------- Configuration -------------
 
@@ -52,36 +52,17 @@ def load_transcripts():
     return [c[0] for c in calls] if calls else []
 
 def auto_migrate():
-    """Ensure database schema is up to date and check version."""
+    """Check that the database schema is up to date. Run migrate.py if not."""
     try:
-        import psycopg
         from db.repositories import SchemaRepository
-        
-        # Original simple migration
-        with psycopg.connect(CONN_STR) as conn:
-            with conn.cursor() as cur:
-                cur.execute("ALTER TABLE extracted_terms ADD COLUMN IF NOT EXISTS explanation TEXT DEFAULT '';")
-                # Also ensure schema_version table exists for version 1 initialization
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS schema_version (
-                        version     INTEGER PRIMARY KEY,
-                        installed_at TIMESTAMPTZ DEFAULT now()
-                    );
-                """)
-                cur.execute("INSERT INTO schema_version (version) VALUES (2) ON CONFLICT DO NOTHING;")
-            conn.commit()
-            
-        # Version check
         schema_repo = SchemaRepository(CONN_STR)
         is_ok, error_msg = schema_repo.check_health()
         if not is_ok:
             st.error(f"⚠️ {error_msg}")
-            # We don't st.stop() here because the user might just want to browse existing data,
-            # but ingestion should still fail if they try it.
             return False
         return True
     except Exception as e:
-        st.warning(f"Auto-migrate/Health check failed: {e}")
+        st.warning(f"Schema health check failed: {e}")
         return False
 
 # Run migration once per browser session (not cached across sessions).
@@ -153,7 +134,7 @@ def generate_definition(ticker: str, term: str) -> bool:
         try:
             repo = CallRepository(CONN_STR)
             company_name, industry = repo.get_company_info(ticker)
-            context = _build_company_context(ticker, company_name, industry)
+            context = build_company_context(ticker, company_name, industry)
             system_prompt = (
                 f"You are a precise financial analyst. Define the provided term in the context of "
                 f"{context}. Return ONLY the definition, 1-2 sentences."

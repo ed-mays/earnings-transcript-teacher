@@ -2,6 +2,9 @@ import os
 import re
 import sys
 import subprocess
+from pathlib import Path
+
+_PROMPTS_DIR = Path(__file__).parent.parent / "prompts" / "feynman"
 
 from db.persistence import (
     save_analysis,
@@ -104,15 +107,15 @@ def interactive_menu() -> None:
                                 jargon_terms = get_extracted_terms_for_ticker(conn_str, ticker, limit=10)
                                 if not jargon_terms:
                                     raw_keywords = get_keywords_for_ticker(conn_str, ticker, limit=10)
-                                    jargon_terms = [(k, "A frequently used keyword in this call.") for k in raw_keywords]
-                                    
+                                    jargon_terms = [(k, "A frequently used keyword in this call.", "") for k in raw_keywords]
+
                                 if jargon_terms:
                                     print("\nExtracting key financial jargon for beginners...")
-                                    terms_str = "\n".join(f"- {term}: {definition}" for term, definition in jargon_terms)
+                                    terms_str = "\n".join(f"- {term}: {definition}" for term, definition, _ in jargon_terms)
                                     user_input = f"Here is a list of financial jargon and terms from the transcript:\n{terms_str}\n\nPlease explain the most important ones simply to a beginner."
                                     
                                     try:
-                                        with open("prompts/feynman/00_beginner_jargon.md", "r") as f:
+                                        with open(_PROMPTS_DIR / "00_beginner_jargon.md", "r") as f:
                                             sys_prompt = f.read()
                                     except FileNotFoundError:
                                         sys_prompt = "You are a friendly mentor explaining financial jargon simply to a beginner. Explain these terms."
@@ -158,7 +161,7 @@ def interactive_menu() -> None:
                                     user_input = f"Here are the key takeaways:\n{takeaways_str}\n\n<transcript_context>\n{context_str}\n</transcript_context>\n\nPlease explain why these takeaways are significant."
                                     
                                     try:
-                                        with open("prompts/feynman/00_beginner_takeaways.md", "r") as f:
+                                        with open(_PROMPTS_DIR / "00_beginner_takeaways.md", "r") as f:
                                             sys_prompt = f.read()
                                     except FileNotFoundError:
                                         sys_prompt = "You are a helpful expert. Explain why the following key takeaways are significant based on the provided transcript context."
@@ -356,7 +359,7 @@ def interactive_menu() -> None:
                             print(f"  {idx}. {s}")
                             
                     try:
-                        with open("prompts/feynman/00_general_qa.md", "r") as f:
+                        with open(_PROMPTS_DIR / "00_general_qa.md", "r") as f:
                             system_prompt = f.read()
                     except FileNotFoundError:
                         system_prompt = "You are a helpful expert answering questions using the transcript context."

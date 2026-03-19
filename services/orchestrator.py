@@ -141,7 +141,6 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     api_count = len(spans_to_embed) if new_embeddings else 0
     cached_count = len(span_records) - len(spans_to_embed)
     
-    # Store these counts temporarily on the call object so display() can show them
     call.cached_embeddings_count = cached_count
     call.api_embeddings_count = api_count
 
@@ -237,8 +236,9 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     try:
         from ingestion.pipeline import IngestionPipeline
         pipeline = IngestionPipeline()
-        chunks = pipeline.process(analysis)
+        chunks, synthesis = pipeline.process(analysis)
         analysis.chunks = chunks
+        analysis.synthesis = synthesis
     except Exception as e:
         logger.warning(f"Agentic pipeline failed or skipped: {e}")
 

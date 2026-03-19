@@ -9,13 +9,13 @@ Each topic is represented as a ranked list of related terms, giving the
 user a high-level thematic map of the call.
 """
 
-import re
 from dataclasses import dataclass
 
 from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from nlp.keywords import ALL_STOP_WORDS
+from parsing.sections import TURN_PATTERN
 
 # Extra stop words for theme extraction — structural / boilerplate language
 # that adds noise when NMF tries to form coherent topic clusters.
@@ -29,14 +29,6 @@ _THEME_EXTRA_STOPS: list[str] = [
 
 _THEME_STOP_WORDS: list[str] = sorted(
     set(ALL_STOP_WORDS) | set(_THEME_EXTRA_STOPS)
-)
-
-# Matches "First Last: text..." at the start of a line.
-# Mirrors _TURN_PATTERN in sections.py but is kept local to avoid a
-# circular-import risk if sections.py ever imports from this module.
-_TURN_PATTERN: re.Pattern = re.compile(
-    r"^(?P<speaker>[A-Z][a-zA-Z\-'.]+(?:\s+[A-Z][a-zA-Z\-'.]+)*)\s*:\s*(?P<text>.+?)(?=\n[A-Z]|\Z)",
-    re.MULTILINE | re.DOTALL,
 )
 
 
@@ -73,7 +65,7 @@ def extract_themes(
     # --- 1. Segment into speaker turns ---------------------------------
     turns = [
         m.group("text").strip()
-        for m in _TURN_PATTERN.finditer(transcript_text)
+        for m in TURN_PATTERN.finditer(transcript_text)
         if (
             m.group("speaker").strip().lower() != "operator"
             and len(m.group("text").strip()) > 50  # skip very short turns
