@@ -100,6 +100,7 @@ def test_agentic_extractor_tier1_no_company_context_header(mocker, monkeypatch):
     user_message = call_kwargs[1]["messages"][0]["content"]
     assert "### Company:" not in user_message
 
+
 def test_agentic_extractor_tier2_failure(mocker, monkeypatch):
     import anthropic as anthropic_lib
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake_key")

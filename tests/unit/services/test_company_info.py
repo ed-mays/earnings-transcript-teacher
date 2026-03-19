@@ -39,6 +39,18 @@ def test_fetch_company_info_network_error(mocker):
     assert industry == ""
 
 
+def test_fetch_company_info_http_error(mocker):
+    import requests as requests_lib
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = requests_lib.HTTPError("404 Not Found")
+    mocker.patch("services.company_info.requests.get", return_value=mock_response)
+
+    company_name, industry = fetch_company_info("000000")
+
+    assert company_name == ""
+    assert industry == ""
+
+
 def test_fetch_company_info_integer_cik(mocker):
     mock_response = MagicMock()
     mock_response.json.return_value = {"name": "Tesla, Inc.", "sicDescription": "Motor Vehicles & Passenger Car Bodies"}

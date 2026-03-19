@@ -2,6 +2,7 @@ import json
 import os
 import logging
 from parsing.loader import read_text_file, extract_transcript_text
+from services.company_info import fetch_company_info
 from nlp.analysis import clean_text, tokenize
 from nlp.keywords import extract_keywords
 from nlp.themes import extract_themes
@@ -42,7 +43,6 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     raw_text = extract_transcript_text(content)
 
     # Look up company name and industry from SEC EDGAR using the CIK in the transcript JSON
-    from services.company_info import fetch_company_info
     cik = json.loads(content).get("cik", "")
     company_name, industry = fetch_company_info(cik) if cik else ("", "")
 
