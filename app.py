@@ -17,7 +17,8 @@ from db.persistence import (
 )
 from nlp.embedder import get_embeddings
 from services.llm import stream_chat
-from db.repositories import AnalysisRepository
+from db.repositories import AnalysisRepository, CallRepository
+from ingestion.pipeline import _build_company_context
 
 # ------------- Configuration -------------
 
@@ -148,14 +149,9 @@ def generate_definition(ticker: str, term: str) -> bool:
     """Call the LLM to generate a company-grounded definition, then save it."""
     with st.spinner(f"Defining {term}..."):
         try:
-            repo = AnalysisRepository(CONN_STR)
+            repo = CallRepository(CONN_STR)
             company_name, industry = repo.get_company_info(ticker)
-            if company_name and industry:
-                context = f"{company_name} ({ticker}) — {industry}"
-            elif company_name:
-                context = f"{company_name} ({ticker})"
-            else:
-                context = ticker
+            context = _build_company_context(ticker, company_name, industry)
             system_prompt = (
                 f"You are a precise financial analyst. Define the provided term in the context of "
                 f"{context}. Return ONLY the definition, 1-2 sentences."

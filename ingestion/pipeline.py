@@ -201,26 +201,28 @@ def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000, o
             
     return chunks
 
+def _build_company_context(ticker: str, company_name: str, industry: str) -> str:
+    """Return a human-readable company context string for LLM prompts."""
+    if company_name and industry:
+        return f"{company_name} ({ticker}) — {industry}"
+    if company_name:
+        return f"{company_name} ({ticker})"
+    return ticker
+
+
 class IngestionPipeline:
     def __init__(self, tier1_threshold: int = 6):
         self.tier1_threshold = tier1_threshold
         # Initialize the LLM client wrapper
         from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
-        self.company_context: str = ""
 
     def process(self, analysis: CallAnalysis) -> List[TranscriptChunk]:
         """Run the full ingestion pipeline on a parsed CallAnalysis."""
         logger.info(f"Starting agentic ingestion for {analysis.call.ticker}")
 
-        # Build company context string for LLM prompts
         call = analysis.call
-        if call.company_name and call.industry:
-            self.company_context = f"{call.company_name} ({call.ticker}) — {call.industry}"
-        elif call.company_name:
-            self.company_context = f"{call.company_name} ({call.ticker})"
-        else:
-            self.company_context = call.ticker
+        company_context = _build_company_context(call.ticker, call.company_name, call.industry)
 
         chunks = create_chunks_from_analysis(analysis)
         prep_count = sum(1 for c in chunks if c.chunk_type == 'prepared')
