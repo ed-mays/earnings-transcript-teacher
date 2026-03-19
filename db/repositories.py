@@ -3,7 +3,7 @@ import logging
 import psycopg
 import psycopg.errors
 from pgvector.psycopg import register_vector
-from core.models import CallAnalysis
+from core.models import CallAnalysis, TranscriptChunk
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +318,7 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch industry terms: {e}")
         return terms
 
-    def get_financial_terms_for_ticker(self, ticker: str) -> list[tuple[str, str, str]]:
+    def get_financial_terms_for_ticker(self, ticker: str, limit: int = 50) -> list[tuple[str, str, str]]:
         """Return deduplicated financial terms found in a transcript as (term, definition, explanation)."""
         terms = []
         try:
@@ -331,8 +331,9 @@ class AnalysisRepository:
                         JOIN calls c ON et.call_id = c.id
                         WHERE c.ticker = %s AND et.category = 'financial'
                         ORDER BY et.term ASC
+                        LIMIT %s
                         """,
-                        (ticker,),
+                        (ticker, limit),
                     )
                     terms = cur.fetchall()
         except Exception as e:
@@ -548,72 +549,108 @@ class AnalysisRepository:
                 (str(call_id), pair.exchange_order, q_id, a_id)
             )
 
-    def _save_agentic_chunks(self, cur, call_id, chunks):
+    def _save_agentic_chunks(self, cur, call_id, chunks: list[TranscriptChunk]) -> None:
+        """Persist all LLM-extracted data for each chunk."""
         for chunk in chunks:
+            self._save_chunk_record(cur, call_id, chunk)
+            self._save_chunk_terms(cur, call_id, chunk)
+            self._save_chunk_concepts(cur, call_id, chunk)
+            self._save_chunk_takeaways(cur, call_id, chunk)
+            self._save_chunk_evasion(cur, call_id, chunk)
+            self._save_chunk_misconceptions(cur, call_id, chunk)
+
+    def _save_chunk_record(self, cur, call_id, chunk: TranscriptChunk) -> None:
+        """Insert the transcript_chunks row for one chunk."""
+        cur.execute(
+            """
+            INSERT INTO transcript_chunks (
+                call_id, chunk_id, chunk_type, sequence_order, tier1_score, needs_deep_analysis, chunk_text
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                str(call_id), chunk.chunk_id, chunk.chunk_type,
+                chunk.sequence_order, chunk.tier1_score,
+                chunk.requires_deep_analysis,
+                chunk.text,
+            ),
+        )
+
+    def _save_chunk_terms(self, cur, call_id, chunk: TranscriptChunk) -> None:
+        """Insert extracted_terms rows for one chunk."""
+        for term_data in chunk.extracted_terms:
+            term = term_data.get("term")
+            if not term:
+                continue
             cur.execute(
                 """
-                INSERT INTO transcript_chunks (
-                    call_id, chunk_id, chunk_type, sequence_order, tier1_score, needs_deep_analysis, chunk_text
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO extracted_terms (call_id, chunk_id, term, definition, explanation, category)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    str(call_id), chunk.chunk_id, chunk.chunk_type,
-                    chunk.sequence_order, getattr(chunk, "tier1_score", None),
-                    getattr(chunk, "requires_deep_analysis", False),
-                    chunk.text
-                )
+                    str(call_id), chunk.chunk_id, term,
+                    term_data.get("definition") or "",
+                    term_data.get("explanation") or "",
+                    term_data.get("category") or "industry",
+                ),
             )
-            for term_data in getattr(chunk, "extracted_terms", []):
-                term = term_data.get("term")
-                if not term: continue
-                cur.execute(
-                    """
-                    INSERT INTO extracted_terms (call_id, chunk_id, term, definition, explanation, category)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    """,
-                    (str(call_id), chunk.chunk_id, term, term_data.get("definition") or "",
-                     term_data.get("explanation") or "", term_data.get("category") or "industry")
-                )
-            for concept in getattr(chunk, "core_concepts", []):
-                if not concept: continue
-                cur.execute(
-                    """
-                    INSERT INTO core_concepts (call_id, chunk_id, concept)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (str(call_id), chunk.chunk_id, concept)
-                )
-            for takeaway_data in getattr(chunk, "takeaways", []):
-                takeaway = takeaway_data.get("takeaway")
-                if not takeaway: continue
-                cur.execute(
-                    """
-                    INSERT INTO extracted_takeaways (call_id, chunk_id, takeaway, why_it_matters)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (str(call_id), chunk.chunk_id, takeaway, takeaway_data.get("why_it_matters") or "")
-                )
-            evasion = getattr(chunk, "evasion_analysis", None)
-            if evasion and evasion.get("analyst_concern"):
-                cur.execute(
-                    """
-                    INSERT INTO evasion_analysis (
-                        call_id, chunk_id, analyst_concern, defensiveness_score, evasion_explanation
-                    ) VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        str(call_id), chunk.chunk_id, evasion.get("analyst_concern"),
-                        evasion.get("defensiveness_score") or 0, evasion.get("evasion_explanation") or ""
-                    )
-                )
-            for gotcha in getattr(chunk, "misconceptions", []):
-                fact = gotcha.get("fact")
-                if not fact: continue
-                cur.execute(
-                    """
-                    INSERT INTO misconceptions (
-                        call_id, chunk_id, fact, misinterpretation, correction
-                    ) VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (str(call_id), chunk.chunk_id, fact, gotcha.get("misinterpretation") or "", gotcha.get("correction") or "")
-                )
+
+    def _save_chunk_concepts(self, cur, call_id, chunk: TranscriptChunk) -> None:
+        """Insert core_concepts rows for one chunk."""
+        for concept in chunk.core_concepts:
+            if not concept:
+                continue
+            cur.execute(
+                "INSERT INTO core_concepts (call_id, chunk_id, concept) VALUES (%s, %s, %s)",
+                (str(call_id), chunk.chunk_id, concept),
+            )
+
+    def _save_chunk_takeaways(self, cur, call_id, chunk: TranscriptChunk) -> None:
+        """Insert extracted_takeaways rows for one chunk."""
+        for takeaway_data in chunk.takeaways:
+            takeaway = takeaway_data.get("takeaway")
+            if not takeaway:
+                continue
+            cur.execute(
+                """
+                INSERT INTO extracted_takeaways (call_id, chunk_id, takeaway, why_it_matters)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (str(call_id), chunk.chunk_id, takeaway, takeaway_data.get("why_it_matters") or ""),
+            )
+
+    def _save_chunk_evasion(self, cur, call_id, chunk: TranscriptChunk) -> None:
+        """Insert evasion_analysis row for one chunk if present."""
+        evasion = chunk.evasion_analysis
+        if not evasion or not evasion.get("analyst_concern"):
+            return
+        cur.execute(
+            """
+            INSERT INTO evasion_analysis (
+                call_id, chunk_id, analyst_concern, defensiveness_score, evasion_explanation
+            ) VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                str(call_id), chunk.chunk_id, evasion.get("analyst_concern"),
+                evasion.get("defensiveness_score") or 0,
+                evasion.get("evasion_explanation") or "",
+            ),
+        )
+
+    def _save_chunk_misconceptions(self, cur, call_id, chunk: TranscriptChunk) -> None:
+        """Insert misconceptions rows for one chunk."""
+        for gotcha in chunk.misconceptions:
+            fact = gotcha.get("fact")
+            if not fact:
+                continue
+            cur.execute(
+                """
+                INSERT INTO misconceptions (
+                    call_id, chunk_id, fact, misinterpretation, correction
+                ) VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    str(call_id), chunk.chunk_id, fact,
+                    gotcha.get("misinterpretation") or "",
+                    gotcha.get("correction") or "",
+                ),
+            )

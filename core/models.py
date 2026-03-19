@@ -9,14 +9,11 @@ instance rather than raw print statements.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from parsing.sections import SpeakerProfile
-
-# Local import to avoid circular dependency loop for now or we can use Any, 
-# but usually it's better to just structure these carefully.
-# For simplicity, we can do:
-from typing import Any
+from pydantic import BaseModel, Field as PydanticField
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +33,8 @@ class CallRecord:
     id: UUID = field(default_factory=uuid4)
     company_name: str = ""
     industry: str = ""
+    cached_embeddings_count: int = 0
+    api_embeddings_count: int = 0
 
 
 @dataclass
@@ -117,6 +116,31 @@ class CallSynthesisRecord:
 
 
 # ---------------------------------------------------------------------------
+# Agentic ingestion chunk
+# ---------------------------------------------------------------------------
+
+class TranscriptChunk(BaseModel):
+    """A standardized chunk of the transcript ready for LLM ingestion."""
+
+    chunk_id: str
+    chunk_type: str  # 'prepared' or 'qa'
+    text: str
+    speakers: List[str]
+    sequence_order: int
+
+    # Tier 1 outputs (populated by cheap model)
+    tier1_score: Optional[int] = None
+    extracted_terms: List[Dict[str, str]] = PydanticField(default_factory=list)
+    core_concepts: List[str] = PydanticField(default_factory=list)
+    requires_deep_analysis: bool = False
+
+    # Tier 2 outputs (populated by reasoning model)
+    takeaways: List[Dict[str, str]] = PydanticField(default_factory=list)
+    evasion_analysis: Optional[Dict[str, Any]] = None
+    misconceptions: List[Dict[str, str]] = PydanticField(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Top-level result
 # ---------------------------------------------------------------------------
 
@@ -132,6 +156,5 @@ class CallAnalysis:
     takeaways: list[SpanRecord]     # subset of spans with textrank_score set
     qa_pairs: list[QAPairRecord]
     
-    # NEW Agentic Ingestion Outputs
-    chunks: list[Any] = field(default_factory=list) # List of TranscriptChunk
+    chunks: list[TranscriptChunk] = field(default_factory=list)
     synthesis: CallSynthesisRecord | None = None

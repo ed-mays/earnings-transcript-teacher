@@ -1,36 +1,14 @@
 import json
 import logging
-from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional, Tuple, Set
 import concurrent.futures
 
-from core.models import CallAnalysis, CallSynthesisRecord
+from core.models import CallAnalysis, CallSynthesisRecord, TranscriptChunk
 from parsing.financial_terms import scan_chunk
+from services.company_info import build_company_context
 
 logger = logging.getLogger(__name__)
 
-class TranscriptChunk(BaseModel):
-    """
-    A standardized chunk of the transcript ready for LLM ingestion.
-    """
-    chunk_id: str
-    chunk_type: str  # 'prepared' or 'qa'
-    text: str
-    speakers: List[str]
-    sequence_order: int
-    
-    # Tier 1 outputs (populated by cheap model)
-    tier1_score: Optional[int] = None
-    extracted_terms: List[Dict[str, str]] = Field(default_factory=list)
-    core_concepts: List[str] = Field(default_factory=list)
-    requires_deep_analysis: bool = False
-    
-    # Tier 2 outputs (populated by reasoning model)
-    takeaways: List[Dict[str, str]] = Field(default_factory=list)
-    evasion_analysis: Optional[Dict[str, Any]] = None
-    misconceptions: List[Dict[str, str]] = Field(default_factory=list)
-
-from typing import Tuple, Set
 
 def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000, overlap_chars: int = 500) -> List[TranscriptChunk]:
     """
@@ -201,15 +179,6 @@ def create_chunks_from_analysis(analysis: CallAnalysis, max_chars: int = 4000, o
             
     return chunks
 
-def _build_company_context(ticker: str, company_name: str, industry: str) -> str:
-    """Return a human-readable company context string for LLM prompts."""
-    if company_name and industry:
-        return f"{company_name} ({ticker}) — {industry}"
-    if company_name:
-        return f"{company_name} ({ticker})"
-    return ticker
-
-
 class IngestionPipeline:
     def __init__(self, tier1_threshold: int = 6):
         self.tier1_threshold = tier1_threshold
@@ -217,12 +186,12 @@ class IngestionPipeline:
         from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
 
-    def process(self, analysis: CallAnalysis) -> List[TranscriptChunk]:
+    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord]:
         """Run the full ingestion pipeline on a parsed CallAnalysis."""
         logger.info(f"Starting agentic ingestion for {analysis.call.ticker}")
 
         call = analysis.call
-        company_context = _build_company_context(call.ticker, call.company_name, call.industry)
+        company_context = build_company_context(call.ticker, call.company_name, call.industry)
 
         chunks = create_chunks_from_analysis(analysis)
         prep_count = sum(1 for c in chunks if c.chunk_type == 'prepared')
@@ -238,7 +207,7 @@ class IngestionPipeline:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Map chunk indices to future objects so we know which is which when completed
             future_to_chunk = {
-                executor.submit(self._process_single_chunk, chunk, i, len(chunks), self.company_context): chunk
+                executor.submit(self._process_single_chunk, chunk, i, len(chunks), company_context): chunk
                 for i, chunk in enumerate(chunks, 1)
             }
             
@@ -278,16 +247,16 @@ class IngestionPipeline:
         if usage:
             print(f"    ↳ Synthesis [Model: {usage['model']} | In: {usage['prompt_tokens']} | Out: {usage['completion_tokens']}]")
             
-        analysis.synthesis = CallSynthesisRecord(
+        synthesis = CallSynthesisRecord(
             overall_sentiment=synthesis_data.get("overall_sentiment", ""),
             executive_tone=synthesis_data.get("executive_tone", ""),
             key_themes=synthesis_data.get("key_themes", []),
             strategic_shifts=synthesis_data.get("strategic_shifts", ""),
             analyst_sentiment=synthesis_data.get("analyst_sentiment", "")
         )
-        
+
         print("✅ Agentic ingestion complete.\n")
-        return chunks
+        return chunks, synthesis
         
     def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int, company_context: str = "") -> None:
         """Helper method to process a single chunk, designed to run in a thread."""

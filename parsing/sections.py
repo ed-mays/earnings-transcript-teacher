@@ -206,7 +206,7 @@ def _find_qa_start_heuristic(transcript: str) -> int | None:
     
     Used when regex-based heading/transition detection fails.
     """
-    turns = list(_TURN_PATTERN.finditer(transcript))
+    turns = list(TURN_PATTERN.finditer(transcript))
     if not turns:
         return None
 

@@ -151,6 +151,13 @@ python3 db/search.py "AI infrastructure capital expenditures" -k 5
 
 The application uses PostgreSQL with `pgvector`.
 
+### Schema migrations
+When upgrading from an older version, apply any schema changes before starting the app:
+```bash
+python3 migrate.py
+```
+This is idempotent — safe to run multiple times. The web UI (`app.py`) now only checks that the schema is current; it no longer auto-migrates on startup.
+
 ### Clearing data
 To delete all stored analysis while keeping the database schema intact:
 ```bash
@@ -172,20 +179,22 @@ If the database schema has changed or the database is in an inconsistent state, 
 earnings-transcript-teacher/
 ├── main.py             # Console UI entry point
 ├── app.py              # Web UI entry point (Streamlit)
+├── migrate.py          # Schema migration script — run after upgrades
 ├── setup.sh            # One-time setup script (macOS/Linux)
 ├── setup.ps1           # One-time setup script (Windows)
 ├── requirements.txt    # Python dependencies
 │
-├── core/               # Shared dataclasses (CallAnalysis, SpanRecord, etc.)
+├── core/               # Shared data models (CallAnalysis, TranscriptChunk, SpanRecord, etc.)
 ├── parsing/            # Transcript loading, section extraction, financial term scanner
 ├── nlp/                # NLP algorithms (TF-IDF keywords, NMF themes, TextRank takeaways)
-├── services/           # Orchestration and LLM integration
+├── services/           # Orchestration and external service integrations
 │   ├── orchestrator.py # Main analysis pipeline — wires all modules together
+│   ├── company_info.py # SEC EDGAR company lookup and context formatting
 │   └── llm.py          # Anthropic/Perplexity API clients with rate limiting
-├── ingestion/          # Three-tier agentic LLM enrichment pipeline
+├── ingestion/          # Three-tier agentic LLM enrichment pipeline (Claude Haiku + Sonnet)
 ├── cli/                # Console UI display and interactive menu
-├── db/                 # PostgreSQL access layer and semantic search
-├── utils/              # Shared utilities (timing decorator)
+├── db/                 # PostgreSQL repository layer and semantic search
+├── utils/              # Shared utilities
 ├── prompts/feynman/    # Pedagogical prompt files for the Feynman learning loop
 └── tests/              # pytest test suite (unit + integration)
 ```

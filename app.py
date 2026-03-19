@@ -1,5 +1,9 @@
+import logging
 import os
+from pathlib import Path
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 from db.persistence import (
     get_all_calls,
@@ -17,8 +21,8 @@ from db.persistence import (
 )
 from nlp.embedder import get_embeddings
 from services.llm import stream_chat
+from services.company_info import build_company_context
 from db.repositories import AnalysisRepository, CallRepository
-from ingestion.pipeline import _build_company_context
 
 # ------------- Configuration -------------
 
@@ -47,42 +51,24 @@ def load_transcripts():
     calls = get_all_calls(CONN_STR)
     return [c[0] for c in calls] if calls else []
 
-@st.cache_data
 def auto_migrate():
-    """Ensure database schema is up to date and check version."""
+    """Check that the database schema is up to date. Run migrate.py if not."""
     try:
-        import psycopg
         from db.repositories import SchemaRepository
-        
-        # Original simple migration
-        with psycopg.connect(CONN_STR) as conn:
-            with conn.cursor() as cur:
-                cur.execute("ALTER TABLE extracted_terms ADD COLUMN IF NOT EXISTS explanation TEXT DEFAULT '';")
-                # Also ensure schema_version table exists for version 1 initialization
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS schema_version (
-                        version     INTEGER PRIMARY KEY,
-                        installed_at TIMESTAMPTZ DEFAULT now()
-                    );
-                """)
-                cur.execute("INSERT INTO schema_version (version) VALUES (2) ON CONFLICT DO NOTHING;")
-            conn.commit()
-            
-        # Version check
         schema_repo = SchemaRepository(CONN_STR)
         is_ok, error_msg = schema_repo.check_health()
         if not is_ok:
             st.error(f"⚠️ {error_msg}")
-            # We don't st.stop() here because the user might just want to browse existing data,
-            # but ingestion should still fail if they try it.
             return False
         return True
     except Exception as e:
-        st.warning(f"Auto-migrate/Health check failed: {e}")
+        st.warning(f"Schema health check failed: {e}")
         return False
 
-# Run migration and check once per Streamlit session
-schema_is_ok = auto_migrate()
+# Run migration once per browser session (not cached across sessions).
+if "schema_checked" not in st.session_state:
+    st.session_state["schema_checked"] = auto_migrate()
+schema_is_ok = st.session_state["schema_checked"]
 
 @st.cache_data
 def load_speakers(ticker: str) -> list[tuple[str, str, str | None, str | None]]:
@@ -114,12 +100,9 @@ def load_metadata(ticker):
                 seen.add(kw.lower())
 
         return themes, takeaways, synthesis, unique_keywords, industry_terms, financial_terms
-    except Exception as e:
-        import traceback
-        with open("streamlit_db_error.txt", "w") as f:
-            f.write(traceback.format_exc())
-            f.write(f"\nConn str: {CONN_STR}")
-        raise e
+    except Exception:
+        logger.exception("load_metadata failed for ticker %s", ticker)
+        raise
 
 def reset_chat():
     """Clear the chat history."""
@@ -151,7 +134,7 @@ def generate_definition(ticker: str, term: str) -> bool:
         try:
             repo = CallRepository(CONN_STR)
             company_name, industry = repo.get_company_info(ticker)
-            context = _build_company_context(ticker, company_name, industry)
+            context = build_company_context(ticker, company_name, industry)
             system_prompt = (
                 f"You are a precise financial analyst. Define the provided term in the context of "
                 f"{context}. Return ONLY the definition, 1-2 sentences."
@@ -520,7 +503,7 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
             if chat_mode == "General Q&A":
                 # Load prompt
                 try:
-                    with open("prompts/feynman/00_general_qa.md", "r") as f:
+                    with open(Path(__file__).parent / "prompts/feynman/00_general_qa.md", "r") as f:
                         sys_prompt = f.read()
                 except FileNotFoundError:
                     sys_prompt = "You are a helpful expert answering questions using the transcript context."
@@ -556,7 +539,7 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
             elif chat_mode == "Feynman Loop":
                 # Basic Feynman implementation for GUI MVP
                 try:
-                    with open("prompts/feynman/01_initial_explanation.md", "r") as f:
+                    with open(Path(__file__).parent / "prompts/feynman/01_initial_explanation.md", "r") as f:
                         sys_prompt = f.read()
                 except FileNotFoundError:
                     sys_prompt = "You are a Feynman method tutor. Evaluate the user's understanding."

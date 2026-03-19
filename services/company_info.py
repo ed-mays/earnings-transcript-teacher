@@ -6,6 +6,15 @@ logger = logging.getLogger(__name__)
 _EDGAR_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 
 
+def build_company_context(ticker: str, company_name: str, industry: str) -> str:
+    """Return a human-readable company context string for LLM prompts."""
+    if company_name and industry:
+        return f"{company_name} ({ticker}) — {industry}"
+    if company_name:
+        return f"{company_name} ({ticker})"
+    return ticker
+
+
 def fetch_company_info(cik: str | int) -> tuple[str, str]:
     """Return (company_name, industry) from the SEC EDGAR API using the CIK.
 

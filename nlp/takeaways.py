@@ -17,12 +17,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from nlp.keywords import ALL_STOP_WORDS
-
-# Speaker-turn pattern (same as themes.py — local copy to avoid coupling).
-_TURN_PATTERN: re.Pattern = re.compile(
-    r"^(?P<speaker>[A-Z][a-zA-Z\-'.]+(?:\s+[A-Z][a-zA-Z\-'.]+)*)\s*:\s*(?P<text>.+?)(?=\n[A-Z]|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
+from parsing.sections import TURN_PATTERN
 
 # Sentence boundary: split on period/question-mark/exclamation followed by
 # whitespace and a capital letter.  Simple but effective for transcript prose.
@@ -100,7 +95,7 @@ def extract_takeaways(
     # --- 1. Parse speaker turns, split into attributed sentences --------
     attributed: list[tuple[str, str]] = []  # (speaker, sentence)
 
-    for m in _TURN_PATTERN.finditer(transcript_text):
+    for m in TURN_PATTERN.finditer(transcript_text):
         speaker = m.group("speaker").strip()
         if speaker.lower() == "operator":
             continue

@@ -1,7 +1,5 @@
 import string
 
-from utils.timing import measure_execution_time
-
 
 # Common English function words to exclude from content-word analysis.
 STOP_WORDS: frozenset[str] = frozenset({
@@ -26,7 +24,6 @@ def clean_text(text: str) -> str:
     return text.lower().translate(_PUNCT_TABLE)
 
 
-@measure_execution_time
 def tokenize(text: str) -> list[str]:
     """Splits cleaned text into a list of word tokens."""
     return text.split()

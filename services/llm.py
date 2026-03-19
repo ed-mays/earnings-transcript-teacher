@@ -2,14 +2,23 @@ import os
 import json
 import logging
 import requests
+import threading
 import time
 from typing import Dict, Any
-from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_if_exception_type
+from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_if_exception
 
 import anthropic
 from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+
+def _should_retry_error(exception: Exception) -> bool:
+    """Return True only for transient API errors that are worth retrying."""
+    if isinstance(exception, anthropic.APIStatusError):
+        return exception.status_code in [429, 500, 502, 503, 504]
+    return False
+
 
 def get_api_key() -> str | None:
     """Retrieve the Perplexity API key."""
@@ -82,42 +91,47 @@ def stream_chat(
                         except json.JSONDecodeError:
                             continue
     except Exception as e:
-        yield f"\n[Error connecting to Perplexity API: {e}]"
+        logger.error("Error connecting to Perplexity API: %s", e)
+        raise
 
 
 class RateLimiter:
-    """A simple token-bucket-like rate limiter for Perplexity API."""
+    """A simple token-bucket-like rate limiter for the Anthropic API. Thread-safe."""
     def __init__(self, requests_per_minute: int = 50, requests_per_second: int = 1):
         self.rpm = requests_per_minute
         self.rps = requests_per_second
         self.minute_allowance = requests_per_minute
         self.second_allowance = requests_per_second
         self.last_check = time.time()
+        self._lock = threading.Lock()
 
     def wait(self):
         """Blocks until a request is allowed according to both RPM and RPS limits."""
-        current = time.time()
-        time_passed = current - self.last_check
-        self.last_check = current
-        
-        self.minute_allowance += time_passed * (self.rpm / 60.0)
-        if self.minute_allowance > self.rpm:
-            self.minute_allowance = self.rpm
-            
-        self.second_allowance += time_passed * self.rps
-        if self.second_allowance > self.rps:
-            self.second_allowance = self.rps
-
-        while self.minute_allowance < 1.0 or self.second_allowance < 1.0:
-            time.sleep(0.1)
+        with self._lock:
             current = time.time()
             time_passed = current - self.last_check
             self.last_check = current
-            self.minute_allowance += time_passed * (self.rpm / 60.0)
-            self.second_allowance += time_passed * self.rps
 
-        self.minute_allowance -= 1.0
-        self.second_allowance -= 1.0
+            self.minute_allowance += time_passed * (self.rpm / 60.0)
+            if self.minute_allowance > self.rpm:
+                self.minute_allowance = self.rpm
+
+            self.second_allowance += time_passed * self.rps
+            if self.second_allowance > self.rps:
+                self.second_allowance = self.rps
+
+            while self.minute_allowance < 1.0 or self.second_allowance < 1.0:
+                self._lock.release()
+                time.sleep(0.1)
+                self._lock.acquire()
+                current = time.time()
+                time_passed = current - self.last_check
+                self.last_check = current
+                self.minute_allowance += time_passed * (self.rpm / 60.0)
+                self.second_allowance += time_passed * self.rps
+
+            self.minute_allowance -= 1.0
+            self.second_allowance -= 1.0
 
 class AgenticExtractor:
     def __init__(self, rpm_limit: int = 50, rps_limit: int = 5):
@@ -127,12 +141,6 @@ class AgenticExtractor:
         self.tier3_model = "claude-haiku-4-5-20251001"
         self.rate_limiter = RateLimiter(requests_per_minute=rpm_limit, requests_per_second=rps_limit)
 
-    def _should_retry_error(exception):
-        """Determine if an exception should trigger a retry."""
-        if isinstance(exception, anthropic.APIStatusError):
-            return exception.status_code in [429, 500, 502, 503, 504]
-        return False
-
     def _parse_response(self, message) -> Dict[str, Any]:
         """Parse an Anthropic message response into a result dict with usage stats."""
         content = message.content[0].text.strip()
@@ -140,7 +148,11 @@ class AgenticExtractor:
             content = content[7:-3].strip()
         elif content.startswith("```"):
             content = content[3:-3].strip()
-        result = json.loads(content)
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse LLM JSON response: %s. Content: %.200s", e, content)
+            raise ValueError(f"LLM returned malformed JSON: {e}") from e
         result["_usage_stats"] = {
             "model": message.model,
             "prompt_tokens": message.usage.input_tokens,
@@ -151,7 +163,7 @@ class AgenticExtractor:
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(anthropic.APIStatusError),
+        retry=retry_if_exception(_should_retry_error),
         reraise=True
     )
     def extract_tier1(self, text: str, chunk_type: str, company_context: str = "") -> Dict[str, Any]:
@@ -170,7 +182,7 @@ class AgenticExtractor:
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(anthropic.APIStatusError),
+        retry=retry_if_exception(_should_retry_error),
         reraise=True
     )
     def extract_tier2(self, text: str, chunk_type: str) -> Dict[str, Any]:
@@ -188,7 +200,7 @@ class AgenticExtractor:
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(anthropic.APIStatusError),
+        retry=retry_if_exception(_should_retry_error),
         reraise=True
     )
     def extract_synthesis(self, aggregated_text: str) -> Dict[str, Any]:
@@ -205,7 +217,7 @@ class AgenticExtractor:
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
-        retry=retry_if_exception_type(anthropic.APIStatusError),
+        retry=retry_if_exception(_should_retry_error),
         reraise=True
     )
     def detect_qa_transition(self, turns: list[dict[str, str]]) -> dict[str, Any]:
