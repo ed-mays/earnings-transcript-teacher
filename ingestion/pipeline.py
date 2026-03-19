@@ -238,7 +238,7 @@ class IngestionPipeline:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Map chunk indices to future objects so we know which is which when completed
             future_to_chunk = {
-                executor.submit(self._process_single_chunk, chunk, i, len(chunks), self.company_context): chunk
+                executor.submit(self._process_single_chunk, chunk, i, len(chunks), company_context): chunk
                 for i, chunk in enumerate(chunks, 1)
             }
             
