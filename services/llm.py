@@ -136,7 +136,8 @@ class RateLimiter:
 class AgenticExtractor:
     def __init__(self, rpm_limit: int = 50, rps_limit: int = 5):
         self.client = anthropic.Anthropic()
-        self.tier1_model = "claude-haiku-4-5-20251001"
+        # self.tier1_model = "claude-haiku-4-5-20251001"
+        self.tier1_model = "claude-sonnet-4-5"
         self.tier2_model = "claude-sonnet-4-5"
         self.tier3_model = "claude-haiku-4-5-20251001"
         self.rate_limiter = RateLimiter(requests_per_minute=rpm_limit, requests_per_second=rps_limit)

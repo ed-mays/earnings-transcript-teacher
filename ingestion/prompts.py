@@ -15,7 +15,12 @@ Do NOT include general financial terms that appear in a standard financial dicti
 (e.g. GAAP, EBITDA, EPS, CapEx, gross margin, free cash flow, guidance, headwinds) — those are handled separately. \
 Do NOT extract: generic superlatives or adjective phrases (e.g. "Amazing Abundance", "Incredible Journey"), \
 motivational or mission-statement language, names of individual people, city or state names unless part of a \
-product name, or vague strategic phrases with no specific technical content.
+product name, vague strategic phrases with no specific technical content, \
+metrics expressed as plain dollar or percentage figures (e.g. "$1 billion in cost savings", "20% growth"), \
+phrases longer than four words unless they are a named product or proprietary metric, \
+or common business/operations language a non-specialist would still recognize \
+(e.g. "supply chain", "go-to-market", "customer acquisition", "operating leverage"). \
+Return at most 5 terms per chunk. When in doubt about whether a term qualifies, omit it.
 2. For each extracted term, provide a one-sentence definition grounded in the company and industry context — \
 not a generic dictionary definition.
 3. Identify the core concepts (1-3 sentences or bullet points) that summarize the most strategic topics discussed in this chunk.
