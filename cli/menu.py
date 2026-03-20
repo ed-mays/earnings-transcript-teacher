@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts" / "feynman"
@@ -23,6 +24,46 @@ from cli.display import display
 def _validate_ticker(ticker: str) -> bool:
     """Return True if ticker is 1-5 uppercase alphabetical characters (e.g. AAPL, MSFT)."""
     return bool(re.match(r'^[A-Z]{1,5}$', ticker))
+
+
+def _export_feynman_session(ticker: str, topic: str, messages: list[dict]) -> None:
+    """Offer to export a completed Feynman session to a markdown file.
+
+    Writes the chat history to feynman_sessions/<ticker>_<slug>_<timestamp>.md.
+    The directory is created if it does not exist.
+    """
+    answer = input("\nWould you like to export this session to a markdown file? (y/n): ").strip().lower()
+    if answer != "y":
+        return
+
+    sessions_dir = Path("feynman_sessions")
+    sessions_dir.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    topic_slug = re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_")[:40]
+    filename = sessions_dir / f"{ticker}_{topic_slug}_{timestamp}.md"
+
+    lines: list[str] = [
+        f"# Feynman Session — {ticker}",
+        f"",
+        f"**Topic:** {topic}  ",
+        f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"",
+        f"---",
+        f"",
+    ]
+
+    for msg in messages:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role == "user":
+            lines.append(f"**You:** {content}")
+        elif role == "assistant":
+            lines.append(f"**Teacher:** {content}")
+        lines.append("")
+
+    filename.write_text("\n".join(lines), encoding="utf-8")
+    print(f"\nSession exported to {filename}")
 
 
 def interactive_menu() -> None:
@@ -283,7 +324,10 @@ def interactive_menu() -> None:
                         elif state == 5:
                             print("\n[System] Feynman Session Complete!")
                             break
-                        
+
+                    if messages:
+                        _export_feynman_session(ticker, topic, messages)
+
         elif choice == "5":
             ticker = input("Enter the ticker symbol to view: ").strip().upper()
             if not _validate_ticker(ticker):

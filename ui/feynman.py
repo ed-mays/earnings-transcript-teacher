@@ -1,3 +1,5 @@
+import re
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -71,7 +73,7 @@ def render_chat_interface(
         return
 
     if chat_mode == "Feynman Loop":
-        _render_stage_header()
+        _render_stage_header(ticker)
 
     _render_message_history()
     _render_stage_advance_buttons(chat_mode)
@@ -123,7 +125,31 @@ def _render_topic_picker(themes: list, takeaways: list) -> None:
 # Stage header and progress indicator
 # ---------------------------------------------------------------------------
 
-def _render_stage_header() -> None:
+def _build_feynman_markdown(ticker: str, topic: str, messages: list[dict]) -> str:
+    """Build a markdown string from a completed Feynman session chat history."""
+    lines: list[str] = [
+        f"# Feynman Session — {ticker}",
+        "",
+        f"**Topic:** {topic}  ",
+        f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "---",
+        "",
+    ]
+    for msg in messages:
+        if msg.get("feynman_auto") or msg.get("display") is False:
+            continue
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role == "user":
+            lines.append(f"**You:** {content}")
+        elif role == "assistant":
+            lines.append(f"**Teacher:** {content}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _render_stage_header(ticker: str) -> None:
     """Render the Feynman stage caption, hint, and completion banner."""
     stage = st.session_state.feynman_stage
     topic_label = st.session_state.feynman_topic
@@ -145,11 +171,26 @@ def _render_stage_header() -> None:
         )
         if last_msg and last_msg.get("feynman_stage") == 5:
             st.success("🎉 **Feynman Session Complete!** Review your teaching note above.")
-            if st.button("🔄 Start a new Feynman cycle", type="secondary"):
-                st.session_state.feynman_topic = ""
-                st.session_state.feynman_stage = 1
-                st.session_state.messages = []
-                st.rerun()
+            new_cycle_col, export_col = st.columns(2)
+            with new_cycle_col:
+                if st.button("🔄 Start a new Feynman cycle", type="secondary", use_container_width=True):
+                    st.session_state.feynman_topic = ""
+                    st.session_state.feynman_stage = 1
+                    st.session_state.messages = []
+                    st.rerun()
+            with export_col:
+                topic = st.session_state.feynman_topic
+                topic_slug = re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_")[:40]
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"{ticker}_{topic_slug}_{timestamp}.md"
+                markdown = _build_feynman_markdown(ticker, topic, st.session_state.messages)
+                st.download_button(
+                    label="⬇️ Export session",
+                    data=markdown,
+                    file_name=filename,
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
 
 
 # ---------------------------------------------------------------------------
