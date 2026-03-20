@@ -360,6 +360,8 @@ def _stream_response(
                 ]
     else:
         sys_prompt = _load_prompt_file(_FEYNMAN_PROMPT_FILES[stage])
+        if stage == 1 and ticker:
+            sys_prompt += f"\n\n<CompanyContext>\nThe transcript being studied is from: {ticker}\n</CompanyContext>"
 
     api_messages = [
         {"role": m["role"], "content": m["content"]}
