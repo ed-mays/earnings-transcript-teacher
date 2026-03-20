@@ -14,36 +14,40 @@ def render_metadata_panel(
     financial_terms: list,
     speakers: list,
 ) -> None:
-    """Render the left-column analysis panel: sentiment, jargon, speakers, takeaways, themes."""
-    st.subheader(f"📊 {ticker} Analysis")
+    """Render the left-column analysis panel as a numbered learning path."""
+    st.markdown(f"### 📊 {ticker} — Learning Path")
 
-    with st.expander("🎭 Sentiment Analysis", expanded=False):
+    with st.expander("Step 1 · Overview"):
+        if takeaways:
+            st.markdown("**Key Takeaways**")
+            for t, why in takeaways:
+                st.markdown(f"- **{t}**\n  - *{why}*")
+        else:
+            st.info("No key takeaways extracted.")
+
+        st.markdown("---")
+
+        if themes:
+            st.markdown("**Extracted Themes**")
+            for idx, t in enumerate(themes, 1):
+                st.markdown(f"**Theme {idx}:** {t}")
+        else:
+            st.info("No themes extracted.")
+
+    with st.expander("Step 2 · Tone & Speakers"):
         if synthesis:
             overall, exec_tone, analyst_sent = synthesis
+            st.markdown("**Sentiment Analysis**")
             st.markdown(f"**Overall Sentiment:** {overall}")
             st.markdown(f"**Executive Tone:** {exec_tone}")
             st.markdown(f"**Analyst Sentiment:** {analyst_sent}")
         else:
             st.info("No sentiment analysis available for this call.")
 
-    with st.expander("🏦 Financial Jargon", expanded=False):
-        if financial_terms:
-            _render_term_list(conn_str, ticker, financial_terms, key_prefix=f"fin_{ticker}")
-        else:
-            st.info("No financial terms found in this transcript.")
+        st.markdown("---")
 
-    with st.expander("🏭 Industry Jargon", expanded=False):
-        if industry_terms:
-            _render_term_list(conn_str, ticker, industry_terms, key_prefix=f"ind_{ticker}")
-        else:
-            st.info("No industry-specific terms extracted.")
-
-        if keywords:
-            st.markdown("**Top Keywords (TF-IDF):**")
-            st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
-
-    with st.expander("🎙️ Speakers", expanded=False):
         if speakers:
+            st.markdown("**Speakers**")
             executives = [(n, r, t, f) for n, r, t, f in speakers if r == "executive"]
             analysts = [(n, r, t, f) for n, r, t, f in speakers if r == "analyst"]
             if executives:
@@ -59,19 +63,24 @@ def render_metadata_panel(
         else:
             st.info("No speaker data available.")
 
-    with st.expander("💡 Key Takeaways", expanded=False):
-        if takeaways:
-            for t, why in takeaways:
-                st.markdown(f"- **{t}**\n  - *{why}*")
-        else:
-            st.info("No key takeaways extracted.")
+    st.checkbox("Show advanced analysis", key="show_advanced_analysis")
 
-    with st.expander("🧩 Extracted Themes", expanded=False):
-        if themes:
-            for idx, t in enumerate(themes, 1):
-                st.markdown(f"**Theme {idx}:** {t}")
-        else:
-            st.info("No themes extracted.")
+    if st.session_state.show_advanced_analysis:
+        with st.expander("Step 3 · Financial Jargon"):
+            if financial_terms:
+                _render_term_list(conn_str, ticker, financial_terms, key_prefix=f"fin_{ticker}")
+            else:
+                st.info("No financial terms found in this transcript.")
+
+        with st.expander("Step 3 · Industry Jargon"):
+            if industry_terms:
+                _render_term_list(conn_str, ticker, industry_terms, key_prefix=f"ind_{ticker}")
+            else:
+                st.info("No industry-specific terms extracted.")
+
+            if keywords:
+                st.markdown("**Top Keywords (TF-IDF):**")
+                st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
 
 
 def _render_term_list(conn_str: str, ticker: str, terms: list, key_prefix: str) -> None:

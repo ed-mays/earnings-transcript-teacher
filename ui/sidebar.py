@@ -6,7 +6,7 @@ from ui.data_loaders import load_transcripts
 def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str, str]:
     """Render the settings sidebar and return (selected_ticker, chat_mode)."""
     with st.sidebar:
-        st.title("🎓 Settings")
+        st.markdown("### 📄 Transcript")
 
         available_tickers = load_transcripts(conn_str)
 
@@ -20,18 +20,13 @@ def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str, str]:
             on_change=on_ticker_change,
         )
 
-        st.divider()
-
         chat_mode = st.radio(
-            "Learning Mode",
+            "Mode",
             ["Feynman Loop", "General Q&A"],
             help=(
-                "Feynman Loop guides you through teaching the material to test your understanding."
-                "General Q&A lets you explore the transcript freely. "
+                "Feynman Loop guides you through teaching the material to test your understanding. "
+                "General Q&A lets you explore the transcript freely."
             ),
         )
-
-        if st.button("Clear Chat", on_click=on_ticker_change, use_container_width=True):
-            pass
 
     return selected_ticker, chat_mode
