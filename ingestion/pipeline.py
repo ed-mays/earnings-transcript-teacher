@@ -3,7 +3,7 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple, Set
 import concurrent.futures
 
-from core.models import CallAnalysis, CallSynthesisRecord, TranscriptChunk
+from core.models import CallAnalysis, CallSynthesisRecord, TranscriptChunk, TokenUsageSummary
 from parsing.financial_terms import scan_chunk
 from services.company_info import build_company_context
 
@@ -186,7 +186,7 @@ class IngestionPipeline:
         from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
 
-    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord]:
+    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord, TokenUsageSummary]:
         """Run the full ingestion pipeline on a parsed CallAnalysis."""
         logger.info(f"Starting agentic ingestion for {analysis.call.ticker}")
 
@@ -204,19 +204,21 @@ class IngestionPipeline:
         max_workers = min(10, len(chunks)) # Don't spin up more threads than we have chunks
         print(f"\n[Map Phase] Running extraction on {len(chunks)} chunks with {max_workers} concurrent workers...")
         
+        all_chunk_usage: list[dict] = []
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Map chunk indices to future objects so we know which is which when completed
             future_to_chunk = {
                 executor.submit(self._process_single_chunk, chunk, i, len(chunks), company_context): chunk
                 for i, chunk in enumerate(chunks, 1)
             }
-            
-            # Wait for all futures to complete
+
+            # Wait for all futures to complete, collecting per-chunk usage stats
             for future in concurrent.futures.as_completed(future_to_chunk):
                 try:
-                    # The chunk is updated in-place by _process_single_chunk, 
-                    # we just need to catch any unhandled exceptions
-                    future.result()
+                    chunk_usage = future.result()
+                    if chunk_usage:
+                        all_chunk_usage.extend(chunk_usage)
                 except Exception as exc:
                     chunk = future_to_chunk[future]
                     logger.error(f"Chunk {chunk.chunk_id} generated an exception: {exc}")
@@ -241,12 +243,12 @@ class IngestionPipeline:
         aggregated_text = json.dumps(compact_summaries, indent=2)
         
         synthesis_data = self.extractor.extract_synthesis(aggregated_text)
-        
+
         # Manually extract usage stats before creating the dataclass
-        usage = synthesis_data.pop("_usage_stats", None)
-        if usage:
-            print(f"    ↳ Synthesis [Model: {usage['model']} | In: {usage['prompt_tokens']} | Out: {usage['completion_tokens']}]")
-            
+        synthesis_usage = synthesis_data.pop("_usage_stats", None)
+        if synthesis_usage:
+            print(f"    ↳ Synthesis [Model: {synthesis_usage['model']} | In: {synthesis_usage['prompt_tokens']} | Out: {synthesis_usage['completion_tokens']}]")
+
         synthesis = CallSynthesisRecord(
             overall_sentiment=synthesis_data.get("overall_sentiment", ""),
             executive_tone=synthesis_data.get("executive_tone", ""),
@@ -255,31 +257,46 @@ class IngestionPipeline:
             analyst_sentiment=synthesis_data.get("analyst_sentiment", "")
         )
 
+        # Aggregate all token usage across chunks and synthesis
+        token_usage = TokenUsageSummary()
+        for u in all_chunk_usage:
+            token_usage.add(u["model"], u["prompt_tokens"], u["completion_tokens"])
+        if synthesis_usage:
+            token_usage.add(
+                synthesis_usage["model"],
+                synthesis_usage["prompt_tokens"],
+                synthesis_usage["completion_tokens"],
+            )
+
         print("✅ Agentic ingestion complete.\n")
-        return chunks, synthesis
+        return chunks, synthesis, token_usage
         
-    def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int, company_context: str = "") -> None:
-        """Helper method to process a single chunk, designed to run in a thread."""
+    def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int, company_context: str = "") -> list[dict]:
+        """Helper method to process a single chunk, designed to run in a thread.
+
+        Returns a list of ``_usage_stats`` dicts (one per LLM call made).
+        """
         logger.info(f"Processing chunk {chunk.chunk_id} [{index}/{total_chunks}]")
-        # print relies on thread-safety of the built-in print, but might interleave slightly in stdout.
-        # This is usually fine for a simple UI, but could be logged instead.
         print(f"  [{index}/{total_chunks}] Analysing {chunk.chunk_id}... ")
+
+        usage_records: list[dict] = []
 
         t1_usage = self._run_tier1(chunk, company_context)
         if t1_usage:
             logger.info(f"Chunk {chunk.chunk_id} - Tier 1 usage: {t1_usage}")
-            # print(f"    ↳ Tier 1 [Model: {t1_usage['model']} | In: {t1_usage['prompt_tokens']} | Out: {t1_usage['completion_tokens']}]")
-        
+            usage_records.append(t1_usage)
+
         # Phase 3: Tier 2 Deep Enrichment (Conditional routing)
         if chunk.requires_deep_analysis and getattr(chunk, 'tier1_score', 0) >= self.tier1_threshold:
             print(f"    ↳ Deep dive required on {chunk.chunk_id} (Score: {chunk.tier1_score}). Routing to Tier 2... ")
             t2_usage = self._run_tier2(chunk)
             if t2_usage:
                 logger.info(f"Chunk {chunk.chunk_id} - Tier 2 usage: {t2_usage}")
-                # print(f"      ↳ Tier 2 [Model: {t2_usage['model']} | In: {t2_usage['prompt_tokens']} | Out: {t2_usage['completion_tokens']}]")
+                usage_records.append(t2_usage)
         else:
             logger.info(f"Chunk {chunk.chunk_id} - Skipping Tier 2 (Score: {getattr(chunk, 'tier1_score', 0)})")
-            # print(f"    ↳ Skipping Tier 2 for {chunk.chunk_id} (Score: {getattr(chunk, 'tier1_score', 0)}).")
+
+        return usage_records
         
     def _run_tier1(self, chunk: TranscriptChunk, company_context: str = "") -> Optional[Dict[str, Any]]:
         """Run Tier 1 extraction: LLM for industry terms + CSV scan for financial terms."""

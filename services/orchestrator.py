@@ -236,9 +236,10 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     try:
         from ingestion.pipeline import IngestionPipeline
         pipeline = IngestionPipeline()
-        chunks, synthesis = pipeline.process(analysis)
+        chunks, synthesis, token_usage = pipeline.process(analysis)
         analysis.chunks = chunks
         analysis.synthesis = synthesis
+        analysis.token_usage = token_usage
     except Exception as e:
         logger.warning(f"Agentic pipeline failed or skipped: {e}")
 

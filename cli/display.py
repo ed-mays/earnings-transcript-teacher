@@ -1,4 +1,4 @@
-from core.models import CallAnalysis
+from core.models import CallAnalysis, TokenUsageSummary
 
 def display(result: CallAnalysis) -> None:
     """Print the analysis results to console."""
@@ -53,3 +53,45 @@ def display(result: CallAnalysis) -> None:
         print(f"    - {api} generated via Voyage AI API")
     else:
         print("  Skipped (VOYAGE_API_KEY not set)")
+
+    if result.token_usage:
+        _display_token_usage(result.token_usage)
+
+
+def _display_token_usage(usage: TokenUsageSummary) -> None:
+    """Print a summary table of token usage and estimated cost."""
+    print("\nToken Usage & Estimated Cost")
+    print("-" * 28)
+
+    col_model  = 24
+    col_input  = 15
+    col_output = 16
+    col_cost   = 14
+
+    header = (
+        f"{'Model':<{col_model}}"
+        f"{'Input Tokens':>{col_input}}"
+        f"{'Output Tokens':>{col_output}}"
+        f"{'Est. Cost':>{col_cost}}"
+    )
+    print(f"  {header}")
+    print("  " + "-" * (col_model + col_input + col_output + col_cost))
+
+    for m in usage.by_model.values():
+        row = (
+            f"{m.display_name:<{col_model}}"
+            f"{m.input_tokens:>{col_input},}"
+            f"{m.output_tokens:>{col_output},}"
+            f"{'$' + f'{m.estimated_cost:.4f}':>{col_cost}}"
+        )
+        print(f"  {row}")
+
+    if len(usage.by_model) > 1:
+        print("  " + "-" * (col_model + col_input + col_output + col_cost))
+        total_row = (
+            f"{'Total':<{col_model}}"
+            f"{usage.total_input_tokens:>{col_input},}"
+            f"{usage.total_output_tokens:>{col_output},}"
+            f"{'$' + f'{usage.total_cost:.4f}':>{col_cost}}"
+        )
+        print(f"  {total_row}")
