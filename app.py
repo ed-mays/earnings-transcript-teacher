@@ -37,6 +37,12 @@ if "feynman_stage" not in st.session_state:
 if "feynman_topic" not in st.session_state:
     st.session_state.feynman_topic = ""
 
+if "confirm_reset" not in st.session_state:
+    st.session_state.confirm_reset = False
+
+if "show_advanced_analysis" not in st.session_state:
+    st.session_state.show_advanced_analysis = False
+
 # ------------- Schema Health Check -------------
 
 def _auto_migrate() -> bool:
@@ -78,9 +84,11 @@ spans = load_transcript_spans(CONN_STR, st.session_state.active_ticker)
 
 # ------------- Layout -------------
 
-left_col, right_col = st.columns([3.5, 6.5])
+left_col, right_col = st.columns([5, 5])
 
 with left_col:
+    render_transcript_browser(spans)
+    st.divider()
     render_metadata_panel(
         conn_str=CONN_STR,
         ticker=st.session_state.active_ticker,
@@ -94,8 +102,6 @@ with left_col:
     )
 
 with right_col:
-    render_transcript_browser(spans)
-    st.divider()
     render_chat_interface(
         conn_str=CONN_STR,
         ticker=st.session_state.active_ticker,
@@ -104,4 +110,5 @@ with right_col:
         takeaways=takeaways,
         financial_terms=financial_terms,
         industry_terms=industry_terms,
+        on_reset=_reset_chat,
     )

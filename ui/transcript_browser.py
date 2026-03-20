@@ -124,32 +124,33 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
 
 
 def render_transcript_browser(spans: list[tuple[str, str, str]]) -> None:
-    """Render the searchable HTML transcript browser inside an expander."""
-    with st.expander("📄 Transcript Browser", expanded=False):
-        if not spans:
-            st.info("No transcript data available.")
-            return
+    """Render the searchable HTML transcript browser."""
+    st.markdown("### 📄 Transcript")
 
-        lines_html = []
-        for speaker, _, text in spans:
-            s = _html.escape(speaker)
-            t = _html.escape(text)
-            lines_html.append(f"<p><strong>{s}:</strong> {t}</p>")
-        transcript_body = "\n".join(lines_html)
+    if not spans:
+        st.info("No transcript data available.")
+        return
 
-        component_html = (
-            f"<!DOCTYPE html>\n<html><head>\n<style>\n{_BROWSER_CSS}\n</style>\n</head><body>\n"
-            '<div class="search-bar">\n'
-            '  <input type="text" id="search-input" placeholder="Search transcript..." oninput="onSearch()">\n'
-            '  <span class="match-count" id="match-count"></span>\n'
-            '  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" title="Previous match" disabled>&#9650;</button>\n'
-            '  <button class="nav-btn" id="next-btn" onclick="navigate(1)" title="Next match" disabled>&#9660;</button>\n'
-            "</div>\n"
-            '<div class="transcript" id="transcript">\n'
-            + transcript_body
-            + "\n</div>\n"
-            f"<script>\n{_BROWSER_JS}\n</script>\n"
-            "</body></html>"
-        )
+    lines_html = []
+    for speaker, _, text in spans:
+        s = _html.escape(speaker)
+        t = _html.escape(text)
+        lines_html.append(f"<p><strong>{s}:</strong> {t}</p>")
+    transcript_body = "\n".join(lines_html)
 
-        _components.html(component_html, height=550, scrolling=False)
+    component_html = (
+        f"<!DOCTYPE html>\n<html><head>\n<style>\n{_BROWSER_CSS}\n</style>\n</head><body>\n"
+        '<div class="search-bar">\n'
+        '  <input type="text" id="search-input" placeholder="Search transcript..." oninput="onSearch()">\n'
+        '  <span class="match-count" id="match-count"></span>\n'
+        '  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" title="Previous match" disabled>&#9650;</button>\n'
+        '  <button class="nav-btn" id="next-btn" onclick="navigate(1)" title="Next match" disabled>&#9660;</button>\n'
+        "</div>\n"
+        '<div class="transcript" id="transcript">\n'
+        + transcript_body
+        + "\n</div>\n"
+        f"<script>\n{_BROWSER_JS}\n</script>\n"
+        "</body></html>"
+    )
+
+    _components.html(component_html, height=400, scrolling=False)

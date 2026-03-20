@@ -41,9 +41,30 @@ def render_chat_interface(
     takeaways: list,
     financial_terms: list,
     industry_terms: list,
+    on_reset=None,
 ) -> None:
     """Render the full chat area: topic picker, stage UI, message history, and input."""
-    st.subheader("💬 Chat Interface")
+    header_col, reset_col = st.columns([5, 1])
+    with header_col:
+        st.subheader("💬 Chat Interface")
+    with reset_col:
+        if st.button("Reset", help="Reset session", use_container_width=True):
+            st.session_state.confirm_reset = True
+
+    if st.session_state.get("confirm_reset"):
+        st.warning("This will clear the chat and reset the Feynman loop.")
+        yes_col, cancel_col = st.columns(2)
+        with yes_col:
+            if st.button("Yes, reset", type="primary", use_container_width=True):
+                if on_reset:
+                    on_reset()
+                st.session_state.confirm_reset = False
+                st.rerun()
+        with cancel_col:
+            if st.button("Cancel", use_container_width=True):
+                st.session_state.confirm_reset = False
+                st.rerun()
+        return
 
     if chat_mode == "Feynman Loop" and not st.session_state.feynman_topic:
         _render_topic_picker(themes, takeaways)
@@ -64,27 +85,27 @@ def render_chat_interface(
 
 def _render_topic_picker(themes: list, takeaways: list) -> None:
     """Show the Feynman topic selection UI."""
-    st.info(
-        "🧠 **Feynman Loop** — choose a topic below and the AI will guide you through "
-        "explaining it back in your own words, exposing gaps, and refining your understanding."
-    )
+    st.markdown("#### 🧠 Feynman Loop")
+    st.caption("Choose a topic. The AI will guide you to explain it back, expose gaps, and deepen your understanding.")
 
     suggestions: list[str] = []
-    if themes:
-        suggestions.append(themes[0])
-        if len(themes) > 1:
-            suggestions.append(themes[1])
-    if takeaways and len(suggestions) < 3:
-        suggestions.append(takeaways[0][0])
+    for t in themes[:3]:
+        suggestions.append(t)
+    for t, _ in takeaways[:2]:
+        if len(suggestions) < 5 and t not in suggestions:
+            suggestions.append(t)
 
     if suggestions:
-        st.markdown("**Suggested topics from this transcript:**")
-        chip_cols = st.columns(len(suggestions))
-        for col, suggestion in zip(chip_cols, suggestions):
-            label = suggestion if len(suggestion) <= 55 else suggestion[:52] + "…"
-            if col.button(label, use_container_width=True):
-                st.session_state.feynman_topic = suggestion
-                st.rerun()
+        st.markdown("**Practice Topics**")
+        num_cols = min(3, len(suggestions))
+        rows = [suggestions[i:i + num_cols] for i in range(0, len(suggestions), num_cols)]
+        for row in rows:
+            chip_cols = st.columns(num_cols)
+            for col, suggestion in zip(chip_cols, row):
+                label = suggestion if len(suggestion) <= 55 else suggestion[:52] + "…"
+                if col.button(label, use_container_width=True):
+                    st.session_state.feynman_topic = suggestion
+                    st.rerun()
 
     st.markdown("---")
     st.markdown("**Or enter your own topic:**")
