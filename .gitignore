@@ -53,3 +53,6 @@ set_env.ps1
 
 # Claude
 .claude/worktrees/
+
+# Feynman session exports (local only)
+feynman_sessions/
