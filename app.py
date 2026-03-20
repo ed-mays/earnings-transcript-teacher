@@ -1,28 +1,16 @@
 import logging
 import os
-from pathlib import Path
+
 import streamlit as st
 
-logger = logging.getLogger(__name__)
+from db.repositories import SchemaRepository
+from ui.data_loaders import load_metadata, load_speakers, load_transcript_spans
+from ui.feynman import render_chat_interface
+from ui.metadata_panel import render_metadata_panel
+from ui.sidebar import render_sidebar
+from ui.transcript_browser import render_transcript_browser
 
-from db.persistence import (
-    get_all_calls,
-    get_themes_for_ticker,
-    get_takeaways_for_ticker,
-    get_synthesis_for_ticker,
-    get_keywords_for_ticker,
-    get_industry_terms_for_ticker,
-    get_financial_terms_for_ticker,
-    get_speakers_for_ticker,
-    get_spans_for_ticker,
-    update_term_definition,
-    update_term_explanation,
-    search_spans
-)
-from nlp.embedder import get_embeddings
-from services.llm import stream_chat
-from services.company_info import build_company_context
-from db.repositories import AnalysisRepository, CallRepository
+logger = logging.getLogger(__name__)
 
 # ------------- Configuration -------------
 
@@ -35,7 +23,7 @@ st.set_page_config(
 
 CONN_STR = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
 
-# ------------- State Management -------------
+# ------------- State Initialisation -------------
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -43,25 +31,17 @@ if "messages" not in st.session_state:
 if "active_ticker" not in st.session_state:
     st.session_state.active_ticker = None
 
-# --- Feynman Loop state ---
 if "feynman_stage" not in st.session_state:
-    st.session_state.feynman_stage = 1   # 1–5
+    st.session_state.feynman_stage = 1
 
 if "feynman_topic" not in st.session_state:
-    st.session_state.feynman_topic = ""  # empty = topic not yet chosen
+    st.session_state.feynman_topic = ""
 
-# ------------- Helper Functions -------------
+# ------------- Schema Health Check -------------
 
-@st.cache_data
-def load_transcripts():
-    """Fetch available transcripts from the database."""
-    calls = get_all_calls(CONN_STR)
-    return [c[0] for c in calls] if calls else []
-
-def auto_migrate():
-    """Check that the database schema is up to date. Run migrate.py if not."""
+def _auto_migrate() -> bool:
+    """Check that the database schema is up to date."""
     try:
-        from db.repositories import SchemaRepository
         schema_repo = SchemaRepository(CONN_STR)
         is_ok, error_msg = schema_repo.check_health()
         if not is_ok:
@@ -72,712 +52,56 @@ def auto_migrate():
         st.warning(f"Schema health check failed: {e}")
         return False
 
-# Run migration once per browser session (not cached across sessions).
+
 if "schema_checked" not in st.session_state:
-    st.session_state["schema_checked"] = auto_migrate()
-schema_is_ok = st.session_state["schema_checked"]
+    st.session_state["schema_checked"] = _auto_migrate()
 
-@st.cache_data
-def load_speakers(ticker: str) -> list[tuple[str, str, str | None, str | None]]:
-    """Fetch enriched speaker profiles for a transcript from the database."""
-    return get_speakers_for_ticker(CONN_STR, ticker)
+# ------------- Sidebar -------------
 
-@st.cache_data
-def load_transcript_spans(ticker: str) -> list[tuple[str, str, str]]:
-    """Fetch all speaker turns for a transcript from the database."""
-    return get_spans_for_ticker(CONN_STR, ticker)
-
-@st.cache_data
-def load_metadata(ticker):
-    """Fetch metadata for a given transcript."""
-    try:
-        themes = get_themes_for_ticker(CONN_STR, ticker)
-        takeaways = get_takeaways_for_ticker(CONN_STR, ticker)
-        synthesis = get_synthesis_for_ticker(CONN_STR, ticker)
-        keywords = get_keywords_for_ticker(CONN_STR, ticker)
-        industry_terms = get_industry_terms_for_ticker(CONN_STR, ticker)
-        financial_terms = get_financial_terms_for_ticker(CONN_STR, ticker)
-
-        # Deduplicate keywords for cleaner display
-        unique_keywords = []
-        seen = set()
-        for kw in keywords:
-            if kw.lower() not in seen:
-                unique_keywords.append(kw)
-                seen.add(kw.lower())
-
-        return themes, takeaways, synthesis, unique_keywords, industry_terms, financial_terms
-    except Exception:
-        logger.exception("load_metadata failed for ticker %s", ticker)
-        raise
-
-def reset_chat():
+def _reset_chat() -> None:
     """Clear the chat history and Feynman state."""
     st.session_state.messages = []
     st.session_state.feynman_stage = 1
     st.session_state.feynman_topic = ""
 
-def handle_define_click(ticker: str, term: str, current_def: str):
-    if not current_def or not current_def.strip():
-        success = generate_definition(ticker, term)
-        if success:
-            st.session_state[f"show_def_{ticker}_{term}"] = True
-        else:
-            st.session_state[f"show_def_{ticker}_{term}"] = False
-    else:
-        st.session_state[f"show_def_{ticker}_{term}"] = True
 
-def handle_explain_click(ticker: str, term: str, current_exp: str):
-    if not current_exp or not current_exp.strip():
-        success = generate_explanation(ticker, term)
-        if success:
-            st.session_state[f"show_exp_{ticker}_{term}"] = True
-        else:
-            st.session_state[f"show_exp_{ticker}_{term}"] = False
-    else:
-        st.session_state[f"show_exp_{ticker}_{term}"] = True
+selected_ticker, chat_mode = render_sidebar(CONN_STR, on_ticker_change=_reset_chat)
+st.session_state.active_ticker = selected_ticker
 
-def generate_definition(ticker: str, term: str) -> bool:
-    """Call the LLM to generate a company-grounded definition, then save it."""
-    with st.spinner(f"Defining {term}..."):
-        try:
-            repo = CallRepository(CONN_STR)
-            company_name, industry = repo.get_company_info(ticker)
-            context = build_company_context(ticker, company_name, industry)
-            system_prompt = (
-                f"You are a precise financial analyst. Define the provided term in the context of "
-                f"{context}. Return ONLY the definition, 1-2 sentences."
-            )
-            messages = [{"role": "user", "content": f"Company: {context}\nTerm: {term}"}]
-            
-            definition = ""
-            for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
-                if isinstance(chunk, str):
-                    definition += chunk
-            
-            if definition:
-                update_term_definition(CONN_STR, ticker, term, definition.strip())
-                # Clear cache so next render shows the new definition
-                load_metadata.clear()
-                return True
-            return False
-        except Exception as e:
-            st.error(f"Error defining term: {e}")
-            return False
+# ------------- Load Data -------------
 
-def generate_explanation(ticker: str, term: str) -> bool:
-    """Call the LLM to generate a contextual explanation using RAG, then save it."""
-    with st.spinner(f"Explaining {term}..."):
-        try:
-            # 1. Retrieve Context (RAG)
-            query_embs = get_embeddings([term])
-            context_spans = []
-            if query_embs and query_embs[0]:
-                context_spans = search_spans(CONN_STR, ticker, query_embs[0], top_k=4)
-                
-            context_str = "\n".join(f"- {span}" for span in context_spans)
-            
-            # 2. Call LLM
-            system_prompt = "You are an expert financial explainer. Explain why the given term is relevant in the context of the provided transcript snippets. Return ONLY the explanation, 1-2 sentences maximum."
-            messages = [{"role": "user", "content": f"Company: {ticker}\nTerm: {term}\n\n<transcript_context>\n{context_str}\n</transcript_context>"}]
-            
-            explanation = ""
-            for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
-                if isinstance(chunk, str):
-                    explanation += chunk
-            
-            if explanation:
-                update_term_explanation(CONN_STR, ticker, term, explanation.strip())
-                load_metadata.clear()
-                return True
-            return False
-        except Exception as e:
-            st.error(f"Error explaining term: {e}")
-            return False
+themes, takeaways, synthesis, keywords, industry_terms, financial_terms = load_metadata(
+    CONN_STR, st.session_state.active_ticker
+)
+speakers = load_speakers(CONN_STR, st.session_state.active_ticker)
+spans = load_transcript_spans(CONN_STR, st.session_state.active_ticker)
 
-# ------------- Sidebar -------------
+# ------------- Layout -------------
 
-with st.sidebar:
-    st.title("🎓 Settings")
-    
-    available_tickers = load_transcripts()
-    
-    if not available_tickers:
-        st.warning("No transcripts found in database. Run `python main.py [TICKER]` first.")
-        st.stop()
-        
-    # Transcript Selection
-    selected_ticker = st.selectbox(
-        "Select Transcript", 
-        available_tickers,
-        on_change=reset_chat
-    )
-    st.session_state.active_ticker = selected_ticker
-    
-    st.divider()
-    
-    # Chat Mode Selection
-    chat_mode = st.radio(
-        "Learning Mode",
-        ["General Q&A", "Feynman Loop"],
-        help="General Q&A lets you explore the transcript freely. Feynman Loop guides you through teaching the material to test your understanding."
-    )
-    
-    if st.button("Clear Chat", on_click=reset_chat, use_container_width=True):
-        pass
-
-# ------------- Main App -------------
-
-# Load data for the active transcript
-themes, takeaways, synthesis, keywords, industry_terms, financial_terms = load_metadata(st.session_state.active_ticker)
-
-# Layout: 35% left column (Metadata), 65% right column (Chat)
 left_col, right_col = st.columns([3.5, 6.5])
 
 with left_col:
-    st.subheader(f"📊 {st.session_state.active_ticker} Analysis")
-    
-    def _render_term_list(terms, key_prefix):
-        """Render a list of (term, definition, explanation) rows with Define/Explain buttons."""
-        for i, (term, definition, explanation) in enumerate(terms):
-            st.markdown(f"**{term.title()}**")
-            btn_col1, btn_col2, _ = st.columns([0.5, 0.5, .1])
-            with btn_col1:
-                st.button(
-                    "Define",
-                    key=f"{key_prefix}_def_{i}_{term}",
-                    on_click=handle_define_click,
-                    args=(st.session_state.active_ticker, term, definition)
-                )
-            with btn_col2:
-                st.button(
-                    "Explain",
-                    key=f"{key_prefix}_exp_{i}_{term}",
-                    on_click=handle_explain_click,
-                    args=(st.session_state.active_ticker, term, explanation)
-                )
-            show_def = st.session_state.get(f"show_def_{st.session_state.active_ticker}_{term}", False)
-            show_exp = st.session_state.get(f"show_exp_{st.session_state.active_ticker}_{term}", False)
-            if show_def:
-                st.markdown(f"📘 **Definition:** {definition if definition else '*(Generating...)*'}")
-            if show_exp:
-                st.markdown(f"💡 **Context:** {explanation if explanation else '*(Generating...)*'}")
-            st.divider()
-
-    with st.expander("🎭 Sentiment Analysis", expanded=True):
-        if synthesis:
-            overall, exec_tone, analyst_sent = synthesis
-            st.markdown(f"**Overall Sentiment:** {overall}")
-            st.markdown(f"**Executive Tone:** {exec_tone}")
-            st.markdown(f"**Analyst Sentiment:** {analyst_sent}")
-        else:
-            st.info("No sentiment analysis available for this call.")
-
-    with st.expander("🏦 Financial Jargon", expanded=False):
-        if financial_terms:
-            _render_term_list(financial_terms, key_prefix=f"fin_{st.session_state.active_ticker}")
-        else:
-            st.info("No financial terms found in this transcript.")
-
-    with st.expander("🏭 Industry Jargon", expanded=False):
-        if industry_terms:
-            _render_term_list(industry_terms, key_prefix=f"ind_{st.session_state.active_ticker}")
-        else:
-            st.info("No industry-specific terms extracted.")
-
-        if keywords:
-            st.markdown("**Top Keywords (TF-IDF):**")
-            st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
-            
-    with st.expander("🎙️ Speakers", expanded=False):
-        speakers = load_speakers(st.session_state.active_ticker)
-        if speakers:
-            executives = [(n, r, t, f) for n, r, t, f in speakers if r == "executive"]
-            analysts = [(n, r, t, f) for n, r, t, f in speakers if r == "analyst"]
-            if executives:
-                st.markdown("**Executives**")
-                for name, _, title, _ in executives:
-                    subtitle = f"*{title}*" if title else ""
-                    st.markdown(f"- {name}{' — ' + subtitle if subtitle else ''}")
-            if analysts:
-                st.markdown("**Analysts**")
-                for name, _, _, firm in analysts:
-                    subtitle = f"*{firm}*" if firm else ""
-                    st.markdown(f"- {name}{' — ' + subtitle if subtitle else ''}")
-        else:
-            st.info("No speaker data available.")
-
-    with st.expander("💡 Key Takeaways", expanded=False):
-        if takeaways:
-            for t, why in takeaways:
-                st.markdown(f"- **{t}**\n  - *{why}*")
-        else:
-            st.info("No key takeaways extracted.")
-            
-    with st.expander("🧩 Extracted Themes", expanded=False):
-        if themes:
-            for idx, t in enumerate(themes, 1):
-                st.markdown(f"**Theme {idx}:** {t}")
-        else:
-            st.info("No themes extracted.")
+    render_metadata_panel(
+        conn_str=CONN_STR,
+        ticker=st.session_state.active_ticker,
+        themes=themes,
+        takeaways=takeaways,
+        synthesis=synthesis,
+        keywords=keywords,
+        industry_terms=industry_terms,
+        financial_terms=financial_terms,
+        speakers=speakers,
+    )
 
 with right_col:
-    with st.expander("📄 Transcript Browser", expanded=True):
-        spans = load_transcript_spans(st.session_state.active_ticker)
-        if spans:
-            import html as _html
-            import streamlit.components.v1 as _components
-
-            lines_html = []
-            for speaker, _, text in spans:
-                s = _html.escape(speaker)
-                t = _html.escape(text)
-                lines_html.append(f"<p><strong>{s}:</strong> {t}</p>")
-            transcript_body = "\n".join(lines_html)
-
-            component_html = (
-                """<!DOCTYPE html>
-<html><head>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #ffffff; --text: #1a1a1a; --border: #e0e0e0;
-  --input-bg: #ffffff; --input-border: #cccccc; --input-text: #1a1a1a;
-  --btn-bg: #ffffff; --btn-hover: #f5f5f5; --btn-border: #cccccc; --btn-text: #1a1a1a;
-  --muted: #666666;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e1e1e; --text: #e0e0e0; --border: #444444;
-    --input-bg: #2d2d2d; --input-border: #555555; --input-text: #e0e0e0;
-    --btn-bg: #2d2d2d; --btn-hover: #3d3d3d; --btn-border: #555555; --btn-text: #e0e0e0;
-    --muted: #999999;
-  }
-}
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; background: var(--bg); color: var(--text); }
-.search-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
-.search-bar input { flex: 1; padding: 5px 8px; border: 1px solid var(--input-border); border-radius: 4px; font-size: 13px; outline: none; background: var(--input-bg); color: var(--input-text); }
-.search-bar input:focus { border-color: #4a9eff; }
-.match-count { font-size: 12px; color: var(--muted); min-width: 80px; text-align: center; }
-.nav-btn { padding: 4px 10px; cursor: pointer; border: 1px solid var(--btn-border); border-radius: 4px; background: var(--btn-bg); color: var(--btn-text); font-size: 16px; line-height: 1; }
-.nav-btn:hover { background: var(--btn-hover); }
-.nav-btn:disabled { opacity: 0.4; cursor: default; }
-.transcript { height: calc(100vh - 46px); overflow-y: auto; padding: 8px; }
-p { margin-bottom: 10px; line-height: 1.6; }
-mark { background: #fff59d; border-radius: 2px; padding: 0 1px; }
-mark.current { background: #ff9800; color: white; }
-</style>
-</head><body>
-<div class="search-bar">
-  <input type="text" id="search-input" placeholder="Search transcript..." oninput="onSearch()">
-  <span class="match-count" id="match-count"></span>
-  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" title="Previous match" disabled>&#9650;</button>
-  <button class="nav-btn" id="next-btn" onclick="navigate(1)" title="Next match" disabled>&#9660;</button>
-</div>
-<div class="transcript" id="transcript">
-"""
-                + transcript_body
-                + """
-</div>
-<script>
-var currentIndex = 0;
-var marks = [];
-
-function clearHighlights() {
-  document.querySelectorAll('mark').forEach(function(m) {
-    var parent = m.parentNode;
-    parent.replaceChild(document.createTextNode(m.textContent), m);
-    parent.normalize();
-  });
-  marks = [];
-}
-
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
-}
-
-function highlightText(root, query) {
-  var regex = new RegExp(escapeRegex(query), 'gi');
-  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-  var nodes = [];
-  var node;
-  while (node = walker.nextNode()) { nodes.push(node); }
-  nodes.forEach(function(textNode) {
-    var text = textNode.textContent;
-    regex.lastIndex = 0;
-    if (!regex.test(text)) { return; }
-    regex.lastIndex = 0;
-    var frag = document.createDocumentFragment();
-    var lastIndex = 0;
-    var match;
-    while ((match = regex.exec(text)) !== null) {
-      frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-      var mark = document.createElement('mark');
-      mark.textContent = match[0];
-      frag.appendChild(mark);
-      marks.push(mark);
-      lastIndex = match.index + match[0].length;
-    }
-    frag.appendChild(document.createTextNode(text.slice(lastIndex)));
-    textNode.parentNode.replaceChild(frag, textNode);
-  });
-}
-
-function updateUI() {
-  var q = document.getElementById('search-input').value;
-  var countEl = document.getElementById('match-count');
-  var prevBtn = document.getElementById('prev-btn');
-  var nextBtn = document.getElementById('next-btn');
-  if (!q) {
-    countEl.textContent = '';
-    prevBtn.disabled = true;
-    nextBtn.disabled = true;
-    return;
-  }
-  if (marks.length === 0) {
-    countEl.textContent = '0 matches';
-    prevBtn.disabled = true;
-    nextBtn.disabled = true;
-    return;
-  }
-  marks.forEach(function(m, i) { m.className = i === currentIndex ? 'current' : ''; });
-  marks[currentIndex].scrollIntoView({ block: 'center', behavior: 'smooth' });
-  countEl.textContent = (currentIndex + 1) + ' / ' + marks.length;
-  prevBtn.disabled = false;
-  nextBtn.disabled = false;
-}
-
-function onSearch() {
-  clearHighlights();
-  currentIndex = 0;
-  var q = document.getElementById('search-input').value;
-  if (q.length >= 2) {
-    highlightText(document.getElementById('transcript'), q);
-  }
-  updateUI();
-}
-
-function navigate(dir) {
-  if (!marks.length) { return; }
-  currentIndex = (currentIndex + dir + marks.length) % marks.length;
-  updateUI();
-}
-
-document.getElementById('search-input').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') { navigate(e.shiftKey ? -1 : 1); }
-});
-</script>
-</body></html>"""
-            )
-
-            _components.html(component_html, height=550, scrolling=False)
-        else:
-            st.info("No transcript data available.")
-
+    render_transcript_browser(spans)
     st.divider()
-
-    st.subheader("💬 Chat Interface")
-
-    # ---- Feynman: topic selection UI (shown before loop starts) ----
-    if chat_mode == "Feynman Loop" and not st.session_state.feynman_topic:
-        st.info(
-            "🧠 **Feynman Loop** — choose a topic below and the AI will guide you through "
-            "explaining it back in your own words, exposing gaps, and refining your understanding."
-        )
-
-        # Build up to 3 suggested topics from themes + takeaways
-        suggestions: list[str] = []
-        if themes:
-            suggestions.append(themes[0])
-            if len(themes) > 1:
-                suggestions.append(themes[1])
-        if takeaways and len(suggestions) < 3:
-            suggestions.append(takeaways[0][0])
-
-        if suggestions:
-            st.markdown("**Suggested topics from this transcript:**")
-            chip_cols = st.columns(len(suggestions))
-            for col, suggestion in zip(chip_cols, suggestions):
-                # Truncate long themes for button label readability
-                label = suggestion if len(suggestion) <= 55 else suggestion[:52] + "…"
-                if col.button(label, use_container_width=True):
-                    st.session_state.feynman_topic = suggestion
-                    st.rerun()
-
-        st.markdown("---")
-        st.markdown("**Or enter your own topic:**")
-        custom_topic = st.text_input(
-            "Topic",
-            placeholder="e.g. revenue guidance, FX headwinds, gross margin drivers",
-            label_visibility="collapsed",
-        )
-        if st.button("Start Feynman Loop ▶", disabled=not custom_topic.strip(), type="primary"):
-            st.session_state.feynman_topic = custom_topic.strip()
-            st.rerun()
-
-    else:
-        # ---- Stage progress indicator (Feynman only) ----
-        if chat_mode == "Feynman Loop":
-            _stage_names = {
-                1: "Initial Explanation",
-                2: "Gap Analysis",
-                3: "Guided Refinement",
-                4: "Understanding Test",
-                5: "Teaching Note",
-            }
-            _stage_hints = {
-                1: "📖 **Read the explanation below.** The AI will ask you to explain it back — give it a try in your own words!",
-                2: "✏️ **Answer the AI's questions.** Try to explain the concept or fill in the gaps it identifies — no need to be perfect.",
-                3: "💬 **Keep the conversation going.** Refine your explanation turn by turn. When you feel confident, click the button below to advance.",
-                4: "🎯 **Apply what you've learned.** The AI will give you a new scenario — explain how the concept applies to it.",
-                5: "🎉 **Session complete!** Your teaching note is below — a concise summary you can keep.",
-            }
-            _stage = st.session_state.feynman_stage
-            _topic_label = st.session_state.feynman_topic
-            if len(_topic_label) > 50:
-                _topic_label = _topic_label[:47] + "…"
-            st.caption(
-                f"🧠 **Feynman Loop** · Topic: *{_topic_label}* · "
-                f"Step {_stage} of 5: {_stage_names.get(_stage, 'Complete')}"
-            )
-
-            # Per-stage instruction hint
-            hint = _stage_hints.get(_stage)
-            if hint:
-                st.info(hint)
-
-            if _stage == 5 and st.session_state.messages:
-                # Check if we've already shown the final note (last assistant message)
-                last_msg = next(
-                    (m for m in reversed(st.session_state.messages)
-                     if m["role"] == "assistant"), None
-                )
-                if last_msg and last_msg.get("feynman_stage") == 5:
-                    st.success("🎉 **Feynman Session Complete!** Review your teaching note above.")
-                    if st.button("🔄 Start a new Feynman cycle", type="secondary"):
-                        st.session_state.feynman_topic = ""
-                        st.session_state.feynman_stage = 1
-                        st.session_state.messages = []
-                        st.rerun()
-
-        # ---- Display existing chat messages ----
-        for msg in st.session_state.messages:
-            if (
-                msg["role"] != "system"
-                and not msg["content"].startswith("*[Proceeding to")
-                and not msg.get("feynman_auto")  # hide silent trigger messages
-            ):
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-                    if "stats" in msg:
-                        st.caption(
-                            f"Model: {msg['stats'].get('model')} "
-                            f"• Tokens: In {msg['stats'].get('prompt_tokens', 0)} "
-                            f"/ Out {msg['stats'].get('completion_tokens', 0)}"
-                        )
-
-        # ---- Stage 3: manual-advance button ----
-        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 3:
-            last_assistant = next(
-                (m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None
-            )
-            if last_assistant:
-                if st.button("✅ I'm ready to be tested", type="primary"):
-                    st.session_state.feynman_stage = 4
-                    # Auto-fire the stage 4 prompt so the AI immediately
-                    # issues the challenge rather than waiting for user input.
-                    st.session_state.messages.append(
-                        {"role": "user", "content": "I'm ready for the understanding test.", "display": False}
-                    )
-                    st.rerun()
-
-        # ---- Stage 4: manual-advance button ----
-        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 4:
-            last_assistant = next(
-                (m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None
-            )
-            # Only show once the AI has issued the stage 4 challenge (feynman_stage tag == 4)
-            if last_assistant and last_assistant.get("feynman_stage") == 4:
-                if st.button("🎓 I'm done — give me my teaching note", type="primary"):
-                    st.session_state.feynman_stage = 5
-                    # Inject the stage 5 trigger now so it's in messages before the next
-                    # render — prevents the render-time auto-fire block from looping.
-                    st.session_state.messages.append(
-                        {"role": "user", "content": "I am ready for the ultimate teaching note.", "display": False}
-                    )
-                    st.rerun()
-
-        # ---- Stage 5: auto-fire final teaching note (safety net only) ----
-        # Primary trigger is injected by the stage 4 advance button above.
-        # This block is a fallback in case the user somehow reaches stage 5 without
-        # the button (e.g. page refresh). Guard against adding duplicate triggers.
-        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5:
-            last_assistant = next(
-                (m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None
-            )
-            _has_pending_trigger = any(
-                m.get("display") is False and m["role"] == "user"
-                for m in st.session_state.messages
-            )
-            teaching_note_done = last_assistant and last_assistant.get("feynman_stage") == 5
-            if not teaching_note_done and not _has_pending_trigger:
-                st.session_state.messages.append(
-                    {"role": "user", "content": "I am ready for the ultimate teaching note.", "display": False}
-                )
-                st.rerun()
-
-        # ---- Chat input ----
-        _feynman_active = chat_mode == "Feynman Loop" and bool(st.session_state.feynman_topic)
-        _stage_complete = chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5
-        _chat_placeholder = (
-            f"Ask about {st.session_state.active_ticker}..."
-            if chat_mode == "General Q&A"
-            else "Type your response..."
-        )
-
-        # Auto-fire stage 1 initial explanation when topic is freshly set
-        if _feynman_active and st.session_state.feynman_stage == 1 and not st.session_state.messages:
-            _init_msg = f"I want to learn about: {st.session_state.feynman_topic}"
-            st.session_state.messages.append(
-                {"role": "user", "content": _init_msg, "display": False}
-            )
-            st.rerun()
-
-
-        # Handle both user-typed prompts and auto-fired hidden prompts (stage 1 + stage 5)
-        _auto_prompt = None
-        for _m in list(st.session_state.messages):
-            if _m.get("display") is False and _m["role"] == "user":
-                _auto_prompt = _m["content"]
-                break
-
-        if prompt := st.chat_input(_chat_placeholder, disabled=_stage_complete) or _auto_prompt:
-            # For auto-fired messages, don't show them as user bubbles
-            _is_auto = prompt == _auto_prompt
-
-            if _is_auto:
-                # Replace the display:False entry with display:True + feynman_auto:True.
-                # This keeps the message in history (so api_messages always starts with
-                # a user message, as required by the LLM API) while hiding it from the UI.
-                st.session_state.messages = [
-                    {**m, "display": True, "feynman_auto": True}
-                    if (m.get("display") is False and m["role"] == "user" and m["content"] == prompt)
-                    else m
-                    for m in st.session_state.messages
-                ]
-            else:
-                # 1. Display user message exactly as typed
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-
-            # 2. Add to session history (only if not already added as auto-prompt)
-            if not _is_auto:
-                st.session_state.messages.append({"role": "user", "content": prompt, "display": True})
-
-            # 3. Retrieve Context (RAG)
-            query_embs = get_embeddings([prompt])
-            context_spans = []
-            if query_embs and query_embs[0]:
-                context_spans = search_spans(CONN_STR, st.session_state.active_ticker, query_embs[0], top_k=4)
-
-            # 4. Handle System Prompts & Custom Logic based on mode
-            with st.chat_message("assistant"):
-                response_placeholder = st.empty()
-                full_response = ""
-                usage_stats = {}
-
-                if chat_mode == "General Q&A":
-                    # Load prompt
-                    try:
-                        with open(Path(__file__).parent / "prompts/feynman/00_general_qa.md", "r") as f:
-                            sys_prompt = f.read()
-                    except FileNotFoundError:
-                        sys_prompt = "You are a helpful expert answering questions using the transcript context."
-
-                    # Inject jargon if user asked about it
-                    if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
-                        all_terms = financial_terms + industry_terms
-                        if all_terms:
-                            jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
-                            context_spans.append(jargon_str)
-
-                    # Build api_messages from history. The current user turn is already
-                    # the last item (appended to session in step 2 above).
-                    api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if m.get("display") == True]
-
-                    # Augment the last user message with the RAG context
-                    if context_spans:
-                        context_str = "\n".join(f"- {span}" for span in context_spans)
-                        augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
-                        api_messages[-1]["content"] = augmented_input
-
-                    # Stream Response
-                    try:
-                        for chunk in stream_chat(api_messages, sys_prompt):
-                            if isinstance(chunk, dict):
-                                usage_stats = chunk
-                                continue
-                            full_response += chunk
-                            response_placeholder.markdown(full_response + "▌")
-                        response_placeholder.markdown(full_response)
-                    except Exception as e:
-                        response_placeholder.error(f"Error connecting to LLM: {e}")
-
-                elif chat_mode == "Feynman Loop":
-                    stage = st.session_state.feynman_stage
-                    feynman_prompt_files = {
-                        1: "prompts/feynman/01_initial_explanation.md",
-                        2: "prompts/feynman/02_gap_analysis.md",
-                        3: "prompts/feynman/03_guided_refinement.md",
-                        4: "prompts/feynman/04_understanding_test.md",
-                        5: "prompts/feynman/05_teaching_note.md",
-                    }
-                    try:
-                        with open(Path(__file__).parent / feynman_prompt_files[stage], "r") as f:
-                            sys_prompt = f.read()
-                    except FileNotFoundError:
-                        sys_prompt = "You are a Feynman method tutor. Evaluate the user's understanding."
-
-                    # Build api_messages from history. The current user turn is already
-                    # the last item (auto-fire: feynman_auto:True; manual: appended in step 2).
-                    api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if m.get("display") == True]
-
-                    if context_spans:
-                        context_str = "\n".join(f"- {span}" for span in context_spans)
-                        augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
-                        api_messages[-1]["content"] = augmented_input
-
-                    try:
-                        for chunk in stream_chat(api_messages, sys_prompt):
-                            if isinstance(chunk, dict):
-                                usage_stats = chunk
-                                continue
-                            full_response += chunk
-                            response_placeholder.markdown(full_response + "▌")
-                        response_placeholder.markdown(full_response)
-                    except Exception as e:
-                        response_placeholder.error(f"Error connecting to LLM: {e}")
-
-                    # Auto-advance rules:
-                    #  Stages 1 & 2: one-turn each, advance after every AI response
-                    #  Stages 3 & 4: multi-turn, user advances manually via button
-                    if full_response and stage in (1, 2):
-                        st.session_state.feynman_stage += 1
-
-                # 5. Save the assistant response and stats to history
-                if full_response:
-                    stats_dict = {'model': usage_stats.get('model', 'Unknown')}
-                    if 'usage' in usage_stats:
-                        stats_dict['prompt_tokens'] = usage_stats['usage'].get('prompt_tokens', 0)
-                        stats_dict['completion_tokens'] = usage_stats['usage'].get('completion_tokens', 0)
-
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": full_response,
-                        "stats": stats_dict,
-                        "display": True,
-                        # Tag with stage so stage-5 auto-fire guard works
-                        "feynman_stage": st.session_state.feynman_stage,
-                    })
-                    # Trigger a rerun so the final markdown renders cleanly without the cursor
-                    st.rerun()
+    render_chat_interface(
+        conn_str=CONN_STR,
+        ticker=st.session_state.active_ticker,
+        chat_mode=chat_mode,
+        themes=themes,
+        takeaways=takeaways,
+        financial_terms=financial_terms,
+        industry_terms=industry_terms,
+    )
