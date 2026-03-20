@@ -17,7 +17,7 @@ def render_metadata_panel(
     """Render the left-column analysis panel: sentiment, jargon, speakers, takeaways, themes."""
     st.subheader(f"📊 {ticker} Analysis")
 
-    with st.expander("🎭 Sentiment Analysis", expanded=True):
+    with st.expander("🎭 Sentiment Analysis", expanded=False):
         if synthesis:
             overall, exec_tone, analyst_sent = synthesis
             st.markdown(f"**Overall Sentiment:** {overall}")
