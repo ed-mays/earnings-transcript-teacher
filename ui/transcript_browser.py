@@ -125,7 +125,7 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
 
 def render_transcript_browser(spans: list[tuple[str, str, str]]) -> None:
     """Render the searchable HTML transcript browser inside an expander."""
-    with st.expander("📄 Transcript Browser", expanded=True):
+    with st.expander("📄 Transcript Browser", expanded=False):
         if not spans:
             st.info("No transcript data available.")
             return
