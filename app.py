@@ -43,6 +43,13 @@ if "messages" not in st.session_state:
 if "active_ticker" not in st.session_state:
     st.session_state.active_ticker = None
 
+# --- Feynman Loop state ---
+if "feynman_stage" not in st.session_state:
+    st.session_state.feynman_stage = 1   # 1–5
+
+if "feynman_topic" not in st.session_state:
+    st.session_state.feynman_topic = ""  # empty = topic not yet chosen
+
 # ------------- Helper Functions -------------
 
 @st.cache_data
@@ -105,8 +112,10 @@ def load_metadata(ticker):
         raise
 
 def reset_chat():
-    """Clear the chat history."""
+    """Clear the chat history and Feynman state."""
     st.session_state.messages = []
+    st.session_state.feynman_stage = 1
+    st.session_state.feynman_topic = ""
 
 def handle_define_click(ticker: str, term: str, current_def: str):
     if not current_def or not current_def.strip():
@@ -468,113 +477,307 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
     st.divider()
 
     st.subheader("💬 Chat Interface")
-    
-    # Display existing chat messages
-    for msg in st.session_state.messages:
-        # Don't show system/hidden messages in the UI
-        if msg["role"] != "system" and not msg["content"].startswith("*[Proceeding to"):
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-                if "stats" in msg:
-                    st.caption(f"Model: {msg['stats'].get('model')} • Tokens: In {msg['stats'].get('prompt_tokens', 0)} / Out {msg['stats'].get('completion_tokens', 0)}")
 
-    # Chat Input
-    if prompt := st.chat_input(f"Ask about {st.session_state.active_ticker}..."):
-        
-        # 1. Display user message exactly as typed
-        with st.chat_message("user"):
-            st.markdown(prompt)
-            
-        # 2. Add to session history
-        st.session_state.messages.append({"role": "user", "content": prompt, "display": True})
-        
-        # 3. Retrieve Context (RAG)
-        query_embs = get_embeddings([prompt])
-        context_spans = []
-        if query_embs and query_embs[0]:
-            context_spans = search_spans(CONN_STR, st.session_state.active_ticker, query_embs[0], top_k=4)
-            
-        # 4. Handle System Prompts & Custom Logic based on mode
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            full_response = ""
-            usage_stats = {}
-            
-            if chat_mode == "General Q&A":
-                # Load prompt
-                try:
-                    with open(Path(__file__).parent / "prompts/feynman/00_general_qa.md", "r") as f:
-                        sys_prompt = f.read()
-                except FileNotFoundError:
-                    sys_prompt = "You are a helpful expert answering questions using the transcript context."
-                    
-                # Inject jargon if user asked about it
-                if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
-                    all_terms = financial_terms + industry_terms
-                    if all_terms:
-                        jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
-                        context_spans.append(jargon_str)
-                        
-                # Format final API messages
-                api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if "display" in m]
-                
-                # Augment the last user message with the RAG context
-                if context_spans:
-                    context_str = "\n".join(f"- {span}" for span in context_spans)
-                    augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
-                    api_messages[-1]["content"] = augmented_input
-                    
-                # Stream Response
-                try:
-                    for chunk in stream_chat(api_messages, sys_prompt):
-                        if isinstance(chunk, dict):
-                            usage_stats = chunk
-                            continue
-                        full_response += chunk
-                        response_placeholder.markdown(full_response + "▌")
-                    response_placeholder.markdown(full_response)
-                except Exception as e:
-                    response_placeholder.error(f"Error connecting to LLM: {e}")
-                    
-            elif chat_mode == "Feynman Loop":
-                # Basic Feynman implementation for GUI MVP
-                try:
-                    with open(Path(__file__).parent / "prompts/feynman/01_initial_explanation.md", "r") as f:
-                        sys_prompt = f.read()
-                except FileNotFoundError:
-                    sys_prompt = "You are a Feynman method tutor. Evaluate the user's understanding."
-                    
-                api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if "display" in m]
-                
-                if context_spans:
-                    context_str = "\n".join(f"- {span}" for span in context_spans)
-                    augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
-                    api_messages[-1]["content"] = augmented_input
-                    
-                try:
-                    for chunk in stream_chat(api_messages, sys_prompt):
-                        if isinstance(chunk, dict):
-                            usage_stats = chunk
-                            continue
-                        full_response += chunk
-                        response_placeholder.markdown(full_response + "▌")
-                    response_placeholder.markdown(full_response)
-                except Exception as e:
-                    response_placeholder.error(f"Error connecting to LLM: {e}")
+    # ---- Feynman: topic selection UI (shown before loop starts) ----
+    if chat_mode == "Feynman Loop" and not st.session_state.feynman_topic:
+        st.info(
+            "🧠 **Feynman Loop** — choose a topic below and the AI will guide you through "
+            "explaining it back in your own words, exposing gaps, and refining your understanding."
+        )
 
-            # 5. Save the assistant response and stats to history
-            if full_response:
-                stats_dict = {'model': usage_stats.get('model', 'Unknown')}
-                if 'usage' in usage_stats:
-                    stats_dict['prompt_tokens'] = usage_stats['usage'].get('prompt_tokens', 0)
-                    stats_dict['completion_tokens'] = usage_stats['usage'].get('completion_tokens', 0)
+        # Build up to 3 suggested topics from themes + takeaways
+        suggestions: list[str] = []
+        if themes:
+            suggestions.append(themes[0])
+            if len(themes) > 1:
+                suggestions.append(themes[1])
+        if takeaways and len(suggestions) < 3:
+            suggestions.append(takeaways[0][0])
 
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": full_response,
-                    "stats": stats_dict,
-                    "display": True
-                })
-                # Trigger a rerun so the final markdown renders cleanly without the cursor
+        if suggestions:
+            st.markdown("**Suggested topics from this transcript:**")
+            chip_cols = st.columns(len(suggestions))
+            for col, suggestion in zip(chip_cols, suggestions):
+                # Truncate long themes for button label readability
+                label = suggestion if len(suggestion) <= 55 else suggestion[:52] + "…"
+                if col.button(label, use_container_width=True):
+                    st.session_state.feynman_topic = suggestion
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("**Or enter your own topic:**")
+        custom_topic = st.text_input(
+            "Topic",
+            placeholder="e.g. revenue guidance, FX headwinds, gross margin drivers",
+            label_visibility="collapsed",
+        )
+        if st.button("Start Feynman Loop ▶", disabled=not custom_topic.strip(), type="primary"):
+            st.session_state.feynman_topic = custom_topic.strip()
+            st.rerun()
+
+    else:
+        # ---- Stage progress indicator (Feynman only) ----
+        if chat_mode == "Feynman Loop":
+            _stage_names = {
+                1: "Initial Explanation",
+                2: "Gap Analysis",
+                3: "Guided Refinement",
+                4: "Understanding Test",
+                5: "Teaching Note",
+            }
+            _stage_hints = {
+                1: "📖 **Read the explanation below.** The AI will ask you to explain it back — give it a try in your own words!",
+                2: "✏️ **Answer the AI's questions.** Try to explain the concept or fill in the gaps it identifies — no need to be perfect.",
+                3: "💬 **Keep the conversation going.** Refine your explanation turn by turn. When you feel confident, click the button below to advance.",
+                4: "🎯 **Apply what you've learned.** The AI will give you a new scenario — explain how the concept applies to it.",
+                5: "🎉 **Session complete!** Your teaching note is below — a concise summary you can keep.",
+            }
+            _stage = st.session_state.feynman_stage
+            _topic_label = st.session_state.feynman_topic
+            if len(_topic_label) > 50:
+                _topic_label = _topic_label[:47] + "…"
+            st.caption(
+                f"🧠 **Feynman Loop** · Topic: *{_topic_label}* · "
+                f"Step {_stage} of 5: {_stage_names.get(_stage, 'Complete')}"
+            )
+
+            # Per-stage instruction hint
+            hint = _stage_hints.get(_stage)
+            if hint:
+                st.info(hint)
+
+            if _stage == 5 and st.session_state.messages:
+                # Check if we've already shown the final note (last assistant message)
+                last_msg = next(
+                    (m for m in reversed(st.session_state.messages)
+                     if m["role"] == "assistant"), None
+                )
+                if last_msg and last_msg.get("feynman_stage") == 5:
+                    st.success("🎉 **Feynman Session Complete!** Review your teaching note above.")
+                    if st.button("🔄 Start a new Feynman cycle", type="secondary"):
+                        st.session_state.feynman_topic = ""
+                        st.session_state.feynman_stage = 1
+                        st.session_state.messages = []
+                        st.rerun()
+
+        # ---- Display existing chat messages ----
+        for msg in st.session_state.messages:
+            if (
+                msg["role"] != "system"
+                and not msg["content"].startswith("*[Proceeding to")
+                and not msg.get("feynman_auto")  # hide silent trigger messages
+            ):
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+                    if "stats" in msg:
+                        st.caption(
+                            f"Model: {msg['stats'].get('model')} "
+                            f"• Tokens: In {msg['stats'].get('prompt_tokens', 0)} "
+                            f"/ Out {msg['stats'].get('completion_tokens', 0)}"
+                        )
+
+        # ---- Stage 3: manual-advance button ----
+        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 3:
+            last_assistant = next(
+                (m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None
+            )
+            if last_assistant:
+                if st.button("✅ I'm ready to be tested", type="primary"):
+                    st.session_state.feynman_stage = 4
+                    # Auto-fire the stage 4 prompt so the AI immediately
+                    # issues the challenge rather than waiting for user input.
+                    st.session_state.messages.append(
+                        {"role": "user", "content": "I'm ready for the understanding test.", "display": False}
+                    )
+                    st.rerun()
+
+        # ---- Stage 4: manual-advance button ----
+        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 4:
+            last_assistant = next(
+                (m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None
+            )
+            # Only show once the AI has issued the stage 4 challenge (feynman_stage tag == 4)
+            if last_assistant and last_assistant.get("feynman_stage") == 4:
+                if st.button("🎓 I'm done — give me my teaching note", type="primary"):
+                    st.session_state.feynman_stage = 5
+                    # Inject the stage 5 trigger now so it's in messages before the next
+                    # render — prevents the render-time auto-fire block from looping.
+                    st.session_state.messages.append(
+                        {"role": "user", "content": "I am ready for the ultimate teaching note.", "display": False}
+                    )
+                    st.rerun()
+
+        # ---- Stage 5: auto-fire final teaching note (safety net only) ----
+        # Primary trigger is injected by the stage 4 advance button above.
+        # This block is a fallback in case the user somehow reaches stage 5 without
+        # the button (e.g. page refresh). Guard against adding duplicate triggers.
+        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5:
+            last_assistant = next(
+                (m for m in reversed(st.session_state.messages) if m["role"] == "assistant"), None
+            )
+            _has_pending_trigger = any(
+                m.get("display") is False and m["role"] == "user"
+                for m in st.session_state.messages
+            )
+            teaching_note_done = last_assistant and last_assistant.get("feynman_stage") == 5
+            if not teaching_note_done and not _has_pending_trigger:
+                st.session_state.messages.append(
+                    {"role": "user", "content": "I am ready for the ultimate teaching note.", "display": False}
+                )
                 st.rerun()
 
+        # ---- Chat input ----
+        _feynman_active = chat_mode == "Feynman Loop" and bool(st.session_state.feynman_topic)
+        _stage_complete = chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5
+        _chat_placeholder = (
+            f"Ask about {st.session_state.active_ticker}..."
+            if chat_mode == "General Q&A"
+            else "Type your response..."
+        )
+
+        # Auto-fire stage 1 initial explanation when topic is freshly set
+        if _feynman_active and st.session_state.feynman_stage == 1 and not st.session_state.messages:
+            _init_msg = f"I want to learn about: {st.session_state.feynman_topic}"
+            st.session_state.messages.append(
+                {"role": "user", "content": _init_msg, "display": False}
+            )
+            st.rerun()
+
+
+        # Handle both user-typed prompts and auto-fired hidden prompts (stage 1 + stage 5)
+        _auto_prompt = None
+        for _m in list(st.session_state.messages):
+            if _m.get("display") is False and _m["role"] == "user":
+                _auto_prompt = _m["content"]
+                break
+
+        if prompt := st.chat_input(_chat_placeholder, disabled=_stage_complete) or _auto_prompt:
+            # For auto-fired messages, don't show them as user bubbles
+            _is_auto = prompt == _auto_prompt
+
+            if _is_auto:
+                # Replace the display:False entry with display:True + feynman_auto:True.
+                # This keeps the message in history (so api_messages always starts with
+                # a user message, as required by the LLM API) while hiding it from the UI.
+                st.session_state.messages = [
+                    {**m, "display": True, "feynman_auto": True}
+                    if (m.get("display") is False and m["role"] == "user" and m["content"] == prompt)
+                    else m
+                    for m in st.session_state.messages
+                ]
+            else:
+                # 1. Display user message exactly as typed
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+            # 2. Add to session history (only if not already added as auto-prompt)
+            if not _is_auto:
+                st.session_state.messages.append({"role": "user", "content": prompt, "display": True})
+
+            # 3. Retrieve Context (RAG)
+            query_embs = get_embeddings([prompt])
+            context_spans = []
+            if query_embs and query_embs[0]:
+                context_spans = search_spans(CONN_STR, st.session_state.active_ticker, query_embs[0], top_k=4)
+
+            # 4. Handle System Prompts & Custom Logic based on mode
+            with st.chat_message("assistant"):
+                response_placeholder = st.empty()
+                full_response = ""
+                usage_stats = {}
+
+                if chat_mode == "General Q&A":
+                    # Load prompt
+                    try:
+                        with open(Path(__file__).parent / "prompts/feynman/00_general_qa.md", "r") as f:
+                            sys_prompt = f.read()
+                    except FileNotFoundError:
+                        sys_prompt = "You are a helpful expert answering questions using the transcript context."
+
+                    # Inject jargon if user asked about it
+                    if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
+                        all_terms = financial_terms + industry_terms
+                        if all_terms:
+                            jargon_str = "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
+                            context_spans.append(jargon_str)
+
+                    # Build api_messages from history. The current user turn is already
+                    # the last item (appended to session in step 2 above).
+                    api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if m.get("display") == True]
+
+                    # Augment the last user message with the RAG context
+                    if context_spans:
+                        context_str = "\n".join(f"- {span}" for span in context_spans)
+                        augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
+                        api_messages[-1]["content"] = augmented_input
+
+                    # Stream Response
+                    try:
+                        for chunk in stream_chat(api_messages, sys_prompt):
+                            if isinstance(chunk, dict):
+                                usage_stats = chunk
+                                continue
+                            full_response += chunk
+                            response_placeholder.markdown(full_response + "▌")
+                        response_placeholder.markdown(full_response)
+                    except Exception as e:
+                        response_placeholder.error(f"Error connecting to LLM: {e}")
+
+                elif chat_mode == "Feynman Loop":
+                    stage = st.session_state.feynman_stage
+                    feynman_prompt_files = {
+                        1: "prompts/feynman/01_initial_explanation.md",
+                        2: "prompts/feynman/02_gap_analysis.md",
+                        3: "prompts/feynman/03_guided_refinement.md",
+                        4: "prompts/feynman/04_understanding_test.md",
+                        5: "prompts/feynman/05_teaching_note.md",
+                    }
+                    try:
+                        with open(Path(__file__).parent / feynman_prompt_files[stage], "r") as f:
+                            sys_prompt = f.read()
+                    except FileNotFoundError:
+                        sys_prompt = "You are a Feynman method tutor. Evaluate the user's understanding."
+
+                    # Build api_messages from history. The current user turn is already
+                    # the last item (auto-fire: feynman_auto:True; manual: appended in step 2).
+                    api_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages if m.get("display") == True]
+
+                    if context_spans:
+                        context_str = "\n".join(f"- {span}" for span in context_spans)
+                        augmented_input = f"{prompt}\n\n<transcript_context>\n{context_str}\n</transcript_context>"
+                        api_messages[-1]["content"] = augmented_input
+
+                    try:
+                        for chunk in stream_chat(api_messages, sys_prompt):
+                            if isinstance(chunk, dict):
+                                usage_stats = chunk
+                                continue
+                            full_response += chunk
+                            response_placeholder.markdown(full_response + "▌")
+                        response_placeholder.markdown(full_response)
+                    except Exception as e:
+                        response_placeholder.error(f"Error connecting to LLM: {e}")
+
+                    # Auto-advance rules:
+                    #  Stages 1 & 2: one-turn each, advance after every AI response
+                    #  Stages 3 & 4: multi-turn, user advances manually via button
+                    if full_response and stage in (1, 2):
+                        st.session_state.feynman_stage += 1
+
+                # 5. Save the assistant response and stats to history
+                if full_response:
+                    stats_dict = {'model': usage_stats.get('model', 'Unknown')}
+                    if 'usage' in usage_stats:
+                        stats_dict['prompt_tokens'] = usage_stats['usage'].get('prompt_tokens', 0)
+                        stats_dict['completion_tokens'] = usage_stats['usage'].get('completion_tokens', 0)
+
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": full_response,
+                        "stats": stats_dict,
+                        "display": True,
+                        # Tag with stage so stage-5 auto-fire guard works
+                        "feynman_stage": st.session_state.feynman_stage,
+                    })
+                    # Trigger a rerun so the final markdown renders cleanly without the cursor
+                    st.rerun()
