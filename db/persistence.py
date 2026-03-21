@@ -47,6 +47,14 @@ def get_keywords_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list
     repo = AnalysisRepository(conn_str)
     return repo.get_keywords_for_ticker(ticker, limit)
 
+def get_evasion_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, int, str]]:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_evasion_for_ticker(ticker)
+
+def get_misconceptions_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, str, str]]:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_misconceptions_for_ticker(ticker)
+
 def get_extracted_terms_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
     repo = AnalysisRepository(conn_str)
     return repo.get_extracted_terms_for_ticker(ticker, limit)

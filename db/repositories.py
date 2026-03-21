@@ -296,6 +296,48 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch spans: {e}")
         return rows
 
+    def get_evasion_for_ticker(self, ticker: str) -> list[tuple[str, int, str]]:
+        """Return evasion analysis entries for a ticker as (analyst_concern, defensiveness_score, evasion_explanation)."""
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation
+                        FROM evasion_analysis ea
+                        JOIN calls c ON ea.call_id = c.id
+                        WHERE c.ticker = %s
+                        ORDER BY ea.defensiveness_score DESC
+                        """,
+                        (ticker,),
+                    )
+                    rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch evasion analysis for {ticker}: {e}")
+        return rows
+
+    def get_misconceptions_for_ticker(self, ticker: str) -> list[tuple[str, str, str]]:
+        """Return misconception entries for a ticker as (fact, misinterpretation, correction)."""
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT m.fact, m.misinterpretation, m.correction
+                        FROM misconceptions m
+                        JOIN calls c ON m.call_id = c.id
+                        WHERE c.ticker = %s
+                        ORDER BY m.id ASC
+                        """,
+                        (ticker,),
+                    )
+                    rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch misconceptions for {ticker}: {e}")
+        return rows
+
     def get_industry_terms_for_ticker(self, ticker: str, limit: int = 30) -> list[tuple[str, str, str]]:
         """Return deduplicated industry-specific terms for a ticker as (term, definition, explanation)."""
         terms = []

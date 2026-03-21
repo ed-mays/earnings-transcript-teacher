@@ -13,6 +13,8 @@ def render_metadata_panel(
     industry_terms: list,
     financial_terms: list,
     speakers: list,
+    evasion: list | None = None,
+    misconceptions: list | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
     st.markdown(f"### 📊 {ticker} — Learning Path")
@@ -62,6 +64,22 @@ def render_metadata_panel(
                     st.markdown(f"- {name}{' — ' + subtitle if subtitle else ''}")
         else:
             st.info("No speaker data available.")
+
+    if evasion:
+        with st.expander("Step 3 · What management avoided"):
+            for analyst_concern, defensiveness_score, evasion_explanation in evasion:
+                st.markdown(f"**Concern:** {analyst_concern}")
+                st.markdown(f"*Defensiveness score: {defensiveness_score}/10*")
+                st.markdown(f"**Why it was flagged:** {evasion_explanation}")
+                st.divider()
+
+    if misconceptions:
+        with st.expander("Step 3 · Learning Opportunities"):
+            for fact, misinterpretation, correction in misconceptions:
+                st.markdown(f"*Context: {fact}*")
+                st.markdown(f"**Misconception:** {misinterpretation}")
+                st.markdown(f"**Correction:** {correction}")
+                st.divider()
 
     st.checkbox("Show advanced analysis", key="show_advanced_analysis")
 
