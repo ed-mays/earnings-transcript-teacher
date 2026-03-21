@@ -1,7 +1,7 @@
 import pytest
 import json
 from unittest.mock import MagicMock
-from services.llm import stream_chat, AgenticExtractor
+from services.llm import stream_chat, AgenticExtractor, _CITATION_PATTERN
 from tenacity import RetryError
 
 def test_stream_chat_success(mocker, monkeypatch):
@@ -29,6 +29,65 @@ def test_stream_chat_success(mocker, monkeypatch):
     usage_chunk = next((c for c in chunks if isinstance(c, dict) and "usage" in c), None)
     assert usage_chunk is not None
     assert usage_chunk["usage"]["prompt_tokens"] == 10
+
+def test_stream_chat_strips_numeric_citations(mocker, monkeypatch):
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "fake_key")
+
+    mock_post = mocker.patch("requests.post")
+    mock_response = MagicMock()
+    mock_post.return_value.__enter__.return_value = mock_response
+
+    mock_response.iter_lines.return_value = [
+        b'data: {"choices": [{"delta": {"content": "Good point.[1] Another idea.[2]"}}]}',
+        b'data: [DONE]'
+    ]
+
+    chunks = list(stream_chat([{"role": "user", "content": "hi"}], "sys"))
+    full = "".join(c for c in chunks if isinstance(c, str))
+    assert "[1]" not in full
+    assert "[2]" not in full
+    assert "Good point." in full
+    assert "Another idea." in full
+
+
+def test_stream_chat_strips_transcript_context_citations(mocker, monkeypatch):
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "fake_key")
+
+    mock_post = mocker.patch("requests.post")
+    mock_response = MagicMock()
+    mock_post.return_value.__enter__.return_value = mock_response
+
+    mock_response.iter_lines.return_value = [
+        b'data: {"choices": [{"delta": {"content": "Tesla said this.[transcript_context]"}}]}',
+        b'data: [DONE]'
+    ]
+
+    chunks = list(stream_chat([{"role": "user", "content": "hi"}], "sys"))
+    full = "".join(c for c in chunks if isinstance(c, str))
+    assert "[transcript_context]" not in full
+    assert "Tesla said this." in full
+
+
+def test_stream_chat_strips_citation_split_across_chunks(mocker, monkeypatch):
+    """Citation split across two SSE chunks must still be removed."""
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "fake_key")
+
+    mock_post = mocker.patch("requests.post")
+    mock_response = MagicMock()
+    mock_post.return_value.__enter__.return_value = mock_response
+
+    mock_response.iter_lines.return_value = [
+        b'data: {"choices": [{"delta": {"content": "Hello [tra"}}]}',
+        b'data: {"choices": [{"delta": {"content": "nscript_context] world"}}]}',
+        b'data: [DONE]'
+    ]
+
+    chunks = list(stream_chat([{"role": "user", "content": "hi"}], "sys"))
+    full = "".join(c for c in chunks if isinstance(c, str))
+    assert "[transcript_context]" not in full
+    assert "Hello" in full
+    assert "world" in full
+
 
 def test_stream_chat_missing_key(monkeypatch):
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
