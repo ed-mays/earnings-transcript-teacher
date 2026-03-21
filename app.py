@@ -37,6 +37,9 @@ if "feynman_stage" not in st.session_state:
 if "feynman_topic" not in st.session_state:
     st.session_state.feynman_topic = ""
 
+if "feynman_session_id" not in st.session_state:
+    st.session_state.feynman_session_id = ""
+
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
@@ -65,10 +68,14 @@ if "schema_checked" not in st.session_state:
 # ------------- Sidebar -------------
 
 def _reset_chat() -> None:
-    """Clear the chat history and Feynman state."""
+    """Clear the chat history and Feynman state, saving in-progress session first."""
+    if st.session_state.get("feynman_topic") and st.session_state.get("feynman_session_id"):
+        from ui.feynman import _save_feynman_session
+        _save_feynman_session(CONN_STR, st.session_state.active_ticker or "", completed=False)
     st.session_state.messages = []
     st.session_state.feynman_stage = 1
     st.session_state.feynman_topic = ""
+    st.session_state.feynman_session_id = ""
 
 
 selected_ticker, chat_mode = render_sidebar(CONN_STR, on_ticker_change=_reset_chat)
