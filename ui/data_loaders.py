@@ -12,6 +12,8 @@ from db.persistence import (
     get_financial_terms_for_ticker,
     get_speakers_for_ticker,
     get_spans_for_ticker,
+    get_evasion_for_ticker,
+    get_misconceptions_for_ticker,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,14 @@ def load_speakers(conn_str: str, ticker: str) -> list[tuple[str, str, str | None
 def load_transcript_spans(conn_str: str, ticker: str) -> list[tuple[str, str, str]]:
     """Fetch all speaker turns for a transcript from the database."""
     return get_spans_for_ticker(conn_str, ticker)
+
+
+@st.cache_data
+def load_analyst_view(conn_str: str, ticker: str) -> tuple[list, list]:
+    """Fetch evasion analysis and misconceptions for a transcript."""
+    evasion = get_evasion_for_ticker(conn_str, ticker)
+    misconceptions = get_misconceptions_for_ticker(conn_str, ticker)
+    return evasion, misconceptions
 
 
 @st.cache_data

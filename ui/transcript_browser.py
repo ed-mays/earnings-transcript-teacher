@@ -1,4 +1,5 @@
 import html as _html
+import re
 
 import streamlit as st
 import streamlit.components.v1 as _components
@@ -31,6 +32,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; f
 p { margin-bottom: 10px; line-height: 1.6; }
 mark { background: #fff59d; border-radius: 2px; padding: 0 1px; }
 mark.current { background: #ff9800; color: white; }
+.jargon { border-bottom: 1px dotted #4a9eff; cursor: help; }
 """
 
 _BROWSER_JS = """
@@ -123,7 +125,40 @@ document.getElementById('search-input').addEventListener('keydown', function(e) 
 """
 
 
-def render_transcript_browser(spans: list[tuple[str, str, str]]) -> None:
+def _apply_jargon_tooltips(escaped_text: str, jargon: dict[str, str]) -> str:
+    """Wrap recognised jargon terms in tooltip spans within already-HTML-escaped text.
+
+    Terms are sorted longest-first so multi-word phrases take priority over
+    single-word subterms.  Text inside existing HTML tags is never modified,
+    which prevents double-wrapping if the function is called more than once.
+    """
+    if not jargon:
+        return escaped_text
+
+    sorted_terms = sorted(jargon.keys(), key=len, reverse=True)
+    terms_pattern = r'(?<!\w)(' + '|'.join(re.escape(t) for t in sorted_terms) + r')(?!\w)'
+    # Match either an HTML tag (group 1) or a jargon term (group 2).
+    # HTML tags are passed through unchanged; only group-2 matches are wrapped.
+    combined = re.compile(r'(<[^>]+>)|' + terms_pattern, re.IGNORECASE)
+
+    def replacer(m: re.Match) -> str:
+        if m.group(1) is not None:
+            # It's an HTML tag — leave it untouched
+            return m.group(1)
+        matched = m.group(2)
+        definition = jargon.get(matched.lower())
+        if not definition:
+            return matched
+        escaped_def = _html.escape(definition, quote=True)
+        return f'<span class="jargon" title="{escaped_def}">{matched}</span>'
+
+    return combined.sub(replacer, escaped_text)
+
+
+def render_transcript_browser(
+    spans: list[tuple[str, str, str]],
+    jargon: dict[str, str] | None = None,
+) -> None:
     """Render the searchable HTML transcript browser."""
     st.markdown("### 📄 Transcript")
 
@@ -131,10 +166,13 @@ def render_transcript_browser(spans: list[tuple[str, str, str]]) -> None:
         st.info("No transcript data available.")
         return
 
+    jargon = jargon or {}
     lines_html = []
     for speaker, _, text in spans:
         s = _html.escape(speaker)
         t = _html.escape(text)
+        if jargon:
+            t = _apply_jargon_tooltips(t, jargon)
         lines_html.append(f"<p><strong>{s}:</strong> {t}</p>")
     transcript_body = "\n".join(lines_html)
 

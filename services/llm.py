@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import requests
@@ -6,6 +7,9 @@ import threading
 import time
 from typing import Dict, Any
 from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_if_exception
+
+# Matches Perplexity inline citation markers: [1], [2], [transcript_context], etc.
+_CITATION_PATTERN = re.compile(r'\[(?:\d+|[a-z_]+)\]')
 
 import anthropic
 from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT
@@ -67,7 +71,10 @@ def stream_chat(
             stream=True
         ) as response:
             response.raise_for_status()
-            
+
+            # Buffer to handle citation markers that span multiple chunks.
+            citation_buffer = ""
+
             for line in response.iter_lines():
                 if line:
                     line_str = line.decode('utf-8')
@@ -78,18 +85,37 @@ def stream_chat(
                         try:
                             # Parse JSON and extract delta content
                             data_json = json.loads(data_str)
-                            
-                            # Optional: Send usage stats back up
+
+                            # Flush buffer before emitting usage stats (a non-text event)
                             if "usage" in data_json and data_json["usage"]:
+                                if citation_buffer:
+                                    yield citation_buffer
+                                    citation_buffer = ""
                                 yield {"model": data_json.get("model", model), "usage": data_json["usage"]}
-                                
+
                             if "choices" in data_json and len(data_json["choices"]) > 0:
                                 delta = data_json["choices"][0].get("delta", {})
                                 content = delta.get("content", "")
                                 if content:
-                                    yield content
+                                    combined = citation_buffer + content
+                                    # Strip complete citations
+                                    cleaned = _CITATION_PATTERN.sub("", combined)
+                                    # Hold any trailing partial citation (an unclosed '[') in buffer
+                                    partial = re.search(r'\[[^\]]*$', cleaned)
+                                    if partial:
+                                        citation_buffer = cleaned[partial.start():]
+                                        cleaned = cleaned[:partial.start()]
+                                    else:
+                                        citation_buffer = ""
+                                    if cleaned:
+                                        yield cleaned
                         except json.JSONDecodeError:
                             continue
+
+            # Flush any remaining buffered text (a partial citation that never closed)
+            if citation_buffer:
+                yield citation_buffer
+
     except Exception as e:
         logger.error("Error connecting to Perplexity API: %s", e)
         raise

@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -35,6 +36,26 @@ _FEYNMAN_PROMPT_FILES = {
 }
 
 
+def _save_feynman_session(conn_str: str, ticker: str, completed: bool) -> None:
+    """Write current Feynman session state to DB. Silently skips if session_id not set."""
+    session_id = st.session_state.get("feynman_session_id")
+    topic = st.session_state.get("feynman_topic", "")
+    stage = st.session_state.get("feynman_stage", 1)
+    messages = st.session_state.get("messages", [])
+    if not session_id or not topic:
+        return
+    from db.repositories import LearningRepository
+    repo = LearningRepository(conn_str)
+    repo.save_session(
+        ticker=ticker,
+        session_id=session_id,
+        topic=topic,
+        stage=stage,
+        messages=messages,
+        completed=completed,
+    )
+
+
 def render_chat_interface(
     conn_str: str,
     ticker: str,
@@ -69,7 +90,9 @@ def render_chat_interface(
         return
 
     if chat_mode == "Feynman Loop" and not st.session_state.feynman_topic:
-        _render_topic_picker(themes, takeaways)
+        from db.repositories import LearningRepository
+        past_sessions = LearningRepository(conn_str).get_sessions_for_ticker(ticker)
+        _render_topic_picker(themes, takeaways, past_sessions=past_sessions)
         return
 
     if chat_mode == "Feynman Loop":
@@ -85,10 +108,52 @@ def render_chat_interface(
 # Topic picker (shown before Feynman loop starts)
 # ---------------------------------------------------------------------------
 
-def _render_topic_picker(themes: list, takeaways: list) -> None:
+def _render_topic_picker(themes: list, takeaways: list, past_sessions: list[dict] | None = None) -> None:
     """Show the Feynman topic selection UI."""
     st.markdown("#### 🧠 Feynman Loop")
     st.caption("Choose a topic. The AI will guide you to explain it back, expose gaps, and deepen your understanding.")
+
+    if past_sessions:
+        in_progress = [s for s in past_sessions if not s["completed"]]
+        completed = [s for s in past_sessions if s["completed"]]
+
+        if in_progress or completed:
+            with st.expander("📚 Previous Sessions", expanded=True):
+                if in_progress:
+                    st.markdown("**In Progress**")
+                    for session in in_progress[:3]:
+                        label = session["topic"]
+                        if len(label) > 50:
+                            label = label[:47] + "…"
+                        stage_label = _STAGE_NAMES.get(session["stage"], f"Stage {session['stage']}")
+                        col1, col2 = st.columns([4, 1])
+                        with col1:
+                            st.markdown(f"*{label}* — {stage_label}")
+                        with col2:
+                            if st.button("Continue →", key=f"resume_{session['id']}", use_container_width=True):
+                                st.session_state.feynman_session_id = session["id"]
+                                st.session_state.feynman_topic = session["topic"]
+                                st.session_state.feynman_stage = session["stage"]
+                                st.session_state.messages = session["messages"]
+                                st.rerun()
+
+                if completed:
+                    st.markdown("**Completed**")
+                    for session in completed[:3]:
+                        label = session["topic"]
+                        if len(label) > 50:
+                            label = label[:47] + "…"
+                        col1, col2 = st.columns([4, 1])
+                        with col1:
+                            st.markdown(f"*{label}*")
+                        with col2:
+                            if st.button("Review ↗", key=f"review_{session['id']}", use_container_width=True):
+                                st.session_state.feynman_session_id = session["id"]
+                                st.session_state.feynman_topic = session["topic"]
+                                st.session_state.feynman_stage = 5
+                                st.session_state.messages = session["messages"]
+                                st.rerun()
+            st.markdown("---")
 
     suggestions: list[str] = []
     for t in themes[:3]:
@@ -106,6 +171,7 @@ def _render_topic_picker(themes: list, takeaways: list) -> None:
             for col, suggestion in zip(chip_cols, row):
                 label = suggestion if len(suggestion) <= 55 else suggestion[:52] + "…"
                 if col.button(label, use_container_width=True):
+                    st.session_state.feynman_session_id = str(uuid.uuid4())
                     st.session_state.feynman_topic = suggestion
                     st.rerun()
 
@@ -117,6 +183,7 @@ def _render_topic_picker(themes: list, takeaways: list) -> None:
         label_visibility="collapsed",
     )
     if st.button("Start Feynman Loop ▶", disabled=not custom_topic.strip(), type="primary"):
+        st.session_state.feynman_session_id = str(uuid.uuid4())
         st.session_state.feynman_topic = custom_topic.strip()
         st.rerun()
 
@@ -359,6 +426,10 @@ def _render_chat_input(
             "display": True,
             "feynman_stage": st.session_state.feynman_stage,
         })
+        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5:
+            last_appended = st.session_state.messages[-1]
+            if last_appended.get("feynman_stage") == 5:
+                _save_feynman_session(conn_str, ticker, completed=True)
         st.rerun()
 
 
