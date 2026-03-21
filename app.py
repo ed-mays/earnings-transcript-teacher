@@ -87,8 +87,14 @@ spans = load_transcript_spans(CONN_STR, st.session_state.active_ticker)
 
 left_col, right_col = st.columns([5, 5])
 
+jargon: dict[str, str] = {
+    term.lower(): definition
+    for term, definition, _ in (*financial_terms, *industry_terms)
+    if definition
+}
+
 with left_col:
-    render_transcript_browser(spans)
+    render_transcript_browser(spans, jargon=jargon)
     st.divider()
     render_metadata_panel(
         conn_str=CONN_STR,
