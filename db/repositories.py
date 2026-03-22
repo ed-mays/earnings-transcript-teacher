@@ -92,14 +92,15 @@ class CallRepository:
             logger.warning(f"Could not fetch call_date for {ticker}: {e}")
             return None
 
-    def get_all_calls(self) -> list[tuple[str, str]]:
+    def get_all_calls(self) -> list[tuple[str, str, str | None, str | None]]:
+        """Return (ticker, fiscal_quarter, company_name, call_date) for all stored calls."""
         calls = []
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT ticker, fiscal_quarter
+                        SELECT ticker, fiscal_quarter, company_name, call_date
                         FROM calls
                         ORDER BY created_at DESC
                         """

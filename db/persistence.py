@@ -9,7 +9,7 @@ def fetch_existing_embeddings(
     repo = EmbeddingRepository(conn_str)
     return repo.fetch_existing_embeddings(ticker, fiscal_quarter)
 
-def get_all_calls(conn_str: str) -> list[tuple[str, str]]:
+def get_all_calls(conn_str: str) -> list[tuple[str, str, str | None, str | None]]:
     repo = CallRepository(conn_str)
     return repo.get_all_calls()
 
