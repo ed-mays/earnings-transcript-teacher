@@ -43,9 +43,6 @@ if "feynman_session_id" not in st.session_state:
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
-if "show_advanced_analysis" not in st.session_state:
-    st.session_state.show_advanced_analysis = False
-
 # ------------- Schema Health Check -------------
 
 def _auto_migrate() -> bool:

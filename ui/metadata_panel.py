@@ -60,38 +60,36 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
 
     if news_items is not None:
         # Data ready — render it. run_every keeps firing but this branch is fast.
-        with st.expander("Step 5 · Recent News"):
-            if news_items:
-                st.caption("Top news from around the earnings call, ranked by relevance to transcript themes.")
-                for i, item in enumerate(news_items):
-                    article_key = f"{ticker}_news_{i}"
-                    if item.url:
-                        st.markdown(f"**[{item.headline}]({item.url})**")
-                    else:
-                        st.markdown(f"**{item.headline}**")
-                    meta_parts = [p for p in (item.source, item.date) if p]
-                    if meta_parts:
-                        st.caption(" · ".join(meta_parts))
-                    if item.summary:
-                        st.markdown(item.summary)
-                    st.button(
-                        "Explain relevance",
-                        key=f"relevance_btn_{article_key}",
-                        on_click=_handle_relevance_click,
-                        args=(article_key, item.headline, item.summary, themes),
-                    )
-                    if st.session_state.get(f"show_relevance_{article_key}"):
-                        explanation = st.session_state.get(f"relevance_{article_key}", "")
-                        st.markdown(f"💡 **Relevance:** {explanation}")
-                    if i < len(news_items) - 1:
-                        st.divider()
-            else:
-                st.info("No recent news found.")
+        if news_items:
+            st.caption("Top news from around the earnings call, ranked by relevance to transcript themes.")
+            for i, item in enumerate(news_items):
+                article_key = f"{ticker}_news_{i}"
+                if item.url:
+                    st.markdown(f"**[{item.headline}]({item.url})**")
+                else:
+                    st.markdown(f"**{item.headline}**")
+                meta_parts = [p for p in (item.source, item.date) if p]
+                if meta_parts:
+                    st.caption(" · ".join(meta_parts))
+                if item.summary:
+                    st.markdown(item.summary)
+                st.button(
+                    "Explain relevance",
+                    key=f"relevance_btn_{article_key}",
+                    on_click=_handle_relevance_click,
+                    args=(article_key, item.headline, item.summary, themes),
+                )
+                if st.session_state.get(f"show_relevance_{article_key}"):
+                    explanation = st.session_state.get(f"relevance_{article_key}", "")
+                    st.markdown(f"💡 **Relevance:** {explanation}")
+                if i < len(news_items) - 1:
+                    st.divider()
+        else:
+            st.info("No recent news found.")
         return
 
     # Still loading — show placeholder and start the background thread once.
-    with st.expander("Step 5 · Recent News  ·  ⏳ Loading…"):
-        st.caption("Fetching recent news in the background…")
+    st.caption("Fetching recent news in the background… ⏳")
 
     if not st.session_state.get(thread_key):
         st.session_state[thread_key] = True
@@ -127,33 +125,31 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
 
     if competitors is not None:
         # Data ready — render it.
-        with st.expander("Step 6 · Competitors"):
-            if competitors:
-                st.caption("Direct competitors identified for this company and industry.")
-                for c in competitors:
-                    name_line = f"**{c.name}**"
-                    if c.ticker:
-                        name_line += f" `{c.ticker}`"
-                    if c.mentioned_in_transcript:
-                        name_line += " 🔖 *mentioned in transcript*"
-                    st.markdown(name_line)
-                    if c.description:
-                        st.markdown(f"_{c.description}_")
-                    st.divider()
-            else:
-                st.info("No competitor data available.")
+        if competitors:
+            st.caption("Direct competitors identified for this company and industry.")
+            for c in competitors:
+                name_line = f"**{c.name}**"
+                if c.ticker:
+                    name_line += f" `{c.ticker}`"
+                if c.mentioned_in_transcript:
+                    name_line += " 🔖 *mentioned in transcript*"
+                st.markdown(name_line)
+                if c.description:
+                    st.markdown(f"_{c.description}_")
+                st.divider()
+        else:
+            st.info("No competitor data available.")
 
-            if st.button("Refresh competitors", key=f"refresh_competitors_{ticker}"):
-                CompetitorRepository(conn_str).delete(ticker)
-                del st.session_state[data_key]
-                if thread_key in st.session_state:
-                    del st.session_state[thread_key]
-                st.rerun()
+        if st.button("Refresh competitors", key=f"refresh_competitors_{ticker}"):
+            CompetitorRepository(conn_str).delete(ticker)
+            del st.session_state[data_key]
+            if thread_key in st.session_state:
+                del st.session_state[thread_key]
+            st.rerun()
         return
 
     # Still loading — show placeholder and start the background thread once.
-    with st.expander("Step 6 · Competitors  ·  ⏳ Loading…"):
-        st.caption("Fetching competitors in the background…")
+    st.caption("Fetching competitors in the background… ⏳")
 
     if not st.session_state.get(thread_key):
         st.session_state[thread_key] = True
@@ -186,6 +182,66 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
 def _handle_feynman_shift_click(shift_text: str) -> None:
     """Set the Feynman topic to the strategic shift text when the button is clicked."""
     st.session_state.feynman_topic = shift_text
+
+
+def _handle_feynman_topic_click(topic: str) -> None:
+    """Set feynman_topic and switch to Feynman Loop mode when a CTA button is clicked."""
+    st.session_state.feynman_topic = topic
+    st.session_state.chat_mode = "Feynman Loop"
+
+
+def _render_feynman_cta(
+    ticker: str,
+    strategic_shifts: list[str] | None,
+    evasion: list | None,
+    qa_evasion: list | None,
+) -> None:
+    """Render the 'You're ready to teach this' CTA at the bottom of the learning path."""
+    suggested: list[str] = []
+
+    if strategic_shifts:
+        suggested.extend(strategic_shifts[:2])
+
+    if evasion:
+        for analyst_concern, _, _ in evasion:
+            if len(suggested) >= 3:
+                break
+            if analyst_concern not in suggested:
+                suggested.append(analyst_concern)
+
+    if qa_evasion:
+        for _, question_topic, _, _, concern, _, _ in qa_evasion:
+            if len(suggested) >= 3:
+                break
+            topic = question_topic or concern
+            if topic and topic not in suggested:
+                suggested.append(topic)
+
+    if not suggested:
+        return
+
+    st.divider()
+    st.markdown("### 🧠 Ready to test your understanding?")
+    st.caption("Suggested topics to teach:")
+
+    cols = st.columns(len(suggested))
+    for i, (col, topic) in enumerate(zip(cols, suggested)):
+        with col:
+            label = topic[:50] + "…" if len(topic) > 50 else topic
+            st.button(
+                label,
+                key=f"cta_topic_{ticker}_{i}",
+                on_click=_handle_feynman_topic_click,
+                args=(topic,),
+                use_container_width=True,
+            )
+
+    st.button(
+        "Start the Feynman Loop with your own topic →",
+        key=f"cta_start_loop_{ticker}",
+        on_click=_handle_feynman_topic_click,
+        args=("",),
+    )
 
 
 def render_metadata_panel(
@@ -252,21 +308,33 @@ def render_metadata_panel(
         else:
             st.info("No speaker data available.")
 
-    if evasion:
-        with st.expander("Step 3 · What management avoided"):
-            for analyst_concern, defensiveness_score, evasion_explanation in evasion:
-                st.markdown(f"**Concern:** {analyst_concern}")
-                st.markdown(f"*Defensiveness score: {defensiveness_score}/10*")
-                st.markdown(f"**Why it was flagged:** {evasion_explanation}")
-                st.divider()
+    if evasion or qa_evasion:
+        with st.expander("Step 3 · Said vs. Avoided"):
+            if evasion:
+                st.markdown("**📋 Prepared Remarks**")
+                for analyst_concern, defensiveness_score, evasion_explanation in evasion:
+                    st.markdown(f"**Concern:** {analyst_concern}")
+                    st.markdown(f"*Defensiveness score: {defensiveness_score}/10*")
+                    st.markdown(f"**Why it was flagged:** {evasion_explanation}")
+                    st.divider()
 
-    if misconceptions:
-        with st.expander("Language Lab · Learning Opportunities"):
-            for fact, misinterpretation, correction in misconceptions:
-                st.markdown(f"*Context: {fact}*")
-                st.markdown(f"**Misconception:** {misinterpretation}")
-                st.markdown(f"**Correction:** {correction}")
-                st.divider()
+            if qa_evasion:
+                st.markdown("**🎤 Q&A Session**")
+                for i, (analyst_name, question_topic, question_text, answer_text, concern, score, explanation) in enumerate(qa_evasion):
+                    badge = "🔴" if score >= 8 else "🟡" if score >= 5 else "🟢"
+                    name = analyst_name or "The analyst"
+                    topic = question_topic or concern
+                    with st.expander(f"{badge} {name} asked about {topic}"):
+                        if question_text:
+                            st.markdown("**Question**")
+                            st.markdown(question_text)
+                        if answer_text:
+                            st.markdown("**Response**")
+                            st.markdown(answer_text)
+                        with st.expander("What the executive avoided"):
+                            st.markdown(explanation)
+                    if i < len(qa_evasion) - 1:
+                        st.divider()
 
     with st.expander("Step 4 · What Changed"):
         if strategic_shifts:
@@ -284,47 +352,39 @@ def render_metadata_panel(
             st.info("No surprises or insights")
 
     if ticker:
-        _render_news_fragment(conn_str, ticker, themes)
-        _render_competitors_fragment(conn_str, ticker)
+        with st.expander("Step 5 · The Bigger Picture"):
+            st.markdown("#### Recent News")
+            _render_news_fragment(conn_str, ticker, themes)
+            st.divider()
+            st.markdown("#### Competitors")
+            _render_competitors_fragment(conn_str, ticker)
 
-    with st.expander("Step 7 · Q&A Evasion Review"):
-        if qa_evasion:
-            for i, (analyst_name, question_topic, question_text, answer_text, concern, score, explanation) in enumerate(qa_evasion):
-                badge = "🔴" if score >= 8 else "🟡" if score >= 5 else "🟢"
-                name = analyst_name or "The analyst"
-                topic = question_topic or concern
-                with st.expander(f"{badge} {name} asked about {topic}"):
-                    if question_text:
-                        st.markdown("**Question**")
-                        st.markdown(question_text)
-                    if answer_text:
-                        st.markdown("**Response**")
-                        st.markdown(answer_text)
-                    with st.expander("What the executive avoided"):
-                        st.markdown(explanation)
-                if i < len(qa_evasion) - 1:
-                    st.divider()
+    with st.expander("Step 6 · Language Lab"):
+        if misconceptions:
+            st.markdown("**Common Misconceptions**")
+            for fact, misinterpretation, correction in misconceptions:
+                st.markdown(f"*Context: {fact}*")
+                st.markdown(f"**Misconception:** {misinterpretation}")
+                st.markdown(f"**Correction:** {correction}")
+                st.divider()
+
+        st.markdown("**Financial Jargon**")
+        if financial_terms:
+            _render_term_list(conn_str, ticker, financial_terms, key_prefix=f"fin_{ticker}")
         else:
-            st.info("No evasion analysis available for this call.")
+            st.info("No financial terms found in this transcript.")
 
-    st.checkbox("Show advanced analysis", key="show_advanced_analysis")
+        st.markdown("**Industry Jargon**")
+        if industry_terms:
+            _render_term_list(conn_str, ticker, industry_terms, key_prefix=f"ind_{ticker}")
+        else:
+            st.info("No industry-specific terms extracted.")
 
-    if st.session_state.show_advanced_analysis:
-        with st.expander("Step 3 · Financial Jargon"):
-            if financial_terms:
-                _render_term_list(conn_str, ticker, financial_terms, key_prefix=f"fin_{ticker}")
-            else:
-                st.info("No financial terms found in this transcript.")
+        if keywords:
+            st.markdown("**Top Keywords (TF-IDF):**")
+            st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
 
-        with st.expander("Step 3 · Industry Jargon"):
-            if industry_terms:
-                _render_term_list(conn_str, ticker, industry_terms, key_prefix=f"ind_{ticker}")
-            else:
-                st.info("No industry-specific terms extracted.")
-
-            if keywords:
-                st.markdown("**Top Keywords (TF-IDF):**")
-                st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
+    _render_feynman_cta(ticker, strategic_shifts, evasion, qa_evasion)
 
 
 def _render_term_list(conn_str: str, ticker: str, terms: list, key_prefix: str) -> None:
