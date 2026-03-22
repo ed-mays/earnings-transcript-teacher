@@ -101,6 +101,7 @@ class CallRecord:
     id: UUID = field(default_factory=uuid4)
     company_name: str = ""
     industry: str = ""
+    call_date: str | None = None   # ISO date string from the transcript JSON
     cached_embeddings_count: int = 0
     api_embeddings_count: int = 0
 
@@ -165,6 +166,21 @@ class QAPairRecord:
     exchange_order: int
     question_span_ids: list[UUID]
     answer_span_ids: list[UUID]
+
+
+# ---------------------------------------------------------------------------
+# News item
+# ---------------------------------------------------------------------------
+
+@dataclass
+class NewsItem:
+    """A single news article fetched around the earnings call date."""
+
+    headline: str
+    url: str
+    source: str
+    date: str       # ISO date string, e.g. "2025-01-15"
+    summary: str
 
 
 # ---------------------------------------------------------------------------

@@ -43,8 +43,10 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     raw_text = extract_transcript_text(content)
 
     # Look up company name and industry from SEC EDGAR using the CIK in the transcript JSON
-    cik = json.loads(content).get("cik", "")
+    transcript_meta = json.loads(content)
+    cik = transcript_meta.get("cik", "")
     company_name, industry = fetch_company_info(cik) if cik else ("", "")
+    call_date = transcript_meta.get("date")  # ISO date string, e.g. "2026-01-29"
 
     # Basic stats
     tokens = tokenize(clean_text(raw_text))
@@ -95,6 +97,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
         qa_len=len(qa),
         company_name=company_name,
         industry=industry,
+        call_date=call_date,
     )
 
     # Speakers
