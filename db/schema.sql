@@ -235,7 +235,7 @@ CREATE TABLE call_synthesis (
     overall_sentiment  TEXT NOT NULL,
     executive_tone     TEXT NOT NULL,
     key_themes         TEXT[] NOT NULL,
-    strategic_shifts   TEXT NOT NULL,
+    strategic_shifts   TEXT[] NOT NULL,
     analyst_sentiment  TEXT NOT NULL
 );
 

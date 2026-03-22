@@ -112,8 +112,8 @@ def load_competitors(conn_str: str, ticker: str) -> list[Competitor]:
 
 
 @st.cache_data
-def load_strategic_shifts(conn_str: str, ticker: str) -> str | None:
-    """Fetch the strategic shifts analysis text for a transcript."""
+def load_strategic_shifts(conn_str: str, ticker: str) -> list[str] | None:
+    """Fetch the strategic shifts list for a transcript."""
     if not ticker:
         return None
     return get_strategic_shifts_for_ticker(conn_str, ticker)

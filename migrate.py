@@ -43,7 +43,19 @@ try:
             cur.execute(
                 "INSERT INTO schema_version (version) VALUES (3) ON CONFLICT DO NOTHING;"
             )
+
+            # v3 → v4: convert strategic_shifts from TEXT to TEXT[]
+            cur.execute(
+                """
+                ALTER TABLE call_synthesis
+                    ALTER COLUMN strategic_shifts TYPE TEXT[]
+                    USING ARRAY[strategic_shifts];
+                """
+            )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (4) ON CONFLICT DO NOTHING;"
+            )
         conn.commit()
-    print("Migration successful — schema is at version 3.")
+    print("Migration successful — schema is at version 4.")
 except Exception as e:
     print(f"Error during migration: {e}")

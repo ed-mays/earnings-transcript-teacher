@@ -43,8 +43,8 @@ def get_synthesis_for_ticker(conn_str: str, ticker: str) -> tuple[str, str, str]
     repo = AnalysisRepository(conn_str)
     return repo.get_synthesis_for_ticker(ticker)
 
-def get_strategic_shifts_for_ticker(conn_str: str, ticker: str) -> str | None:
-    """Return the strategic_shifts analysis text for a ticker, or None if absent."""
+def get_strategic_shifts_for_ticker(conn_str: str, ticker: str) -> list[str] | None:
+    """Return the strategic_shifts list for a ticker, or None if absent."""
     repo = AnalysisRepository(conn_str)
     return repo.get_strategic_shifts_for_ticker(ticker)
 

@@ -200,7 +200,7 @@ def render_metadata_panel(
     speakers: list,
     evasion: list | None = None,
     misconceptions: list | None = None,
-    strategic_shifts: str | None = None,
+    strategic_shifts: list[str] | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
     st.markdown(f"### 📊 {ticker} — Learning Path")
@@ -272,14 +272,17 @@ def render_metadata_panel(
         _render_competitors_fragment(conn_str, ticker)
 
     with st.expander("Step 6 · Strategic Shifts"):
-        if strategic_shifts and strategic_shifts.strip():
-            st.markdown(strategic_shifts)
-            st.button(
-                "Explain via Feynman",
-                key=f"feynman_shift_{ticker}",
-                on_click=_handle_feynman_shift_click,
-                args=(strategic_shifts,),
-            )
+        if strategic_shifts:
+            for i, shift in enumerate(strategic_shifts):
+                st.markdown(shift)
+                st.button(
+                    "Explain via Feynman",
+                    key=f"feynman_shift_{ticker}_{i}",
+                    on_click=_handle_feynman_shift_click,
+                    args=(shift,),
+                )
+                if i < len(strategic_shifts) - 1:
+                    st.divider()
         else:
             st.info("No surprises or insights")
 

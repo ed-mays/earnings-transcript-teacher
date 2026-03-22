@@ -253,7 +253,7 @@ class IngestionPipeline:
             overall_sentiment=synthesis_data.get("overall_sentiment", ""),
             executive_tone=synthesis_data.get("executive_tone", ""),
             key_themes=synthesis_data.get("key_themes", []),
-            strategic_shifts=synthesis_data.get("strategic_shifts", ""),
+            strategic_shifts=synthesis_data.get("strategic_shifts", []),
             analyst_sentiment=synthesis_data.get("analyst_sentiment", "")
         )
 

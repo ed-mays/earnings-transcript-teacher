@@ -13,7 +13,7 @@ class OutdatedSchemaError(Exception):
     """Exception raised when the database schema is out of date."""
     pass
 
-REQUIRED_SCHEMA_VERSION = 3
+REQUIRED_SCHEMA_VERSION = 4
 
 
 def reset_all_data(conn_str: str) -> None:
@@ -226,8 +226,8 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch synthesis for {ticker}: {e}")
         return None
 
-    def get_strategic_shifts_for_ticker(self, ticker: str) -> str | None:
-        """Return the strategic_shifts analysis text for a ticker, or None if absent."""
+    def get_strategic_shifts_for_ticker(self, ticker: str) -> list[str] | None:
+        """Return the strategic_shifts list for a ticker, or None if absent."""
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
