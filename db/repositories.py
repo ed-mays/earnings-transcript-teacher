@@ -75,6 +75,21 @@ class CallRepository:
             logger.warning(f"Could not fetch company info for {ticker}: {e}")
         return ("", "")
 
+    def get_call_date(self, ticker: str):
+        """Return the call_date for a ticker, or None if not set."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT call_date FROM calls WHERE ticker = %s LIMIT 1",
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"Could not fetch call_date for {ticker}: {e}")
+            return None
+
     def get_all_calls(self) -> list[tuple[str, str]]:
         calls = []
         try:
@@ -508,7 +523,7 @@ class AnalysisRepository:
                 call.company_name or None,
                 call.industry or None,
                 fiscal_quarter,
-                None,  # call_date
+                call.call_date or None,
                 call.transcript_json,
                 call.transcript_text,
                 call.token_count,

@@ -1,6 +1,45 @@
 import streamlit as st
 
+from core.models import NewsItem
+from services.llm import stream_chat
 from ui.term_actions import handle_define_click, handle_explain_click
+
+
+def _handle_relevance_click(
+    article_key: str,
+    headline: str,
+    summary: str,
+    themes: list[str],
+) -> None:
+    """Generate and cache a relevance explanation for a news article."""
+    if st.session_state.get(f"relevance_{article_key}"):
+        st.session_state[f"show_relevance_{article_key}"] = True
+        return
+
+    themes_str = ", ".join(themes[:5]) if themes else "the earnings call results"
+    system_prompt = (
+        "You are a financial analyst. In 2-3 sentences explain why the given news article "
+        "is relevant to the provided earnings call themes. Be specific and concise."
+    )
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Earnings call themes: {themes_str}\n\n"
+                f"News headline: {headline}\n"
+                f"Article summary: {summary}"
+            ),
+        }
+    ]
+
+    explanation = ""
+    for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
+        if isinstance(chunk, str):
+            explanation += chunk
+
+    if explanation:
+        st.session_state[f"relevance_{article_key}"] = explanation.strip()
+        st.session_state[f"show_relevance_{article_key}"] = True
 
 
 def render_metadata_panel(
@@ -15,6 +54,7 @@ def render_metadata_panel(
     speakers: list,
     evasion: list | None = None,
     misconceptions: list | None = None,
+    news_items: list[NewsItem] | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
     st.markdown(f"### 📊 {ticker} — Learning Path")
@@ -80,6 +120,37 @@ def render_metadata_panel(
                 st.markdown(f"**Misconception:** {misinterpretation}")
                 st.markdown(f"**Correction:** {correction}")
                 st.divider()
+
+    if news_items:
+        with st.expander("Step 4 · Recent News"):
+            st.caption("Top news from around the earnings call, ranked by relevance to transcript themes.")
+            for i, item in enumerate(news_items):
+                article_key = f"{ticker}_news_{i}"
+                if item.url:
+                    st.markdown(f"**[{item.headline}]({item.url})**")
+                else:
+                    st.markdown(f"**{item.headline}**")
+
+                meta_parts = [p for p in (item.source, item.date) if p]
+                if meta_parts:
+                    st.caption(" · ".join(meta_parts))
+
+                if item.summary:
+                    st.markdown(item.summary)
+
+                st.button(
+                    "Explain relevance",
+                    key=f"relevance_btn_{article_key}",
+                    on_click=_handle_relevance_click,
+                    args=(article_key, item.headline, item.summary, themes),
+                )
+
+                if st.session_state.get(f"show_relevance_{article_key}"):
+                    explanation = st.session_state.get(f"relevance_{article_key}", "")
+                    st.markdown(f"💡 **Relevance:** {explanation}")
+
+                if i < len(news_items) - 1:
+                    st.divider()
 
     st.checkbox("Show advanced analysis", key="show_advanced_analysis")
 

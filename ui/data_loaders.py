@@ -2,6 +2,7 @@ import logging
 
 import streamlit as st
 
+from core.models import NewsItem
 from db.persistence import (
     get_all_calls,
     get_themes_for_ticker,
@@ -15,6 +16,9 @@ from db.persistence import (
     get_evasion_for_ticker,
     get_misconceptions_for_ticker,
 )
+
+from db.repositories import CallRepository
+from services.recent_news import fetch_recent_news
 
 logger = logging.getLogger(__name__)
 
@@ -69,3 +73,28 @@ def load_metadata(conn_str: str, ticker: str):
     except Exception:
         logger.exception("load_metadata failed for ticker %s", ticker)
         raise
+
+
+@st.cache_data
+def load_recent_news(conn_str: str, ticker: str, themes: tuple[str, ...]) -> list[NewsItem]:
+    """Fetch recent news articles around the earnings call date.
+
+    themes is a tuple (not list) so it is hashable for st.cache_data.
+    Returns an empty list if call_date is unknown or the fetch fails.
+    """
+    if not ticker:
+        return []
+
+    repo = CallRepository(conn_str)
+    call_date = repo.get_call_date(ticker)
+    if not call_date:
+        logger.info("No call_date for %s — skipping news fetch", ticker)
+        return []
+
+    company_name, _ = repo.get_company_info(ticker)
+    return fetch_recent_news(
+        ticker=ticker,
+        company_name=company_name,
+        call_date=call_date,
+        themes=list(themes),
+    )
