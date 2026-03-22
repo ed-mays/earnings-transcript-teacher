@@ -84,21 +84,27 @@ You will be provided with:
 1. The aggregated Tier 1 and Tier 2 outputs (terms, concepts, takeaways, evasion analysis, and misconceptions) from across the entire call.
 
 Follow these instructions to generate the final synthesis:
-1. **overall_sentiment**: Summarize the overall sentiment of the call in one concise sentence (e.g., "Cautiously optimistic despite macroeconomic headwinds.").
-2. **executive_tone**: Describe the tone of the executives, particularly during Q&A (e.g., "Defensive on margin questions but highly confident on product roadmap.").
-3. **key_themes**: Extract the 3-5 most dominant and recurring thematic clusters across all chunks.
-4. **strategic_shifts**: Identify any major pivots, new initiatives, or changes to prior guidance that signal a structural shift. Return each distinct shift as a separate string in the array.
-5. **analyst_sentiment**: Summarize the prevailing mood and main areas of concern from the analyst questions.
+1. **call_summary**: Write a 2-3 sentence narrative summary of the call covering: what the company reported (headline numbers or events), the overall tone and market reaction, and the single most important forward-looking signal. This is the first thing a learner reads — make it vivid and specific.
+2. **overall_sentiment**: Summarize the overall sentiment of the call in one concise sentence (e.g., "Cautiously optimistic despite macroeconomic headwinds.").
+3. **executive_tone**: Describe the tone of the executives, particularly during Q&A (e.g., "Defensive on margin questions but highly confident on product roadmap.").
+4. **key_themes**: Extract the 3-5 most dominant and recurring thematic clusters across all chunks.
+5. **strategic_shifts**: Identify any major pivots, new initiatives, or changes to prior guidance that signal a structural shift. For each shift, provide three fields: prior_position (what management had previously signalled or committed to — leave empty string if unknown), current_position (what they are saying now), and investor_significance (why this change matters for valuation, risk, or narrative).
+6. **analyst_sentiment**: Summarize the prevailing mood and main areas of concern from the analyst questions.
 
 Respond ONLY with valid JSON matching this schema:
 {
+  "call_summary": "string",
   "overall_sentiment": "string",
   "executive_tone": "string",
   "key_themes": [
     "string"
   ],
   "strategic_shifts": [
-    "string"
+    {
+      "prior_position": "string",
+      "current_position": "string",
+      "investor_significance": "string"
+    }
   ],
   "analyst_sentiment": "string"
 }

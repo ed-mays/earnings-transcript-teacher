@@ -4,7 +4,7 @@ import os
 import streamlit as st
 
 from db.repositories import SchemaRepository
-from ui.data_loaders import load_analyst_view, load_metadata, load_qa_evasion, load_speakers, load_strategic_shifts, load_transcript_spans
+from ui.data_loaders import load_analyst_view, load_call_summary, load_metadata, load_qa_evasion, load_speaker_dynamics, load_speakers, load_strategic_shifts, load_transcript_spans
 from ui.feynman import render_chat_interface
 from ui.metadata_panel import render_metadata_panel
 from ui.sidebar import render_sidebar
@@ -88,6 +88,8 @@ speakers = load_speakers(CONN_STR, st.session_state.active_ticker)
 spans = load_transcript_spans(CONN_STR, st.session_state.active_ticker)
 strategic_shifts = load_strategic_shifts(CONN_STR, st.session_state.active_ticker)
 qa_evasion = load_qa_evasion(CONN_STR, st.session_state.active_ticker)
+call_summary = load_call_summary(CONN_STR, st.session_state.active_ticker)
+speaker_dynamics = load_speaker_dynamics(CONN_STR, st.session_state.active_ticker)
 
 # ------------- Layout -------------
 
@@ -116,6 +118,8 @@ with left_col:
         misconceptions=misconceptions,
         strategic_shifts=strategic_shifts,
         qa_evasion=qa_evasion,
+        call_summary=call_summary,
+        speaker_dynamics=speaker_dynamics,
     )
 
 with right_col:

@@ -43,10 +43,20 @@ def get_synthesis_for_ticker(conn_str: str, ticker: str) -> tuple[str, str, str]
     repo = AnalysisRepository(conn_str)
     return repo.get_synthesis_for_ticker(ticker)
 
-def get_strategic_shifts_for_ticker(conn_str: str, ticker: str) -> list[str] | None:
-    """Return the strategic_shifts list for a ticker, or None if absent."""
+def get_strategic_shifts_for_ticker(conn_str: str, ticker: str) -> list[dict] | None:
+    """Return the strategic_shifts list for a ticker as structured dicts, or None if absent."""
     repo = AnalysisRepository(conn_str)
     return repo.get_strategic_shifts_for_ticker(ticker)
+
+def get_call_summary_for_ticker(conn_str: str, ticker: str) -> str | None:
+    """Return the call_summary paragraph for a ticker, or None if absent."""
+    repo = AnalysisRepository(conn_str)
+    return repo.get_call_summary_for_ticker(ticker)
+
+def get_speaker_dynamics(conn_str: str, ticker: str) -> list[dict]:
+    """Return per-speaker turn and word counts for a ticker."""
+    repo = AnalysisRepository(conn_str)
+    return repo.get_speaker_dynamics(ticker)
 
 def get_keywords_for_ticker(conn_str: str, ticker: str, limit: int = 15) -> list[str]:
     repo = AnalysisRepository(conn_str)

@@ -249,12 +249,26 @@ class IngestionPipeline:
         if synthesis_usage:
             print(f"    ↳ Synthesis [Model: {synthesis_usage['model']} | In: {synthesis_usage['prompt_tokens']} | Out: {synthesis_usage['completion_tokens']}]")
 
+        # Normalise strategic_shifts: accept list[str] (old prompts) or list[dict] (new prompt)
+        raw_shifts = synthesis_data.get("strategic_shifts", [])
+        structured_shifts = []
+        for s in raw_shifts:
+            if isinstance(s, dict):
+                structured_shifts.append(s)
+            else:
+                structured_shifts.append({
+                    "prior_position": "",
+                    "current_position": str(s),
+                    "investor_significance": "",
+                })
+
         synthesis = CallSynthesisRecord(
             overall_sentiment=synthesis_data.get("overall_sentiment", ""),
             executive_tone=synthesis_data.get("executive_tone", ""),
             key_themes=synthesis_data.get("key_themes", []),
-            strategic_shifts=synthesis_data.get("strategic_shifts", []),
-            analyst_sentiment=synthesis_data.get("analyst_sentiment", "")
+            strategic_shifts=structured_shifts,
+            analyst_sentiment=synthesis_data.get("analyst_sentiment", ""),
+            call_summary=synthesis_data.get("call_summary") or None,
         )
 
         # Aggregate all token usage across chunks and synthesis

@@ -17,6 +17,8 @@ from db.persistence import (
     get_misconceptions_for_ticker,
     get_strategic_shifts_for_ticker,
     get_qa_evasion_for_ticker,
+    get_call_summary_for_ticker,
+    get_speaker_dynamics,
 )
 
 from db.repositories import CallRepository, CompetitorRepository
@@ -121,11 +123,27 @@ def load_qa_evasion(conn_str: str, ticker: str) -> list[tuple[str, int, str]]:
 
 
 @st.cache_data
-def load_strategic_shifts(conn_str: str, ticker: str) -> list[str] | None:
-    """Fetch the strategic shifts list for a transcript."""
+def load_strategic_shifts(conn_str: str, ticker: str) -> list[dict] | None:
+    """Fetch the strategic shifts list for a transcript as structured dicts."""
     if not ticker:
         return None
     return get_strategic_shifts_for_ticker(conn_str, ticker)
+
+
+@st.cache_data
+def load_call_summary(conn_str: str, ticker: str) -> str | None:
+    """Fetch the executive summary paragraph for a transcript."""
+    if not ticker:
+        return None
+    return get_call_summary_for_ticker(conn_str, ticker)
+
+
+@st.cache_data
+def load_speaker_dynamics(conn_str: str, ticker: str) -> list[dict]:
+    """Fetch per-speaker turn and word counts for a transcript."""
+    if not ticker:
+        return []
+    return get_speaker_dynamics(conn_str, ticker)
 
 
 @st.cache_data
