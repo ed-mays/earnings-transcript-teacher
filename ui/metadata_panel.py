@@ -60,7 +60,7 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
 
     if news_items is not None:
         # Data ready — render it. run_every keeps firing but this branch is fast.
-        with st.expander("Step 4 · Recent News"):
+        with st.expander("Step 5 · Recent News"):
             if news_items:
                 st.caption("Top news from around the earnings call, ranked by relevance to transcript themes.")
                 for i, item in enumerate(news_items):
@@ -90,7 +90,7 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
         return
 
     # Still loading — show placeholder and start the background thread once.
-    with st.expander("Step 4 · Recent News  ·  ⏳ Loading…"):
+    with st.expander("Step 5 · Recent News  ·  ⏳ Loading…"):
         st.caption("Fetching recent news in the background…")
 
     if not st.session_state.get(thread_key):
@@ -127,7 +127,7 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
 
     if competitors is not None:
         # Data ready — render it.
-        with st.expander("Step 5 · Competitors"):
+        with st.expander("Step 6 · Competitors"):
             if competitors:
                 st.caption("Direct competitors identified for this company and industry.")
                 for c in competitors:
@@ -152,7 +152,7 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
         return
 
     # Still loading — show placeholder and start the background thread once.
-    with st.expander("Step 5 · Competitors  ·  ⏳ Loading…"):
+    with st.expander("Step 6 · Competitors  ·  ⏳ Loading…"):
         st.caption("Fetching competitors in the background…")
 
     if not st.session_state.get(thread_key):
@@ -261,18 +261,14 @@ def render_metadata_panel(
                 st.divider()
 
     if misconceptions:
-        with st.expander("Step 3 · Learning Opportunities"):
+        with st.expander("Language Lab · Learning Opportunities"):
             for fact, misinterpretation, correction in misconceptions:
                 st.markdown(f"*Context: {fact}*")
                 st.markdown(f"**Misconception:** {misinterpretation}")
                 st.markdown(f"**Correction:** {correction}")
                 st.divider()
 
-    if ticker:
-        _render_news_fragment(conn_str, ticker, themes)
-        _render_competitors_fragment(conn_str, ticker)
-
-    with st.expander("Step 6 · Strategic Shifts"):
+    with st.expander("Step 4 · What Changed"):
         if strategic_shifts:
             for i, shift in enumerate(strategic_shifts):
                 st.markdown(shift)
@@ -286,6 +282,10 @@ def render_metadata_panel(
                     st.divider()
         else:
             st.info("No surprises or insights")
+
+    if ticker:
+        _render_news_fragment(conn_str, ticker, themes)
+        _render_competitors_fragment(conn_str, ticker)
 
     with st.expander("Step 7 · Q&A Evasion Review"):
         if qa_evasion:

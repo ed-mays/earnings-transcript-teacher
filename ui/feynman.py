@@ -274,12 +274,6 @@ def _render_message_history() -> None:
         ):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
-                if "stats" in msg:
-                    st.caption(
-                        f"Model: {msg['stats'].get('model')} "
-                        f"• Tokens: In {msg['stats'].get('prompt_tokens', 0)} "
-                        f"/ Out {msg['stats'].get('completion_tokens', 0)}"
-                    )
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +348,7 @@ def _render_chat_input(
     stage_complete = chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5
     placeholder_text = (
         f"Ask about {ticker}..."
-        if chat_mode == "General Q&A"
+        if chat_mode == "Ask the Transcript"
         else "Type your response..."
     )
 
@@ -461,7 +455,7 @@ def _stream_response(
     """Build the API message list, call the LLM, and stream the response."""
     stage = st.session_state.feynman_stage
 
-    if chat_mode == "General Q&A":
+    if chat_mode == "Ask the Transcript":
         sys_prompt = _load_prompt_file("feynman/00_general_qa.md")
         # Inject jargon when explicitly requested
         if any(w in prompt.lower() for w in ["jargon", "vocabulary", "terms"]):
