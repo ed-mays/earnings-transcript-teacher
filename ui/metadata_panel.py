@@ -200,7 +200,10 @@ def _render_feynman_cta(
     suggested: list[str] = []
 
     if strategic_shifts:
-        suggested.extend(strategic_shifts[:2])
+        for shift in strategic_shifts[:2]:
+            topic = shift.get("current_position", "") if isinstance(shift, dict) else str(shift)
+            if topic:
+                suggested.append(topic)
 
     if evasion:
         for analyst_concern, _, _ in evasion:
@@ -256,13 +259,19 @@ def render_metadata_panel(
     speakers: list,
     evasion: list | None = None,
     misconceptions: list | None = None,
-    strategic_shifts: list[str] | None = None,
-    qa_evasion: list[tuple[str, int, str]] | None = None,
+    strategic_shifts: list[dict] | None = None,
+    qa_evasion: list[tuple] | None = None,
+    call_summary: str | None = None,
+    speaker_dynamics: list[dict] | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
     st.markdown(f"### 📊 {ticker} — Learning Path")
 
     with st.expander("Step 1 · Overview"):
+        if call_summary:
+            st.markdown(call_summary)
+            st.markdown("---")
+
         if takeaways:
             st.markdown("**Key Takeaways**")
             for t, why in takeaways:
@@ -308,6 +317,26 @@ def render_metadata_panel(
         else:
             st.info("No speaker data available.")
 
+        if speaker_dynamics:
+            st.markdown("---")
+            st.markdown("**Call Dynamics**")
+            # Most active executive: highest total turn count across all sections
+            exec_rows = [r for r in speaker_dynamics if r["role"] == "executive"]
+            if exec_rows:
+                by_exec: dict[str, int] = {}
+                for r in exec_rows:
+                    by_exec[r["speaker"]] = by_exec.get(r["speaker"], 0) + r["turn_count"]
+                top_exec, top_exec_turns = max(by_exec.items(), key=lambda x: x[1])
+                st.markdown(f"Most active executive: **{top_exec}** — {top_exec_turns} turns")
+            # Most active analyst: highest Q&A turn count
+            analyst_qa_rows = [r for r in speaker_dynamics if r["role"] == "analyst" and r["section"] == "qa"]
+            if analyst_qa_rows:
+                top = max(analyst_qa_rows, key=lambda r: r["turn_count"])
+                label = top["speaker"]
+                if top["firm"]:
+                    label += f", {top['firm']}"
+                st.markdown(f"Most active analyst: **{label}** — {top['turn_count']} exchanges in Q&A")
+
     if evasion or qa_evasion:
         with st.expander("Step 3 · Said vs. Avoided"):
             if evasion:
@@ -339,12 +368,19 @@ def render_metadata_panel(
     with st.expander("Step 4 · What Changed"):
         if strategic_shifts:
             for i, shift in enumerate(strategic_shifts):
-                st.markdown(shift)
+                prior = shift.get("prior_position", "") if isinstance(shift, dict) else ""
+                current = shift.get("current_position", str(shift)) if isinstance(shift, dict) else str(shift)
+                significance = shift.get("investor_significance", "") if isinstance(shift, dict) else ""
+                if prior:
+                    st.markdown(f"**Prior:** {prior}")
+                st.markdown(f"**Now:** {current}")
+                if significance:
+                    st.markdown(f"**Why it matters:** {significance}")
                 st.button(
                     "Explain via Feynman",
                     key=f"feynman_shift_{ticker}_{i}",
                     on_click=_handle_feynman_shift_click,
-                    args=(shift,),
+                    args=(current,),
                 )
                 if i < len(strategic_shifts) - 1:
                     st.divider()

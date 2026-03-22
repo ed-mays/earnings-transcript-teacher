@@ -71,7 +71,67 @@ try:
             cur.execute(
                 "INSERT INTO schema_version (version) VALUES (5) ON CONFLICT DO NOTHING;"
             )
+
+            # v5 → v6: add call_summary to call_synthesis
+            cur.execute(
+                "ALTER TABLE call_synthesis ADD COLUMN IF NOT EXISTS call_summary TEXT;"
+            )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (6) ON CONFLICT DO NOTHING;"
+            )
+
+            # v6 → v7: convert strategic_shifts from TEXT[] to JSONB[]
+            # Uses a new-column+UPDATE+rename approach because PostgreSQL does not
+            # allow subqueries in ALTER COLUMN TYPE ... USING.
+            # The block is written to be safe to re-run after a partial failure:
+            #   - inspect actual column state before each step
+            #   - only execute steps that have not already completed
+            cur.execute("""
+                SELECT column_name, udt_name
+                FROM information_schema.columns
+                WHERE table_name = 'call_synthesis'
+                  AND column_name IN ('strategic_shifts', 'strategic_shifts_new')
+            """)
+            existing = {row[0]: row[1] for row in cur.fetchall()}
+
+            shifts_type = existing.get("strategic_shifts")        # '_text', '_jsonb', or None
+            shifts_new_exists = "strategic_shifts_new" in existing
+
+            if shifts_type == "_jsonb":
+                # Already migrated — nothing to do
+                pass
+            else:
+                if not shifts_new_exists:
+                    cur.execute(
+                        "ALTER TABLE call_synthesis ADD COLUMN strategic_shifts_new JSONB[] DEFAULT '{}';"
+                    )
+                if shifts_type == "_text":
+                    # Populate from the TEXT[] column
+                    cur.execute(
+                        """
+                        UPDATE call_synthesis
+                        SET strategic_shifts_new = (
+                            SELECT array_agg(
+                                jsonb_build_object(
+                                    'prior_position', '',
+                                    'current_position', s,
+                                    'investor_significance', ''
+                                )
+                            )
+                            FROM unnest(strategic_shifts) AS s
+                        )
+                        WHERE strategic_shifts IS NOT NULL
+                          AND array_length(strategic_shifts, 1) > 0;
+                        """
+                    )
+                    cur.execute("ALTER TABLE call_synthesis DROP COLUMN strategic_shifts;")
+                cur.execute(
+                    "ALTER TABLE call_synthesis RENAME COLUMN strategic_shifts_new TO strategic_shifts;"
+                )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (7) ON CONFLICT DO NOTHING;"
+            )
         conn.commit()
-    print("Migration successful — schema is at version 5.")
+    print("Migration successful — schema is at version 7.")
 except Exception as e:
     print(f"Error during migration: {e}")

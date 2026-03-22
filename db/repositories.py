@@ -13,7 +13,7 @@ class OutdatedSchemaError(Exception):
     """Exception raised when the database schema is out of date."""
     pass
 
-REQUIRED_SCHEMA_VERSION = 4
+REQUIRED_SCHEMA_VERSION = 7
 
 
 def reset_all_data(conn_str: str) -> None:
@@ -36,7 +36,7 @@ class SchemaRepository:
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT version FROM schema_version ORDER BY installed_at DESC LIMIT 1")
+                    cur.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
                     row = cur.fetchone()
                     return row[0] if row else 0
         except psycopg.errors.UndefinedTable:
@@ -226,8 +226,8 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch synthesis for {ticker}: {e}")
         return None
 
-    def get_strategic_shifts_for_ticker(self, ticker: str) -> list[str] | None:
-        """Return the strategic_shifts list for a ticker, or None if absent."""
+    def get_strategic_shifts_for_ticker(self, ticker: str) -> list[dict] | None:
+        """Return the strategic_shifts list for a ticker as structured dicts, or None if absent."""
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
@@ -241,10 +241,91 @@ class AnalysisRepository:
                         (ticker,),
                     )
                     row = cur.fetchone()
-                    return row[0] if row else None
+                    if not row or not row[0]:
+                        return None
+                    # Normalise: old TEXT[] rows may have been migrated; ensure list[dict]
+                    shifts = []
+                    for item in row[0]:
+                        if isinstance(item, dict):
+                            shifts.append(item)
+                        else:
+                            shifts.append({"prior_position": "", "current_position": str(item), "investor_significance": ""})
+                    return shifts
         except Exception as e:
             logger.warning(f"Could not fetch strategic_shifts for {ticker}: {e}")
         return None
+
+    def get_call_summary_for_ticker(self, ticker: str) -> str | None:
+        """Return the call_summary paragraph for a ticker, or None if absent."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT cs.call_summary
+                        FROM call_synthesis cs
+                        JOIN calls c ON cs.call_id = c.id
+                        WHERE c.ticker = %s
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"Could not fetch call_summary for {ticker}: {e}")
+        return None
+
+    def get_speaker_dynamics(self, ticker: str) -> list[dict]:
+        """Return per-speaker, per-section turn and word counts for a ticker.
+
+        Each dict contains: speaker, role, firm, section, turn_count, word_count.
+        """
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            COALESCE(sp.name, 'Unknown') AS speaker,
+                            COALESCE(sp.role, 'unknown') AS role,
+                            COALESCE(sp.firm, '') AS firm,
+                            s.section,
+                            COUNT(*) AS turn_count,
+                            SUM(COALESCE(
+                                array_length(regexp_split_to_array(trim(s.text), '\\s+'), 1),
+                                0
+                            )) AS word_count
+                        FROM spans s
+                        JOIN calls c ON s.call_id = c.id
+                        LEFT JOIN speakers sp ON s.speaker_id = sp.id
+                        WHERE c.ticker = %s
+                          AND s.span_type = 'turn'
+                          AND s.sequence_order >= 0
+                          AND (sp.role IS NULL OR sp.role != 'operator')
+                        GROUP BY
+                            COALESCE(sp.name, 'Unknown'),
+                            COALESCE(sp.role, 'unknown'),
+                            COALESCE(sp.firm, ''),
+                            s.section
+                        ORDER BY turn_count DESC
+                        """,
+                        (ticker,),
+                    )
+                    rows = [
+                        {
+                            "speaker": r[0],
+                            "role": r[1],
+                            "firm": r[2],
+                            "section": r[3],
+                            "turn_count": r[4],
+                            "word_count": r[5],
+                        }
+                        for r in cur.fetchall()
+                    ]
+        except Exception as e:
+            logger.warning(f"Could not fetch speaker dynamics for {ticker}: {e}")
+        return rows
 
     def get_takeaways_for_ticker(self, ticker: str, limit: int = 5) -> list[tuple[str, str]]:
         takeaways = []
@@ -530,18 +611,29 @@ class AnalysisRepository:
             conn.commit()
 
     def _save_call_synthesis(self, cur, call_id, synthesis):
+        from psycopg.types.json import Jsonb
+
+        # Serialise strategic_shifts: list[dict] → JSONB[]
+        shifts = synthesis.strategic_shifts or []
+        shifts_value = [
+            Jsonb(s) if isinstance(s, dict)
+            else Jsonb({"prior_position": "", "current_position": str(s), "investor_significance": ""})
+            for s in shifts
+        ]
+
         cur.execute(
             """
             INSERT INTO call_synthesis (
                 id, call_id, overall_sentiment, executive_tone,
-                key_themes, strategic_shifts, analyst_sentiment
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                key_themes, strategic_shifts, analyst_sentiment, call_summary
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (call_id) DO UPDATE SET
                 overall_sentiment = EXCLUDED.overall_sentiment,
                 executive_tone = EXCLUDED.executive_tone,
                 key_themes = EXCLUDED.key_themes,
                 strategic_shifts = EXCLUDED.strategic_shifts,
-                analyst_sentiment = EXCLUDED.analyst_sentiment
+                analyst_sentiment = EXCLUDED.analyst_sentiment,
+                call_summary = EXCLUDED.call_summary
             """,
             (
                 str(synthesis.id),
@@ -549,8 +641,9 @@ class AnalysisRepository:
                 synthesis.overall_sentiment,
                 synthesis.executive_tone,
                 synthesis.key_themes,
-                synthesis.strategic_shifts,
-                synthesis.analyst_sentiment
+                shifts_value,
+                synthesis.analyst_sentiment,
+                synthesis.call_summary,
             )
         )
 
