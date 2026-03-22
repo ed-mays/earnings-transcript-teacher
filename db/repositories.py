@@ -990,6 +990,7 @@ class LearningRepository:
         stage: int,
         messages: list[dict],
         completed: bool,
+        session_type: str = "feynman",
     ) -> bool:
         """Upsert a learning session. Stores full message history in notes as JSON. Returns True on success."""
         import json
@@ -1000,7 +1001,7 @@ class LearningRepository:
                     if not call_id:
                         logger.warning(f"No call found for ticker {ticker}, skipping session save")
                         return False
-                    notes = json.dumps({"topic": topic, "stage": stage, "messages": messages})
+                    notes = json.dumps({"topic": topic, "stage": stage, "messages": messages, "type": session_type})
                     completed_at_expr = "now()" if completed else "NULL"
                     cur.execute(
                         f"""
@@ -1062,6 +1063,7 @@ class LearningRepository:
                             "completed": completed_at is not None,
                             "teaching_note": teaching_note,
                             "started_at": started_at,
+                            "session_type": notes.get("type", "feynman"),
                         })
         except Exception as e:
             logger.warning(f"Could not fetch sessions for ticker {ticker}: {e}")

@@ -36,7 +36,7 @@ _FEYNMAN_PROMPT_FILES = {
 }
 
 
-def _save_feynman_session(conn_str: str, ticker: str, completed: bool) -> None:
+def _save_feynman_session(conn_str: str, ticker: str, completed: bool, session_type: str = "feynman") -> None:
     """Write current Feynman session state to DB. Silently skips if session_id not set."""
     session_id = st.session_state.get("feynman_session_id")
     topic = st.session_state.get("feynman_topic", "")
@@ -53,6 +53,7 @@ def _save_feynman_session(conn_str: str, ticker: str, completed: bool) -> None:
         stage=stage,
         messages=messages,
         completed=completed,
+        session_type=session_type,
     )
 
 
@@ -107,14 +108,27 @@ def render_chat_interface(
 # Topic picker (shown before Feynman loop starts)
 # ---------------------------------------------------------------------------
 
+_STAGE_DESCRIPTIONS = {
+    1: "The AI explains the topic simply, using an everyday analogy anchored in the transcript.",
+    2: "You explain it back in your own words. The AI identifies gaps and asks targeted questions.",
+    3: "Refine your understanding through back-and-forth dialogue. Advance when you feel confident.",
+    4: "Apply the concept to a new scenario the AI gives you.",
+    5: "Receive a concise teaching note — a summary you can keep.",
+}
+
+
 def _render_topic_picker(suggested_topics: list[str] | None = None, past_sessions: list[dict] | None = None) -> None:
     """Show the Feynman topic selection UI."""
     st.markdown("#### 🧠 Feynman Loop")
     st.caption("Choose a topic. The AI will guide you to explain it back, expose gaps, and deepen your understanding.")
 
+    with st.expander("How does the Feynman Loop work?", expanded=False):
+        for stage_num, stage_name in _STAGE_NAMES.items():
+            st.markdown(f"**Stage {stage_num} — {stage_name}:** {_STAGE_DESCRIPTIONS[stage_num]}")
+
     if past_sessions:
-        in_progress = [s for s in past_sessions if not s["completed"]]
-        completed = [s for s in past_sessions if s["completed"]]
+        in_progress = [s for s in past_sessions if not s["completed"] and s.get("session_type", "feynman") == "feynman"]
+        completed = [s for s in past_sessions if s["completed"] and s.get("session_type", "feynman") == "feynman"]
 
         if in_progress or completed:
             with st.expander("📚 Previous Sessions", expanded=True):
@@ -154,15 +168,42 @@ def _render_topic_picker(suggested_topics: list[str] | None = None, past_session
                                 st.rerun()
             st.markdown("---")
 
+        # Synthesis: offer when 2+ sessions completed (#74)
+        if len(completed) >= 2:
+            synthesis_notes = [
+                {"topic": s["topic"], "teaching_note": s.get("teaching_note")}
+                for s in completed
+            ]
+            synthesis_label = " + ".join(s["topic"][:30] for s in completed[:3])
+            if len(completed) > 3:
+                synthesis_label += f" + {len(completed) - 3} more"
+            st.markdown("**Connect the dots:**")
+            if st.button(
+                f"🔗 Synthesize what you've learned — {synthesis_label}",
+                use_container_width=True,
+                help="Pull together your learning across completed sessions",
+            ):
+                st.session_state.feynman_session_id = str(uuid.uuid4())
+                st.session_state.feynman_topic = f"Synthesis: {synthesis_label}"
+                st.session_state.feynman_is_synthesis = True
+                st.session_state.feynman_synthesis_notes = synthesis_notes
+                st.rerun()
+            st.markdown("---")
+
     if suggested_topics:
         st.markdown("**Suggested topics:**")
         num_cols = min(3, len(suggested_topics))
         rows = [suggested_topics[i:i + num_cols] for i in range(0, len(suggested_topics), num_cols)]
+        topic_index = 0
         for row in rows:
             chip_cols = st.columns(num_cols)
             for col, suggestion in zip(chip_cols, row):
                 label = suggestion if len(suggestion) <= 55 else suggestion[:52] + "…"
-                if col.button(label, use_container_width=True):
+                is_recommended = topic_index == 0
+                button_label = f"⭐ {label}" if is_recommended else label
+                button_help = "Recommended starting point" if is_recommended else None
+                topic_index += 1
+                if col.button(button_label, use_container_width=True, help=button_help):
                     st.session_state.feynman_session_id = str(uuid.uuid4())
                     st.session_state.feynman_topic = suggestion
                     st.rerun()
@@ -214,6 +255,12 @@ def _render_stage_header(ticker: str) -> None:
     topic_label = st.session_state.feynman_topic
     if len(topic_label) > 50:
         topic_label = topic_label[:47] + "…"
+    is_synthesis = st.session_state.get("feynman_is_synthesis", False)
+
+    if is_synthesis:
+        st.caption(f"🔗 **Synthesis Session** · *{topic_label}*")
+        st.info("💡 Reflect on how your studied topics connect. The AI will help you see the big picture.")
+        return
 
     st.caption(
         f"🧠 **Feynman Loop** · Topic: *{topic_label}* · "
@@ -236,6 +283,8 @@ def _render_stage_header(ticker: str) -> None:
                     st.session_state.feynman_topic = ""
                     st.session_state.feynman_stage = 1
                     st.session_state.messages = []
+                    st.session_state.feynman_is_synthesis = False
+                    st.session_state.feynman_synthesis_notes = []
                     st.rerun()
             with export_col:
                 topic = st.session_state.feynman_topic
@@ -306,6 +355,8 @@ def _render_stage_advance_buttons(chat_mode: str) -> None:
 def _handle_auto_fire_stage5(chat_mode: str) -> None:
     """Inject the stage 5 trigger if it's missing (fallback for page refresh)."""
     if chat_mode != "Feynman Loop" or st.session_state.feynman_stage != 5:
+        return
+    if st.session_state.get("feynman_is_synthesis", False):
         return
 
     last_assistant = next(
@@ -393,8 +444,10 @@ def _render_chat_input(
             response_placeholder=response_placeholder,
         )
 
-    # Auto-advance stages 1 & 2
-    if chat_mode == "Feynman Loop" and full_response:
+    is_synthesis = st.session_state.get("feynman_is_synthesis", False)
+
+    # Auto-advance stages 1 & 2 (not for synthesis sessions)
+    if chat_mode == "Feynman Loop" and full_response and not is_synthesis:
         stage = st.session_state.feynman_stage
         if stage in (1, 2):
             st.session_state.feynman_stage += 1
@@ -412,10 +465,14 @@ def _render_chat_input(
             "display": True,
             "feynman_stage": st.session_state.feynman_stage,
         })
-        if chat_mode == "Feynman Loop" and st.session_state.feynman_stage == 5:
-            last_appended = st.session_state.messages[-1]
-            if last_appended.get("feynman_stage") == 5:
-                _save_feynman_session(conn_str, ticker, completed=True)
+        if chat_mode == "Feynman Loop":
+            if is_synthesis and len(st.session_state.messages) <= 2:
+                # Save synthesis session after first exchange
+                _save_feynman_session(conn_str, ticker, completed=True, session_type="synthesis")
+            elif not is_synthesis and st.session_state.feynman_stage == 5:
+                last_appended = st.session_state.messages[-1]
+                if last_appended.get("feynman_stage") == 5:
+                    _save_feynman_session(conn_str, ticker, completed=True)
         st.rerun()
 
 
@@ -447,6 +504,8 @@ def _stream_response(
     """Build the API message list, call the LLM, and stream the response."""
     stage = st.session_state.feynman_stage
 
+    is_synthesis = st.session_state.get("feynman_is_synthesis", False)
+
     if chat_mode == "Ask the Transcript":
         sys_prompt = _load_prompt_file("feynman/00_general_qa.md")
         # Inject jargon when explicitly requested
@@ -456,6 +515,15 @@ def _stream_response(
                 context_spans = list(context_spans) + [
                     "Extracted Jargon:\n" + "\n".join([f"- {t}: {d}" for t, d, _ in all_terms])
                 ]
+    elif is_synthesis:
+        sys_prompt = _load_prompt_file("feynman/synthesis.md")
+        synthesis_notes = st.session_state.get("feynman_synthesis_notes", [])
+        if synthesis_notes:
+            notes_str = "\n".join(
+                f"- **{n['topic']}**: {n['teaching_note'] or 'No teaching note saved.'}"
+                for n in synthesis_notes
+            )
+            sys_prompt += f"\n\n<StudiedTopics>\n{notes_str}\n</StudiedTopics>"
     else:
         sys_prompt = _load_prompt_file(_FEYNMAN_PROMPT_FILES[stage])
         if stage == 1 and ticker:

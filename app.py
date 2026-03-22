@@ -40,6 +40,12 @@ if "feynman_topic" not in st.session_state:
 if "feynman_session_id" not in st.session_state:
     st.session_state.feynman_session_id = ""
 
+if "feynman_is_synthesis" not in st.session_state:
+    st.session_state.feynman_is_synthesis = False
+
+if "feynman_synthesis_notes" not in st.session_state:
+    st.session_state.feynman_synthesis_notes = []
+
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
@@ -73,6 +79,8 @@ def _reset_chat() -> None:
     st.session_state.feynman_stage = 1
     st.session_state.feynman_topic = ""
     st.session_state.feynman_session_id = ""
+    st.session_state.feynman_is_synthesis = False
+    st.session_state.feynman_synthesis_notes = []
 
 
 selected_ticker, chat_mode = render_sidebar(CONN_STR, on_ticker_change=_reset_chat)
