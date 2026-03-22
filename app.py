@@ -6,7 +6,7 @@ import streamlit as st
 from db.repositories import SchemaRepository
 from ui.data_loaders import load_analyst_view, load_call_summary, load_metadata, load_qa_evasion, load_speaker_dynamics, load_speakers, load_strategic_shifts, load_transcript_spans
 from ui.feynman import render_chat_interface
-from ui.metadata_panel import render_metadata_panel
+from ui.metadata_panel import build_feynman_suggestions, render_metadata_panel
 from ui.sidebar import render_sidebar
 from ui.transcript_browser import render_transcript_browser
 
@@ -90,6 +90,7 @@ strategic_shifts = load_strategic_shifts(CONN_STR, st.session_state.active_ticke
 qa_evasion = load_qa_evasion(CONN_STR, st.session_state.active_ticker)
 call_summary = load_call_summary(CONN_STR, st.session_state.active_ticker)
 speaker_dynamics = load_speaker_dynamics(CONN_STR, st.session_state.active_ticker)
+suggested_topics = build_feynman_suggestions(strategic_shifts, evasion, qa_evasion)
 
 # ------------- Layout -------------
 
@@ -127,8 +128,7 @@ with right_col:
         conn_str=CONN_STR,
         ticker=st.session_state.active_ticker,
         chat_mode=chat_mode,
-        themes=themes,
-        takeaways=takeaways,
+        suggested_topics=suggested_topics,
         financial_terms=financial_terms,
         industry_terms=industry_terms,
         on_reset=_reset_chat,
