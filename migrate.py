@@ -23,7 +23,27 @@ try:
             cur.execute(
                 "INSERT INTO schema_version (version) VALUES (2) ON CONFLICT DO NOTHING;"
             )
+
+            # v2 → v3: add competitors table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS competitors (
+                    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    call_id                 UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+                    competitor_name         TEXT NOT NULL,
+                    competitor_ticker       TEXT,
+                    description             TEXT,
+                    mentioned_in_transcript BOOLEAN NOT NULL DEFAULT FALSE,
+                    fetched_at              TIMESTAMPTZ DEFAULT now(),
+                    UNIQUE (call_id, competitor_name)
+                );
+            """)
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_competitors_call ON competitors(call_id);"
+            )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (3) ON CONFLICT DO NOTHING;"
+            )
         conn.commit()
-    print("Migration successful — schema is at version 2.")
+    print("Migration successful — schema is at version 3.")
 except Exception as e:
     print(f"Error during migration: {e}")

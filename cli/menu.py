@@ -16,10 +16,29 @@ from db.persistence import (
     get_extracted_terms_for_ticker,
     search_spans
 )
+from db.repositories import CompetitorRepository
 from nlp.embedder import get_embeddings
+from services.competitors import fetch_competitors
 from services.llm import stream_chat
 from services.orchestrator import analyze
 from cli.display import display
+
+def _cache_competitors(conn_str: str, analysis) -> None:
+    """Fetch competitors from Perplexity and persist them so the UI loads them instantly."""
+    try:
+        print("Pre-caching competitors...")
+        competitors = fetch_competitors(
+            ticker=analysis.call.ticker,
+            company_name=analysis.call.company_name,
+            industry=analysis.call.industry,
+            transcript_text=analysis.call.transcript_text,
+        )
+        if competitors:
+            CompetitorRepository(conn_str).save(analysis.call.ticker, competitors)
+            print(f"Cached {len(competitors)} competitors.")
+    except Exception as e:
+        print(f"Warning: could not pre-cache competitors: {e}")
+
 
 def _validate_ticker(ticker: str) -> bool:
     """Return True if ticker is 1-5 uppercase alphabetical characters (e.g. AAPL, MSFT)."""
@@ -104,6 +123,7 @@ def interactive_menu() -> None:
                     print(f"\nSaving analysis to database ({conn_str})...")
                     save_analysis(conn_str, analysis)
                     print("Successfully saved to database.")
+                    _cache_competitors(conn_str, analysis)
                 except Exception as e:
                     print(f"Error analyzing or saving transcript: {e}", file=sys.stderr)
                     
