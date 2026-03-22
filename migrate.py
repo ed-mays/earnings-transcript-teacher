@@ -55,7 +55,23 @@ try:
             cur.execute(
                 "INSERT INTO schema_version (version) VALUES (4) ON CONFLICT DO NOTHING;"
             )
+            # v4 → v5: add structured Q&A fields to evasion_analysis
+            cur.execute(
+                "ALTER TABLE evasion_analysis ADD COLUMN IF NOT EXISTS analyst_name TEXT;"
+            )
+            cur.execute(
+                "ALTER TABLE evasion_analysis ADD COLUMN IF NOT EXISTS question_topic TEXT;"
+            )
+            cur.execute(
+                "ALTER TABLE evasion_analysis ADD COLUMN IF NOT EXISTS question_text TEXT;"
+            )
+            cur.execute(
+                "ALTER TABLE evasion_analysis ADD COLUMN IF NOT EXISTS answer_text TEXT;"
+            )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (5) ON CONFLICT DO NOTHING;"
+            )
         conn.commit()
-    print("Migration successful — schema is at version 4.")
+    print("Migration successful — schema is at version 5.")
 except Exception as e:
     print(f"Error during migration: {e}")

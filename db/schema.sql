@@ -215,6 +215,10 @@ CREATE TABLE evasion_analysis (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     call_id             UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
     chunk_id            TEXT NOT NULL,
+    analyst_name        TEXT,
+    question_topic      TEXT,
+    question_text       TEXT,
+    answer_text         TEXT,
     analyst_concern     TEXT NOT NULL,
     defensiveness_score INTEGER NOT NULL,
     evasion_explanation TEXT NOT NULL

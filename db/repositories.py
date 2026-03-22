@@ -333,15 +333,22 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch spans: {e}")
         return rows
 
-    def get_qa_evasion_for_ticker(self, ticker: str) -> list[tuple[str, int, str]]:
-        """Return evasion entries ordered by call sequence as (analyst_concern, defensiveness_score, evasion_explanation)."""
+    def get_qa_evasion_for_ticker(self, ticker: str) -> list[tuple]:
+        """Return evasion entries ordered by call sequence.
+
+        Each row: (analyst_name, question_topic, question_text, answer_text,
+                   analyst_concern, defensiveness_score, evasion_explanation)
+        """
         rows = []
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation
+                        SELECT ea.analyst_name, ea.question_topic,
+                               ea.question_text, ea.answer_text,
+                               ea.analyst_concern, ea.defensiveness_score,
+                               ea.evasion_explanation
                         FROM evasion_analysis ea
                         JOIN transcript_chunks tc ON ea.chunk_id = tc.chunk_id AND ea.call_id = tc.call_id
                         JOIN calls c ON ea.call_id = c.id
@@ -727,11 +734,18 @@ class AnalysisRepository:
         cur.execute(
             """
             INSERT INTO evasion_analysis (
-                call_id, chunk_id, analyst_concern, defensiveness_score, evasion_explanation
-            ) VALUES (%s, %s, %s, %s, %s)
+                call_id, chunk_id,
+                analyst_name, question_topic, question_text, answer_text,
+                analyst_concern, defensiveness_score, evasion_explanation
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                str(call_id), chunk.chunk_id, evasion.get("analyst_concern"),
+                str(call_id), chunk.chunk_id,
+                evasion.get("analyst_name"),
+                evasion.get("question_topic"),
+                evasion.get("question_text"),
+                evasion.get("answer_text"),
+                evasion.get("analyst_concern"),
                 evasion.get("defensiveness_score") or 0,
                 evasion.get("evasion_explanation") or "",
             ),
