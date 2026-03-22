@@ -24,6 +24,7 @@ def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str, str]:
         chat_mode = st.radio(
             "Mode",
             ["Feynman Loop", "Ask the Transcript"],
+            key="chat_mode",
             help=(
                 "Feynman Loop guides you through teaching the material to test your understanding. "
                 "Ask the Transcript lets you explore the transcript freely."
