@@ -56,6 +56,10 @@ def get_evasion_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, int, s
     repo = AnalysisRepository(conn_str)
     return repo.get_evasion_for_ticker(ticker)
 
+def get_qa_evasion_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, int, str]]:
+    repo = AnalysisRepository(conn_str)
+    return repo.get_qa_evasion_for_ticker(ticker)
+
 def get_misconceptions_for_ticker(conn_str: str, ticker: str) -> list[tuple[str, str, str]]:
     repo = AnalysisRepository(conn_str)
     return repo.get_misconceptions_for_ticker(ticker)

@@ -16,6 +16,7 @@ from db.persistence import (
     get_evasion_for_ticker,
     get_misconceptions_for_ticker,
     get_strategic_shifts_for_ticker,
+    get_qa_evasion_for_ticker,
 )
 
 from db.repositories import CallRepository, CompetitorRepository
@@ -109,6 +110,14 @@ def load_competitors(conn_str: str, ticker: str) -> list[Competitor]:
     if competitors:
         repo.save(ticker, competitors)
     return competitors
+
+
+@st.cache_data
+def load_qa_evasion(conn_str: str, ticker: str) -> list[tuple[str, int, str]]:
+    """Fetch Q&A evasion entries ordered by call sequence."""
+    if not ticker:
+        return []
+    return get_qa_evasion_for_ticker(conn_str, ticker)
 
 
 @st.cache_data

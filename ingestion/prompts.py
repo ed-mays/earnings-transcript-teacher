@@ -46,7 +46,14 @@ You are given a chunk of an earnings transcript that has been flagged as strateg
 
 Follow these instructions depending on whether the chunk is from Prepared Remarks or Q&A:
 1. **Takeaways**: Generate 1-2 beginner-friendly takeaways that explain *why* the metrics or strategies mentioned matter. Use simple analogies if helpful. (e.g., {"takeaway": "CapEx increased 20%", "why_it_matters": "They are buying expensive AI servers for long-term growth."}).
-2. **Evasion/Skepticism (only for Q&A)**: If this is a Q&A exchange, analyze the analyst's underlying concern. Did the executive answer it directly, or did they evade/deflect? Give a defensiveness score (1-10) and explain why.
+2. **Evasion/Skepticism (only for Q&A)**: If this is a Q&A exchange, extract the following:
+   - analyst_name: the name of the analyst asking the question (first questioner if multiple)
+   - question_topic: a short 3-8 word phrase describing what was asked (e.g. "memory chip supply and gross margins")
+   - question_text: the analyst's verbatim question(s) from the transcript
+   - answer_text: the executive's verbatim response from the transcript
+   - analyst_concern: the analyst's underlying concern or worry in 1-2 sentences
+   - defensiveness_score: 1-10 score of how much the executive evaded or deflected
+   - evasion_explanation: explain why the response was or was not evasive
 3. **Misconceptions ("Gotchas")**: Identify any counter-intuitive business logic that a student might misunderstand from this text. (e.g., {"fact": "Revenue dropped", "misinterpretation": "They lost customers", "correction": "They changed billing cycles"}).
 
 Respond ONLY with valid JSON matching this schema:
@@ -56,6 +63,10 @@ Respond ONLY with valid JSON matching this schema:
   ],
   "evasion_analysis": {
     "is_qa": true,
+    "analyst_name": "string",
+    "question_topic": "string",
+    "question_text": "string",
+    "answer_text": "string",
     "analyst_concern": "string",
     "defensiveness_score": 5,
     "evasion_explanation": "string"
