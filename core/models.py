@@ -203,7 +203,7 @@ class CallSynthesisRecord:
     overall_sentiment: str
     executive_tone: str
     key_themes: list[str]
-    strategic_shifts: str
+    strategic_shifts: list[str]
     analyst_sentiment: str
     call_id: UUID = field(default_factory=uuid4)
     id: UUID = field(default_factory=uuid4)

@@ -15,6 +15,7 @@ from db.persistence import (
     get_spans_for_ticker,
     get_evasion_for_ticker,
     get_misconceptions_for_ticker,
+    get_strategic_shifts_for_ticker,
 )
 
 from db.repositories import CallRepository, CompetitorRepository
@@ -108,6 +109,14 @@ def load_competitors(conn_str: str, ticker: str) -> list[Competitor]:
     if competitors:
         repo.save(ticker, competitors)
     return competitors
+
+
+@st.cache_data
+def load_strategic_shifts(conn_str: str, ticker: str) -> list[str] | None:
+    """Fetch the strategic shifts list for a transcript."""
+    if not ticker:
+        return None
+    return get_strategic_shifts_for_ticker(conn_str, ticker)
 
 
 @st.cache_data
