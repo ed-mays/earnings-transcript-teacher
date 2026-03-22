@@ -333,6 +333,28 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch spans: {e}")
         return rows
 
+    def get_qa_evasion_for_ticker(self, ticker: str) -> list[tuple[str, int, str]]:
+        """Return evasion entries ordered by call sequence as (analyst_concern, defensiveness_score, evasion_explanation)."""
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation
+                        FROM evasion_analysis ea
+                        JOIN transcript_chunks tc ON ea.chunk_id = tc.chunk_id AND ea.call_id = tc.call_id
+                        JOIN calls c ON ea.call_id = c.id
+                        WHERE c.ticker = %s
+                        ORDER BY tc.sequence_order ASC
+                        """,
+                        (ticker,),
+                    )
+                    rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch Q&A evasion for {ticker}: {e}")
+        return rows
+
     def get_evasion_for_ticker(self, ticker: str) -> list[tuple[str, int, str]]:
         """Return evasion analysis entries for a ticker as (analyst_concern, defensiveness_score, evasion_explanation)."""
         rows = []

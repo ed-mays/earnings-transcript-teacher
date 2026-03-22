@@ -201,6 +201,7 @@ def render_metadata_panel(
     evasion: list | None = None,
     misconceptions: list | None = None,
     strategic_shifts: list[str] | None = None,
+    qa_evasion: list[tuple[str, int, str]] | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
     st.markdown(f"### 📊 {ticker} — Learning Path")
@@ -285,6 +286,17 @@ def render_metadata_panel(
                     st.divider()
         else:
             st.info("No surprises or insights")
+
+    with st.expander("Step 7 · Q&A Evasion Review"):
+        if qa_evasion:
+            for i, (concern, score, explanation) in enumerate(qa_evasion):
+                badge = "🔴" if score >= 8 else "🟡" if score >= 5 else "🟢"
+                with st.expander(f"{badge} {concern}"):
+                    st.markdown(explanation)
+                if i < len(qa_evasion) - 1:
+                    st.divider()
+        else:
+            st.info("No evasion analysis available for this call.")
 
     st.checkbox("Show advanced analysis", key="show_advanced_analysis")
 
