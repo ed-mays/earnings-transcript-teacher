@@ -14,7 +14,7 @@ CREATE TABLE schema_version (
 );
 
 -- Initialize version
-INSERT INTO schema_version (version) VALUES (2) ON CONFLICT DO NOTHING;
+INSERT INTO schema_version (version) VALUES (3) ON CONFLICT DO NOTHING;
 
 
 -- One row per earnings call
@@ -238,4 +238,17 @@ CREATE TABLE call_synthesis (
     strategic_shifts   TEXT NOT NULL,
     analyst_sentiment  TEXT NOT NULL
 );
+
+CREATE TABLE competitors (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id                 UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    competitor_name         TEXT NOT NULL,
+    competitor_ticker       TEXT,
+    description             TEXT,
+    mentioned_in_transcript BOOLEAN NOT NULL DEFAULT FALSE,
+    fetched_at              TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (call_id, competitor_name)
+);
+
+CREATE INDEX idx_competitors_call ON competitors(call_id);
 

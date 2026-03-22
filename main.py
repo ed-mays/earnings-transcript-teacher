@@ -59,11 +59,23 @@ if __name__ == "__main__":
     
         if args.save:
             from db.persistence import save_analysis
+            from db.repositories import CompetitorRepository
+            from services.competitors import fetch_competitors
             conn_str = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
             print(f"\nSaving analysis to database ({conn_str})...")
             try:
                 save_analysis(conn_str, result)
                 print("Successfully saved to database.")
+                print("Pre-caching competitors...")
+                competitors = fetch_competitors(
+                    ticker=result.call.ticker,
+                    company_name=result.call.company_name,
+                    industry=result.call.industry,
+                    transcript_text=result.call.transcript_text,
+                )
+                if competitors:
+                    CompetitorRepository(conn_str).save(result.call.ticker, competitors)
+                    print(f"Cached {len(competitors)} competitors.")
             except Exception as e:
                 print(f"Error saving to database: {e}", file=sys.stderr)
                 sys.exit(1)

@@ -2,7 +2,7 @@ import logging
 
 import streamlit as st
 
-from core.models import NewsItem
+from core.models import Competitor, NewsItem  # Competitor used by load_competitors return type
 from db.persistence import (
     get_all_calls,
     get_themes_for_ticker,
@@ -17,7 +17,8 @@ from db.persistence import (
     get_misconceptions_for_ticker,
 )
 
-from db.repositories import CallRepository
+from db.repositories import CallRepository, CompetitorRepository
+from services.competitors import fetch_competitors
 from services.recent_news import fetch_recent_news
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,40 @@ def load_metadata(conn_str: str, ticker: str):
     except Exception:
         logger.exception("load_metadata failed for ticker %s", ticker)
         raise
+
+
+@st.cache_data
+def load_competitors(conn_str: str, ticker: str) -> list[Competitor]:
+    """Return competitors for a ticker, using the DB cache when fresh.
+
+    Falls back to a live Perplexity fetch when the cache is empty or stale (>30 days).
+    Returns an empty list if the ticker is unknown or the fetch fails.
+    """
+    if not ticker:
+        return []
+
+    repo = CompetitorRepository(conn_str)
+    cached = repo.get(ticker)
+    if cached:
+        return cached
+
+    call_repo = CallRepository(conn_str)
+    company_name, industry = call_repo.get_company_info(ticker)
+
+    # We need the transcript text to flag mentions — fetch from the spans table.
+    from db.persistence import get_spans_for_ticker
+    spans = get_spans_for_ticker(conn_str, ticker)
+    transcript_text = " ".join(text for _, _, text in spans)
+
+    competitors = fetch_competitors(
+        ticker=ticker,
+        company_name=company_name,
+        industry=industry,
+        transcript_text=transcript_text,
+    )
+    if competitors:
+        repo.save(ticker, competitors)
+    return competitors
 
 
 @st.cache_data

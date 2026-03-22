@@ -183,6 +183,16 @@ class NewsItem:
     summary: str
 
 
+@dataclass
+class Competitor:
+    """A competitor company identified via Perplexity for a given ticker."""
+
+    name: str
+    ticker: str             # may be empty string if unknown
+    description: str        # one-sentence description
+    mentioned_in_transcript: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Synthesis record
 # ---------------------------------------------------------------------------
