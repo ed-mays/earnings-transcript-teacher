@@ -244,6 +244,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
         analysis.synthesis = synthesis
         analysis.token_usage = token_usage
     except Exception as e:
+        print(f"❌ Agentic pipeline failed: {e}")
         logger.warning(f"Agentic pipeline failed or skipped: {e}")
 
     return analysis

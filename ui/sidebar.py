@@ -31,6 +31,11 @@ def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str, str]:
             ),
         )
 
+        st.markdown("---")
+        if st.button("🔄 Reload data", help="Clear cached data and reload from the database. Use this after re-ingesting a transcript."):
+            st.cache_data.clear()
+            st.rerun()
+
         learning_repo = LearningRepository(conn_str)
         stats = learning_repo.get_learning_stats()
         if stats["total_sessions"] > 0:

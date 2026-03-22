@@ -184,19 +184,13 @@ def _handle_feynman_shift_click(shift_text: str) -> None:
     st.session_state.feynman_topic = shift_text
 
 
-def _handle_feynman_topic_click(topic: str) -> None:
-    """Set feynman_topic and switch to Feynman Loop mode when a CTA button is clicked."""
-    st.session_state.feynman_topic = topic
-    st.session_state.chat_mode = "Feynman Loop"
-
-
-def _render_feynman_cta(
-    ticker: str,
-    strategic_shifts: list[str] | None,
+def build_feynman_suggestions(
+    strategic_shifts: list[dict] | None,
     evasion: list | None,
     qa_evasion: list | None,
-) -> None:
-    """Render the 'You're ready to teach this' CTA at the bottom of the learning path."""
+    max_suggestions: int = 3,
+) -> list[str]:
+    """Build an ordered list of suggested Feynman topics from the richest available sources."""
     suggested: list[str] = []
 
     if strategic_shifts:
@@ -207,44 +201,21 @@ def _render_feynman_cta(
 
     if evasion:
         for analyst_concern, _, _ in evasion:
-            if len(suggested) >= 3:
+            if len(suggested) >= max_suggestions:
                 break
             if analyst_concern not in suggested:
                 suggested.append(analyst_concern)
 
     if qa_evasion:
         for _, question_topic, _, _, concern, _, _ in qa_evasion:
-            if len(suggested) >= 3:
+            if len(suggested) >= max_suggestions:
                 break
             topic = question_topic or concern
             if topic and topic not in suggested:
                 suggested.append(topic)
 
-    if not suggested:
-        return
+    return suggested
 
-    st.divider()
-    st.markdown("### 🧠 Ready to test your understanding?")
-    st.caption("Suggested topics to teach:")
-
-    cols = st.columns(len(suggested))
-    for i, (col, topic) in enumerate(zip(cols, suggested)):
-        with col:
-            label = topic[:50] + "…" if len(topic) > 50 else topic
-            st.button(
-                label,
-                key=f"cta_topic_{ticker}_{i}",
-                on_click=_handle_feynman_topic_click,
-                args=(topic,),
-                use_container_width=True,
-            )
-
-    st.button(
-        "Start the Feynman Loop with your own topic →",
-        key=f"cta_start_loop_{ticker}",
-        on_click=_handle_feynman_topic_click,
-        args=("",),
-    )
 
 
 def render_metadata_panel(
@@ -420,7 +391,6 @@ def render_metadata_panel(
             st.markdown("**Top Keywords (TF-IDF):**")
             st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
 
-    _render_feynman_cta(ticker, strategic_shifts, evasion, qa_evasion)
 
 
 def _render_term_list(conn_str: str, ticker: str, terms: list, key_prefix: str) -> None:

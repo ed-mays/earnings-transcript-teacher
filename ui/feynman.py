@@ -60,8 +60,7 @@ def render_chat_interface(
     conn_str: str,
     ticker: str,
     chat_mode: str,
-    themes: list,
-    takeaways: list,
+    suggested_topics: list[str],
     financial_terms: list,
     industry_terms: list,
     on_reset=None,
@@ -92,7 +91,7 @@ def render_chat_interface(
     if chat_mode == "Feynman Loop" and not st.session_state.feynman_topic:
         from db.repositories import LearningRepository
         past_sessions = LearningRepository(conn_str).get_sessions_for_ticker(ticker)
-        _render_topic_picker(themes, takeaways, past_sessions=past_sessions)
+        _render_topic_picker(suggested_topics=suggested_topics, past_sessions=past_sessions)
         return
 
     if chat_mode == "Feynman Loop":
@@ -108,7 +107,7 @@ def render_chat_interface(
 # Topic picker (shown before Feynman loop starts)
 # ---------------------------------------------------------------------------
 
-def _render_topic_picker(themes: list, takeaways: list, past_sessions: list[dict] | None = None) -> None:
+def _render_topic_picker(suggested_topics: list[str] | None = None, past_sessions: list[dict] | None = None) -> None:
     """Show the Feynman topic selection UI."""
     st.markdown("#### 🧠 Feynman Loop")
     st.caption("Choose a topic. The AI will guide you to explain it back, expose gaps, and deepen your understanding.")
@@ -155,17 +154,10 @@ def _render_topic_picker(themes: list, takeaways: list, past_sessions: list[dict
                                 st.rerun()
             st.markdown("---")
 
-    suggestions: list[str] = []
-    for t in themes[:3]:
-        suggestions.append(t)
-    for t, _ in takeaways[:2]:
-        if len(suggestions) < 5 and t not in suggestions:
-            suggestions.append(t)
-
-    if suggestions:
-        st.markdown("**Practice Topics**")
-        num_cols = min(3, len(suggestions))
-        rows = [suggestions[i:i + num_cols] for i in range(0, len(suggestions), num_cols)]
+    if suggested_topics:
+        st.markdown("**Suggested topics:**")
+        num_cols = min(3, len(suggested_topics))
+        rows = [suggested_topics[i:i + num_cols] for i in range(0, len(suggested_topics), num_cols)]
         for row in rows:
             chip_cols = st.columns(num_cols)
             for col, suggestion in zip(chip_cols, row):
@@ -174,8 +166,8 @@ def _render_topic_picker(themes: list, takeaways: list, past_sessions: list[dict
                     st.session_state.feynman_session_id = str(uuid.uuid4())
                     st.session_state.feynman_topic = suggestion
                     st.rerun()
+        st.markdown("---")
 
-    st.markdown("---")
     st.markdown("**Or enter your own topic:**")
     custom_topic = st.text_input(
         "Topic",

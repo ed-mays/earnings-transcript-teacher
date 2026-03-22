@@ -196,12 +196,22 @@ class IngestionPipeline:
         chunks = create_chunks_from_analysis(analysis)
         prep_count = sum(1 for c in chunks if c.chunk_type == 'prepared')
         qa_count = sum(1 for c in chunks if c.chunk_type == 'qa')
+        prepared_span_count = sum(1 for s in analysis.spans if s.section == 'prepared')
+        print(f"  ↳ Spans: {len(analysis.spans)} total ({prepared_span_count} prepared), QA pairs: {len(analysis.qa_pairs)}")
         logger.info(f"Created {len(chunks)} chunks ({prep_count} prep, {qa_count} qa)")
         print(f"\n🚀 Starting Agentic LLM Ingestion Pipeline ({len(chunks)} chunks)...")
-        
+
+        if not chunks:
+            logger.warning("No chunks created from analysis — skipping LLM extraction")
+            print("⚠️  No chunks created — transcript may have no prepared remarks and no Q&A pairs. Skipping agentic extraction.")
+            return [], CallSynthesisRecord(
+                overall_sentiment="", executive_tone="", key_themes=[],
+                strategic_shifts=[], analyst_sentiment="",
+            ), TokenUsageSummary()
+
         # Phase 2: Map Phase (Concurrent Extraction)
         # Process chunks in parallel using a ThreadPoolExecutor
-        max_workers = min(10, len(chunks)) # Don't spin up more threads than we have chunks
+        max_workers = max(1, min(10, len(chunks)))
         print(f"\n[Map Phase] Running extraction on {len(chunks)} chunks with {max_workers} concurrent workers...")
         
         all_chunk_usage: list[dict] = []
