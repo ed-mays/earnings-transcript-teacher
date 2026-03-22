@@ -183,6 +183,11 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
         threading.Thread(target=_fetch, daemon=True).start()
 
 
+def _handle_feynman_shift_click(shift_text: str) -> None:
+    """Set the Feynman topic to the strategic shift text when the button is clicked."""
+    st.session_state.feynman_topic = shift_text
+
+
 def render_metadata_panel(
     conn_str: str,
     ticker: str,
@@ -195,6 +200,7 @@ def render_metadata_panel(
     speakers: list,
     evasion: list | None = None,
     misconceptions: list | None = None,
+    strategic_shifts: str | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
     st.markdown(f"### 📊 {ticker} — Learning Path")
@@ -264,6 +270,18 @@ def render_metadata_panel(
     if ticker:
         _render_news_fragment(conn_str, ticker, themes)
         _render_competitors_fragment(conn_str, ticker)
+
+    with st.expander("Step 6 · Strategic Shifts"):
+        if strategic_shifts and strategic_shifts.strip():
+            st.markdown(strategic_shifts)
+            st.button(
+                "Explain via Feynman",
+                key=f"feynman_shift_{ticker}",
+                on_click=_handle_feynman_shift_click,
+                args=(strategic_shifts,),
+            )
+        else:
+            st.info("No surprises or insights")
 
     st.checkbox("Show advanced analysis", key="show_advanced_analysis")
 

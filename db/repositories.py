@@ -226,6 +226,26 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch synthesis for {ticker}: {e}")
         return None
 
+    def get_strategic_shifts_for_ticker(self, ticker: str) -> str | None:
+        """Return the strategic_shifts analysis text for a ticker, or None if absent."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT cs.strategic_shifts
+                        FROM call_synthesis cs
+                        JOIN calls c ON cs.call_id = c.id
+                        WHERE c.ticker = %s
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"Could not fetch strategic_shifts for {ticker}: {e}")
+        return None
+
     def get_takeaways_for_ticker(self, ticker: str, limit: int = 5) -> list[tuple[str, str]]:
         takeaways = []
         try:
