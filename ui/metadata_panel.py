@@ -234,6 +234,56 @@ def _defensiveness_label(score: int) -> str:
         return "Low"
 
 
+_TOTAL_STEPS = 6
+
+
+def _mark_step_complete(conn_str: str, ticker: str, step_number: int) -> None:
+    """Callback: persist a step completion and clear the step-progress cache."""
+    from db.repositories import ProgressRepository
+    from ui.data_loaders import load_step_progress, load_all_step_counts
+    ProgressRepository(conn_str).mark_step_viewed(ticker, step_number)
+    load_step_progress.clear()
+    load_all_step_counts.clear()
+
+
+def _step_label(title: str, step_number: int, completed_steps: set[int]) -> str:
+    """Return a step expander label with a checkmark if the step is done."""
+    suffix = " ✓" if step_number in completed_steps else ""
+    return f"{title}{suffix}"
+
+
+def _render_mark_read_button(conn_str: str, ticker: str, step_number: int, completed_steps: set[int]) -> None:
+    """Render a 'Mark as read' button at the bottom of a step, or a completion note if already done."""
+    if step_number in completed_steps:
+        st.caption("✓ Marked as read")
+    else:
+        st.button(
+            "Mark as read",
+            key=f"mark_read_{ticker}_step{step_number}",
+            on_click=_mark_step_complete,
+            args=(conn_str, ticker, step_number),
+        )
+
+
+def render_learning_objectives(themes: list, takeaways: list, call_summary: str | None) -> None:
+    """Render a learning objectives section derived from synthesis data."""
+    with st.expander("🎯 Learning objectives"):
+        st.markdown(
+            "Work through these 6 steps to build a complete picture of the earnings call:"
+        )
+        st.markdown(
+            "- **Step 1 · Overview** — identify the headline themes and key strategic takeaways\n"
+            "- **Step 2 · Tone & Speakers** — read the room: who drove the conversation and how\n"
+            "- **Step 3 · Said vs. Avoided** — spot what executives dodged and why it matters\n"
+            "- **Step 4 · What Changed** — track strategic shifts from prior quarters\n"
+            "- **Step 5 · The Bigger Picture** — place the call in its market and competitive context\n"
+            "- **Step 6 · Language Lab** — master the jargon before you read the transcript"
+        )
+        if themes:
+            theme_list = ", ".join(f"*{t}*" for t in themes[:4])
+            st.markdown(f"**Key themes to watch for in this call:** {theme_list}")
+
+
 def render_metadata_panel(
     conn_str: str,
     ticker: str,
@@ -250,11 +300,24 @@ def render_metadata_panel(
     qa_evasion: list[tuple] | None = None,
     call_summary: str | None = None,
     speaker_dynamics: list[dict] | None = None,
+    completed_steps: set[int] | None = None,
 ) -> None:
     """Render the left-column analysis panel as a numbered learning path."""
+    if completed_steps is None:
+        completed_steps = set()
+
     st.markdown(f"### 📊 {ticker} — Learning Path")
 
-    with st.expander("Step 1 · Overview"):
+    # Progress indicator (#70)
+    steps_done = len(completed_steps)
+    if steps_done > 0:
+        st.progress(steps_done / _TOTAL_STEPS, text=f"{steps_done}/{_TOTAL_STEPS} steps read")
+    else:
+        st.progress(0.0, text=f"0/{_TOTAL_STEPS} steps read")
+
+    render_learning_objectives(themes, takeaways, call_summary)
+
+    with st.expander(_step_label("Step 1 · Overview", 1, completed_steps)):
         if call_summary:
             st.markdown(call_summary)
             st.markdown("---")
@@ -277,7 +340,10 @@ def render_metadata_panel(
         else:
             st.info("No themes extracted.")
 
-    with st.expander("Step 2 · Tone & Speakers"):
+        st.markdown("---")
+        _render_mark_read_button(conn_str, ticker, 1, completed_steps)
+
+    with st.expander(_step_label("Step 2 · Tone & Speakers", 2, completed_steps)):
         if synthesis:
             overall, exec_tone, analyst_sent = synthesis
             st.markdown(f"**Sentiment Analysis** {_AI_BADGE}", unsafe_allow_html=True)
@@ -326,8 +392,11 @@ def render_metadata_panel(
                     label += f", {top['firm']}"
                 st.markdown(f"Most active analyst: **{label}** — {top['turn_count']} exchanges in Q&A")
 
+        st.markdown("---")
+        _render_mark_read_button(conn_str, ticker, 2, completed_steps)
+
     if evasion or qa_evasion:
-        with st.expander("Step 3 · Said vs. Avoided"):
+        with st.expander(_step_label("Step 3 · Said vs. Avoided", 3, completed_steps)):
             if evasion:
                 st.markdown(f"**📋 Prepared Remarks** {_AI_BADGE}", unsafe_allow_html=True)
                 for analyst_concern, defensiveness_score, evasion_explanation in evasion:
@@ -354,7 +423,10 @@ def render_metadata_panel(
                     if i < len(qa_evasion) - 1:
                         st.divider()
 
-    with st.expander("Step 4 · What Changed"):
+        st.markdown("---")
+        _render_mark_read_button(conn_str, ticker, 3, completed_steps)
+
+    with st.expander(_step_label("Step 4 · What Changed", 4, completed_steps)):
         if strategic_shifts:
             for i, shift in enumerate(strategic_shifts):
                 prior = shift.get("prior_position", "") if isinstance(shift, dict) else ""
@@ -376,15 +448,21 @@ def render_metadata_panel(
         else:
             st.info("No surprises or insights")
 
+        st.markdown("---")
+        _render_mark_read_button(conn_str, ticker, 4, completed_steps)
+
     if ticker:
-        with st.expander("Step 5 · The Bigger Picture"):
+        with st.expander(_step_label("Step 5 · The Bigger Picture", 5, completed_steps)):
             st.markdown("#### Recent News")
             _render_news_fragment(conn_str, ticker, themes)
             st.divider()
             st.markdown("#### Competitors")
             _render_competitors_fragment(conn_str, ticker)
 
-    with st.expander("Step 6 · Language Lab"):
+        st.markdown("---")
+        _render_mark_read_button(conn_str, ticker, 5, completed_steps)
+
+    with st.expander(_step_label("Step 6 · Language Lab", 6, completed_steps)):
         if misconceptions:
             st.markdown(f"**Common Misconceptions** {_AI_BADGE}", unsafe_allow_html=True)
             reveal_all_key = f"reveal_all_misconceptions_{ticker}"
@@ -421,6 +499,9 @@ def render_metadata_panel(
         if keywords:
             st.markdown("**Top Keywords (TF-IDF):**")
             st.markdown(", ".join([f"`{k}`" for k in keywords[:15]]))
+
+        st.markdown("---")
+        _render_mark_read_button(conn_str, ticker, 6, completed_steps)
 
 
 

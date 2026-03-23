@@ -12,15 +12,17 @@ Spike #49 (flashcard) is also complete — but its implementation issues were ne
 
 ---
 
-## Phase 1 — Completion & Engagement Foundations
+## Phase 1 — Completion & Engagement Foundations ✅
 
 *Pre-requisite for everything else that references "completion" or "step tracking"*
 
+*Implemented in PR #114 (branch `feat/phase-1-completion-and-objectives`).*
+
 | Issue | Work | Notes |
 |---|---|---|
-| **#91** | Per-transcript completion tracking | DB-backed; defines "done with a transcript" — everything else builds on this signal |
-| **#65** | Learning objectives framing | Pure UI; derives from existing synthesis data; sets learner intent before any step |
-| **#70** | Progress/completion indicator | Dependent on #91; once tracking exists, the indicator is mostly a display layer |
+| ~~**#91**~~ ✅ | Per-transcript completion tracking | DB-backed; defines "done with a transcript" — everything else builds on this signal |
+| ~~**#65**~~ ✅ | Learning objectives framing | Pure UI; derives from existing synthesis data; sets learner intent before any step |
+| ~~**#70**~~ ✅ | Progress/completion indicator | Dependent on #91; once tracking exists, the indicator is mostly a display layer |
 
 #65 can run in parallel with #91. #70 should follow #91.
 
@@ -99,8 +101,8 @@ The flashcard spike recommends building flashcards before quizzes, since quizzes
 ## Sequencing Summary
 
 ```
-Phase 1  ──── #91 (completion tracking) + #65 (learning objectives) [parallel]
-               └── #70 (progress indicator) [after #91]
+Phase 1  ──── #91 ✅ + #65 ✅ [parallel]
+               └── #70 ✅ [after #91]
 
 Phase 2  ──── #60, #61, #63, #68 [parallel] → #59 [last, needs LLM call]
 
@@ -116,4 +118,4 @@ Deferred ──── #50 [spike first]
 ### Immediate action items
 
 1. File the 5 flashcard implementation issues (see spike #49 doc, section 8)
-2. Start #91 — it is the most foundational piece and currently has no dependencies
+2. ~~Start #91 — it is the most foundational piece and currently has no dependencies~~ ✅ Done (PR #114)

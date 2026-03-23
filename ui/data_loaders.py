@@ -21,7 +21,7 @@ from db.persistence import (
     get_speaker_dynamics,
 )
 
-from db.repositories import CallRepository, CompetitorRepository
+from db.repositories import CallRepository, CompetitorRepository, ProgressRepository
 from services.competitors import fetch_competitors
 from services.recent_news import fetch_recent_news
 
@@ -144,6 +144,20 @@ def load_speaker_dynamics(conn_str: str, ticker: str) -> list[dict]:
     if not ticker:
         return []
     return get_speaker_dynamics(conn_str, ticker)
+
+
+@st.cache_data
+def load_step_progress(conn_str: str, ticker: str) -> frozenset[int]:
+    """Return the set of step numbers the user has completed for a transcript."""
+    if not ticker:
+        return frozenset()
+    return frozenset(ProgressRepository(conn_str).get_completed_steps(ticker))
+
+
+@st.cache_data
+def load_all_step_counts(conn_str: str) -> dict[str, int]:
+    """Return a dict mapping ticker → steps_completed for all transcripts with progress."""
+    return dict(ProgressRepository(conn_str).get_all_step_counts())
 
 
 @st.cache_data
