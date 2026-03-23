@@ -1,7 +1,13 @@
 import threading
 
 import streamlit as st
-from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+
+# Module-level store for background-fetch results.
+# Using a plain dict (not st.session_state) so background threads need no
+# Streamlit script-run context — which would block the main render.
+_SENTINEL = object()  # "not yet fetched" marker distinct from None/[]
+_async_data: dict[str, object] = {}
+_async_lock = threading.Lock()
 
 from core.models import Competitor, NewsItem
 from db.repositories import CallRepository, CompetitorRepository
@@ -49,65 +55,69 @@ def _handle_relevance_click(
         st.session_state[f"show_relevance_{article_key}"] = True
 
 
-@st.fragment(run_every="1s")
-def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None:
-    """Render the Recent News section. Fetches data in a background thread so the
-    main script (and the right-hand pane) are never blocked."""
-    data_key = f"news_data_{ticker}"
+@st.fragment(run_every="2s")
+def _poll_for_news(ticker: str) -> None:
+    """Tiny poll-only fragment — no rendering. Triggers a full-page rerun once news arrives."""
+    with _async_lock:
+        ready = _async_data.get(f"news_{ticker}", _SENTINEL) is not _SENTINEL
+    if ready:
+        st.rerun()
+
+
+def _render_news_section(conn_str: str, ticker: str, themes: list[str]) -> None:
+    """Render the Recent News section. Shows a placeholder immediately and fetches in the
+    background; a separate poll fragment triggers a rerun when data is ready."""
+    cache_key = f"news_{ticker}"
     thread_key = f"news_thread_{ticker}"
 
-    news_items = st.session_state.get(data_key)
+    with _async_lock:
+        news_items = _async_data.get(cache_key, _SENTINEL)
 
-    if news_items is not None:
-        # Empty result — clear the cache so the next run retries the fetch.
+    if news_items is not _SENTINEL:
+        # Data ready (may be an empty list if nothing was found).
         if not news_items:
-            del st.session_state[data_key]
-            if thread_key in st.session_state:
-                del st.session_state[thread_key]
-        else:
-            # Data ready — render it. run_every keeps firing but this branch is fast.
-            st.caption(
-                "These articles provide context around the themes discussed in this call. "
-                "Read them alongside the transcript to understand the market backdrop. "
-                "Use **Explain relevance** on any article to see how it connects to this specific call."
-            )
-            for i, item in enumerate(news_items):
-                article_key = f"{ticker}_news_{i}"
-                if item.url:
-                    st.markdown(f"**[{item.headline}]({item.url})**")
-                else:
-                    st.markdown(f"**{item.headline}**")
-                meta_parts = [p for p in (item.source, item.date) if p]
-                if meta_parts:
-                    st.caption(" · ".join(meta_parts))
-                if item.summary:
-                    st.markdown(item.summary)
-
-                already_explained = st.session_state.get(f"show_relevance_{article_key}")
-                if already_explained:
-                    explanation = st.session_state.get(f"relevance_{article_key}", "")
-                    st.info(f"💡 **Why this matters for this call:** {explanation}")
-                else:
-                    st.button(
-                        "💡 Explain relevance to this call",
-                        key=f"relevance_btn_{article_key}",
-                        on_click=_handle_relevance_click,
-                        args=(article_key, item.headline, item.summary, themes),
-                        use_container_width=True,
-                    )
-                if i < len(news_items) - 1:
-                    st.divider()
+            st.caption("No recent news found around this earnings call.")
             return
+        st.caption(
+            "These articles provide context around the themes discussed in this call. "
+            "Read them alongside the transcript to understand the market backdrop. "
+            "Use **Explain relevance** on any article to see how it connects to this specific call."
+        )
+        for i, item in enumerate(news_items):
+            article_key = f"{ticker}_news_{i}"
+            if item.url:
+                st.markdown(f"**[{item.headline}]({item.url})**")
+            else:
+                st.markdown(f"**{item.headline}**")
+            meta_parts = [p for p in (item.source, item.date) if p]
+            if meta_parts:
+                st.caption(" · ".join(meta_parts))
+            if item.summary:
+                st.markdown(item.summary)
 
-    # Still loading — show placeholder and start the background thread once.
+            already_explained = st.session_state.get(f"show_relevance_{article_key}")
+            if already_explained:
+                explanation = st.session_state.get(f"relevance_{article_key}", "")
+                st.info(f"💡 **Why this matters for this call:** {explanation}")
+            else:
+                st.button(
+                    "💡 Explain relevance to this call",
+                    key=f"relevance_btn_{article_key}",
+                    on_click=_handle_relevance_click,
+                    args=(article_key, item.headline, item.summary, themes),
+                    use_container_width=True,
+                )
+            if i < len(news_items) - 1:
+                st.divider()
+        return
+
+    # Still loading — show placeholder, start the background thread once, and poll.
     st.caption("Fetching recent news in the background… ⏳")
 
     if not st.session_state.get(thread_key):
         st.session_state[thread_key] = True
-        ctx = get_script_run_ctx()
 
         def _fetch() -> None:
-            add_script_run_ctx(threading.current_thread(), ctx)
             call_repo = CallRepository(conn_str)
             call_date = call_repo.get_call_date(ticker)
             company_name, _ = call_repo.get_company_info(ticker)
@@ -120,21 +130,33 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
                 )
             else:
                 result = []
-            st.session_state[data_key] = result
+            with _async_lock:
+                _async_data[cache_key] = result
 
         threading.Thread(target=_fetch, daemon=True).start()
 
+    _poll_for_news(ticker)
 
-@st.fragment(run_every="1s")
-def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
-    """Render the Competitors section. Fetches data in a background thread so the
-    main script (and the right-hand pane) are never blocked."""
-    data_key = f"competitors_data_{ticker}"
+
+@st.fragment(run_every="2s")
+def _poll_for_competitors(ticker: str) -> None:
+    """Tiny poll-only fragment — no rendering. Triggers a full-page rerun once competitor data arrives."""
+    with _async_lock:
+        ready = _async_data.get(f"competitors_{ticker}", _SENTINEL) is not _SENTINEL
+    if ready:
+        st.rerun()
+
+
+def _render_competitors_section(conn_str: str, ticker: str) -> None:
+    """Render the Competitors section. Shows a placeholder immediately and fetches in the
+    background; a separate poll fragment triggers a rerun when data is ready."""
+    cache_key = f"competitors_{ticker}"
     thread_key = f"competitors_thread_{ticker}"
 
-    competitors = st.session_state.get(data_key)
+    with _async_lock:
+        competitors = _async_data.get(cache_key, _SENTINEL)
 
-    if competitors is not None:
+    if competitors is not _SENTINEL:
         # Data ready — render it.
         if competitors:
             st.caption(
@@ -172,25 +194,25 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
 
         if st.button("Refresh competitors", key=f"refresh_competitors_{ticker}"):
             CompetitorRepository(conn_str).delete(ticker)
-            del st.session_state[data_key]
+            with _async_lock:
+                _async_data.pop(cache_key, None)
             if thread_key in st.session_state:
                 del st.session_state[thread_key]
             st.rerun()
         return
 
-    # Still loading — show placeholder and start the background thread once.
+    # Still loading — show placeholder, start the background thread once, and poll.
     st.caption("Fetching competitors in the background… ⏳")
 
     if not st.session_state.get(thread_key):
         st.session_state[thread_key] = True
-        ctx = get_script_run_ctx()
 
         def _fetch() -> None:
-            add_script_run_ctx(threading.current_thread(), ctx)
             repo = CompetitorRepository(conn_str)
             cached = repo.get(ticker)
             if cached:
-                st.session_state[data_key] = cached
+                with _async_lock:
+                    _async_data[cache_key] = cached
                 return
             call_repo = CallRepository(conn_str)
             company_name, industry = call_repo.get_company_info(ticker)
@@ -204,9 +226,65 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
             )
             if result:
                 repo.save(ticker, result)
-            st.session_state[data_key] = result
+            with _async_lock:
+                _async_data[cache_key] = result
 
         threading.Thread(target=_fetch, daemon=True).start()
+
+    _poll_for_competitors(ticker)
+
+
+def _handle_signals_click(
+    card_key: str,
+    concern: str,
+    explanation: str,
+    defensiveness_score: int,
+) -> None:
+    """Generate and cache an investor-implications framing for an evasion card."""
+    if st.session_state.get(f"signals_{card_key}"):
+        st.session_state[f"show_signals_{card_key}"] = True
+        return
+
+    level = _defensiveness_label(defensiveness_score)
+    system_prompt = (
+        "You are a financial analyst educator. In 2–3 sentences, explain the investor "
+        "implications of the evasion pattern described. Focus on what a careful investor "
+        "or analyst should infer from this behaviour — not just what happened, but why it matters."
+    )
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Evasion concern: {concern}\n"
+                f"Defensiveness level: {level}\n"
+                f"What the executive avoided: {explanation}"
+            ),
+        }
+    ]
+
+    framing = ""
+    for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
+        if isinstance(chunk, str):
+            framing += chunk
+
+    if framing:
+        st.session_state[f"signals_{card_key}"] = framing.strip()
+        st.session_state[f"show_signals_{card_key}"] = True
+
+
+def _render_signals_button(card_key: str, concern: str, explanation: str, score: int) -> None:
+    """Render the 'What this signals' button or its generated result."""
+    if st.session_state.get(f"show_signals_{card_key}"):
+        framing = st.session_state.get(f"signals_{card_key}", "")
+        st.warning(f"📈 **What this signals for investors:** {framing}")
+    else:
+        st.button(
+            "📈 What this signals for investors",
+            key=f"signals_btn_{card_key}",
+            on_click=_handle_signals_click,
+            args=(card_key, concern, explanation, score),
+            use_container_width=True,
+        )
 
 
 def _handle_feynman_shift_click(shift_text: str) -> None:
@@ -478,10 +556,12 @@ def render_metadata_panel(
         with st.expander(_step_label("Step 3 · Said vs. Avoided", 3, completed_steps)):
             if evasion:
                 st.markdown(f"**📋 Prepared Remarks** {_AI_BADGE}", unsafe_allow_html=True)
-                for analyst_concern, defensiveness_score, evasion_explanation in evasion:
+                for idx, (analyst_concern, defensiveness_score, evasion_explanation) in enumerate(evasion):
                     st.markdown(f"**Concern:** {analyst_concern}")
                     st.markdown(f"*Defensiveness: {_defensiveness_label(defensiveness_score)}*")
                     st.markdown(f"**Why it was flagged:** {evasion_explanation}")
+                    card_key = f"{ticker}_prepared_{idx}"
+                    _render_signals_button(card_key, analyst_concern, evasion_explanation, defensiveness_score)
                     st.divider()
 
             if qa_evasion:
@@ -499,6 +579,8 @@ def render_metadata_panel(
                             st.markdown(answer_text)
                         with st.expander("What the executive avoided"):
                             st.markdown(explanation)
+                        card_key = f"{ticker}_qa_{i}"
+                        _render_signals_button(card_key, question_topic or concern, explanation, score)
                     if i < len(qa_evasion) - 1:
                         st.divider()
 
@@ -533,10 +615,10 @@ def render_metadata_panel(
     if ticker:
         with st.expander(_step_label("Step 5 · The Bigger Picture", 5, completed_steps)):
             st.markdown("#### Recent News")
-            _render_news_fragment(conn_str, ticker, themes)
+            _render_news_section(conn_str, ticker, themes)
             st.divider()
             st.markdown("#### Competitors")
-            _render_competitors_fragment(conn_str, ticker)
+            _render_competitors_section(conn_str, ticker)
 
         st.markdown("---")
         _render_mark_read_button(conn_str, ticker, 5, completed_steps)
