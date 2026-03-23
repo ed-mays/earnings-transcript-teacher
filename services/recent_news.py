@@ -91,6 +91,12 @@ def _parse_news_items(content: str) -> list[NewsItem]:
         content = content[:-3]
     content = content.strip()
 
+    # Extract just the JSON array in case the model appended explanatory text
+    start = content.find("[")
+    end = content.rfind("]")
+    if start != -1 and end != -1 and end >= start:
+        content = content[start : end + 1]
+
     try:
         items = json.loads(content)
     except json.JSONDecodeError as e:
