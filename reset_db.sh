@@ -39,6 +39,11 @@ fi
 step "Re-initializing database using setup.sh..."
 bash setup.sh
 
+# ── 3. Run migrations ────────────────────────────────────────────────────────
+step "Applying schema migrations..."
+.venv/bin/python migrate.py
+ok "Migrations applied"
+
 echo ""
 echo -e "${BOLD}Reset complete!${NC}"
 echo ""
