@@ -19,16 +19,26 @@ def _format_call_label(ticker: str, fiscal_quarter: str, company_name: str | Non
     return " — ".join(parts)
 
 
-def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str, str]:
-    """Render the settings sidebar and return (selected_ticker, chat_mode)."""
-    with st.sidebar:
-        st.markdown("### 📄 Transcript")
+def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str | None, str]:
+    """Render the settings sidebar and return (selected_ticker, chat_mode).
 
+    Returns (None, chat_mode) when no transcripts are available or the Library view is active.
+    """
+    if "show_library" not in st.session_state:
+        st.session_state.show_library = False
+
+    with st.sidebar:
         available_calls = load_transcripts(conn_str)
 
         if not available_calls:
-            st.warning("No transcripts found in database. Run `python main.py [TICKER]` first.")
-            st.stop()
+            st.info("No transcripts yet. See the main panel for setup instructions.")
+            return None, "Feynman Loop"
+
+        st.markdown("### 📄 Transcript")
+
+        if st.button("📚 Library", use_container_width=True, help="Browse all transcripts"):
+            st.session_state.show_library = True
+            st.rerun()
 
         tickers = [c[0] for c in available_calls]
         label_by_ticker = {

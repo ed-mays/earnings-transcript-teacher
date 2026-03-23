@@ -3,9 +3,10 @@ import os
 
 import streamlit as st
 
-from db.repositories import SchemaRepository
+from db.repositories import LearningRepository, SchemaRepository
 from ui.data_loaders import load_analyst_view, load_call_summary, load_metadata, load_qa_evasion, load_speaker_dynamics, load_speakers, load_strategic_shifts, load_transcript_spans
 from ui.feynman import render_chat_interface
+from ui.library import render_library
 from ui.metadata_panel import build_feynman_suggestions, render_metadata_panel
 from ui.sidebar import render_sidebar
 from ui.transcript_browser import render_transcript_browser
@@ -89,6 +90,19 @@ def _reset_chat() -> None:
 selected_ticker, chat_mode = render_sidebar(CONN_STR, on_ticker_change=_reset_chat)
 st.session_state.active_ticker = selected_ticker
 
+# ------------- Library / Zero State -------------
+
+def _select_ticker_from_library(ticker: str) -> None:
+    """Navigate from the library view to studying a specific transcript."""
+    st.session_state.active_ticker = ticker
+    st.session_state.show_library = False
+    _reset_chat()
+
+
+if selected_ticker is None or st.session_state.get("show_library"):
+    render_library(CONN_STR, on_select=_select_ticker_from_library)
+    st.stop()
+
 # ------------- Load Data -------------
 
 themes, takeaways, synthesis, keywords, industry_terms, financial_terms = load_metadata(
@@ -114,27 +128,27 @@ jargon: dict[str, str] = {
 }
 
 with left_col:
-    # Jargon discovery banner (#67): show once per ticker until dismissed.
-    jargon_count = len(financial_terms) + len(industry_terms)
-    banner_dismissed_key = f"jargon_banner_dismissed_{selected_ticker}"
-    if selected_ticker and jargon_count > 0 and not st.session_state.get(banner_dismissed_key):
-        banner_col, dismiss_col = st.columns([9, 1])
-        with banner_col:
-            st.info(
-                f"This transcript contains **{jargon_count} industry & financial terms** worth knowing — "
-                "review them in **Step 6 · Language Lab** below before reading."
+    # Start prompt (#66): shown once per transcript per session, adapts to learning history.
+    start_prompt_key = f"start_prompt_dismissed_{selected_ticker}"
+    if not st.session_state.get(start_prompt_key):
+        learning_repo = LearningRepository(CONN_STR)
+        sessions = learning_repo.get_sessions_for_ticker(selected_ticker)
+        completed_sessions = [s for s in sessions if s["completed"]]
+        if not completed_sessions:
+            suggestion = "New here? **Start with Step 1 · Overview** to get oriented, then read the transcript."
+        else:
+            suggestion = (
+                f"Welcome back — you have **{len(completed_sessions)} completed session(s)** on this call. "
+                "Pick up where you left off, or try the **Feynman Loop** to test your retention."
             )
+        prompt_col, dismiss_col = st.columns([9, 1])
+        with prompt_col:
+            st.success(f"💡 {suggestion}")
         with dismiss_col:
-            if st.button("✕", key=f"dismiss_jargon_banner_{selected_ticker}", help="Dismiss"):
-                st.session_state[banner_dismissed_key] = True
+            if st.button("✕", key=f"dismiss_start_prompt_{selected_ticker}", help="Dismiss"):
+                st.session_state[start_prompt_key] = True
                 st.rerun()
 
-    render_transcript_browser(
-        spans,
-        jargon=jargon,
-        initial_search=st.session_state.get("transcript_search_term", ""),
-    )
-    st.divider()
     render_metadata_panel(
         conn_str=CONN_STR,
         ticker=st.session_state.active_ticker,
@@ -151,6 +165,28 @@ with left_col:
         qa_evasion=qa_evasion,
         call_summary=call_summary,
         speaker_dynamics=speaker_dynamics,
+    )
+    st.divider()
+
+    # Jargon discovery banner (#67): show once per ticker until dismissed.
+    jargon_count = len(financial_terms) + len(industry_terms)
+    banner_dismissed_key = f"jargon_banner_dismissed_{selected_ticker}"
+    if selected_ticker and jargon_count > 0 and not st.session_state.get(banner_dismissed_key):
+        banner_col, dismiss_col = st.columns([9, 1])
+        with banner_col:
+            st.info(
+                f"This transcript contains **{jargon_count} industry & financial terms** worth knowing — "
+                "review them in **Step 6 · Language Lab** above before reading."
+            )
+        with dismiss_col:
+            if st.button("✕", key=f"dismiss_jargon_banner_{selected_ticker}", help="Dismiss"):
+                st.session_state[banner_dismissed_key] = True
+                st.rerun()
+
+    render_transcript_browser(
+        spans,
+        jargon=jargon,
+        initial_search=st.session_state.get("transcript_search_term", ""),
     )
 
 with right_col:
