@@ -218,6 +218,19 @@ def build_feynman_suggestions(
 
 
 
+_AI_BADGE = '<abbr title="This analysis is AI-generated — verify against the transcript">🤖</abbr>'
+
+
+def _defensiveness_label(score: int) -> str:
+    """Convert a numeric defensiveness score to a qualitative label."""
+    if score >= 8:
+        return "High"
+    elif score >= 5:
+        return "Moderate"
+    else:
+        return "Low"
+
+
 def render_metadata_panel(
     conn_str: str,
     ticker: str,
@@ -244,7 +257,8 @@ def render_metadata_panel(
             st.markdown("---")
 
         if takeaways:
-            st.markdown("**Key Takeaways**")
+            st.markdown(f"**Key Takeaways** {_AI_BADGE}", unsafe_allow_html=True)
+            st.caption("The 'so what' — narrative insights and implications from the call.")
             for t, why in takeaways:
                 st.markdown(f"- **{t}**\n  - *{why}*")
         else:
@@ -253,7 +267,8 @@ def render_metadata_panel(
         st.markdown("---")
 
         if themes:
-            st.markdown("**Extracted Themes**")
+            st.markdown(f"**Extracted Themes** {_AI_BADGE}", unsafe_allow_html=True)
+            st.caption("Recurring topics and subject clusters identified across the transcript.")
             for idx, t in enumerate(themes, 1):
                 st.markdown(f"**Theme {idx}:** {t}")
         else:
@@ -262,7 +277,7 @@ def render_metadata_panel(
     with st.expander("Step 2 · Tone & Speakers"):
         if synthesis:
             overall, exec_tone, analyst_sent = synthesis
-            st.markdown("**Sentiment Analysis**")
+            st.markdown(f"**Sentiment Analysis** {_AI_BADGE}", unsafe_allow_html=True)
             st.markdown(f"**Overall Sentiment:** {overall}")
             st.markdown(f"**Executive Tone:** {exec_tone}")
             st.markdown(f"**Analyst Sentiment:** {analyst_sent}")
@@ -311,15 +326,15 @@ def render_metadata_panel(
     if evasion or qa_evasion:
         with st.expander("Step 3 · Said vs. Avoided"):
             if evasion:
-                st.markdown("**📋 Prepared Remarks**")
+                st.markdown(f"**📋 Prepared Remarks** {_AI_BADGE}", unsafe_allow_html=True)
                 for analyst_concern, defensiveness_score, evasion_explanation in evasion:
                     st.markdown(f"**Concern:** {analyst_concern}")
-                    st.markdown(f"*Defensiveness score: {defensiveness_score}/10*")
+                    st.markdown(f"*Defensiveness: {_defensiveness_label(defensiveness_score)}*")
                     st.markdown(f"**Why it was flagged:** {evasion_explanation}")
                     st.divider()
 
             if qa_evasion:
-                st.markdown("**🎤 Q&A Session**")
+                st.markdown(f"**🎤 Q&A Session** {_AI_BADGE}", unsafe_allow_html=True)
                 for i, (analyst_name, question_topic, question_text, answer_text, concern, score, explanation) in enumerate(qa_evasion):
                     badge = "🔴" if score >= 8 else "🟡" if score >= 5 else "🟢"
                     name = analyst_name or "The analyst"
@@ -368,7 +383,7 @@ def render_metadata_panel(
 
     with st.expander("Step 6 · Language Lab"):
         if misconceptions:
-            st.markdown("**Common Misconceptions**")
+            st.markdown(f"**Common Misconceptions** {_AI_BADGE}", unsafe_allow_html=True)
             for fact, misinterpretation, correction in misconceptions:
                 st.markdown(f"*Context: {fact}*")
                 st.markdown(f"**Misconception:** {misinterpretation}")

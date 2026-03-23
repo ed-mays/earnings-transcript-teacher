@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 
 
 @st.cache_data
-def load_transcripts(conn_str: str) -> list[str]:
-    """Fetch available transcript tickers from the database."""
+def load_transcripts(conn_str: str) -> list[tuple[str, str, str | None, str | None]]:
+    """Fetch available transcripts from the database as (ticker, fiscal_quarter, company_name, call_date)."""
     calls = get_all_calls(conn_str)
-    return [c[0] for c in calls] if calls else []
+    return [(c[0], c[1], c[2], c[3]) for c in calls] if calls else []
 
 
 @st.cache_data

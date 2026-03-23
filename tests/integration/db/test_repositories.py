@@ -24,23 +24,26 @@ def test_get_all_calls(mock_psycopg_connect):
     m_connect, m_cursor = mock_psycopg_connect
     
     # Mock the results of fetchall()
-    m_cursor.fetchall.return_value = [("MSFT", "Q1 2024 MSFT"), ("AAPL", "Q2 2024 AAPL")]
-    
+    m_cursor.fetchall.return_value = [
+        ("MSFT", "Q1 2024 MSFT", "Microsoft Corp", None),
+        ("AAPL", "Q2 2024 AAPL", "Apple Inc", None),
+    ]
+
     repo = CallRepository("fake_connection_string")
     calls = repo.get_all_calls()
-    
+
     # Verify the SQL was executed
     m_cursor.execute.assert_called_once_with(
         """
-                        SELECT ticker, fiscal_quarter
+                        SELECT ticker, fiscal_quarter, company_name, call_date
                         FROM calls
                         ORDER BY created_at DESC
                         """
     )
-    
+
     # Verify the return value
     assert len(calls) == 2
-    assert calls[0] == ("MSFT", "Q1 2024 MSFT")
+    assert calls[0] == ("MSFT", "Q1 2024 MSFT", "Microsoft Corp", None)
 
 
 def test_fetch_existing_embeddings(mock_psycopg_connect, mocker):

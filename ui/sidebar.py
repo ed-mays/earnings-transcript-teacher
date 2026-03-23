@@ -4,20 +4,42 @@ from db.repositories import LearningRepository
 from ui.data_loaders import load_transcripts
 
 
+def _format_call_label(ticker: str, fiscal_quarter: str, company_name: str | None, call_date) -> str:
+    """Format a transcript selector label from available call metadata."""
+    parts = [ticker]
+    if company_name:
+        parts.append(company_name)
+    if fiscal_quarter:
+        parts.append(fiscal_quarter)
+    if call_date:
+        try:
+            parts.append(call_date.strftime("%b %-d, %Y"))
+        except AttributeError:
+            parts.append(str(call_date))
+    return " — ".join(parts)
+
+
 def render_sidebar(conn_str: str, on_ticker_change) -> tuple[str, str]:
     """Render the settings sidebar and return (selected_ticker, chat_mode)."""
     with st.sidebar:
         st.markdown("### 📄 Transcript")
 
-        available_tickers = load_transcripts(conn_str)
+        available_calls = load_transcripts(conn_str)
 
-        if not available_tickers:
+        if not available_calls:
             st.warning("No transcripts found in database. Run `python main.py [TICKER]` first.")
             st.stop()
 
+        tickers = [c[0] for c in available_calls]
+        label_by_ticker = {
+            c[0]: _format_call_label(c[0], c[1], c[2], c[3])
+            for c in available_calls
+        }
+
         selected_ticker = st.selectbox(
             "Select Transcript",
-            available_tickers,
+            tickers,
+            format_func=lambda t: label_by_ticker.get(t, t),
             on_change=on_ticker_change,
         )
 
