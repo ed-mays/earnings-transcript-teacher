@@ -209,6 +209,59 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
         threading.Thread(target=_fetch, daemon=True).start()
 
 
+def _handle_signals_click(
+    card_key: str,
+    concern: str,
+    explanation: str,
+    defensiveness_score: int,
+) -> None:
+    """Generate and cache an investor-implications framing for an evasion card."""
+    if st.session_state.get(f"signals_{card_key}"):
+        st.session_state[f"show_signals_{card_key}"] = True
+        return
+
+    level = _defensiveness_label(defensiveness_score)
+    system_prompt = (
+        "You are a financial analyst educator. In 2–3 sentences, explain the investor "
+        "implications of the evasion pattern described. Focus on what a careful investor "
+        "or analyst should infer from this behaviour — not just what happened, but why it matters."
+    )
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Evasion concern: {concern}\n"
+                f"Defensiveness level: {level}\n"
+                f"What the executive avoided: {explanation}"
+            ),
+        }
+    ]
+
+    framing = ""
+    for chunk in stream_chat(messages, system_prompt, model="sonar-pro"):
+        if isinstance(chunk, str):
+            framing += chunk
+
+    if framing:
+        st.session_state[f"signals_{card_key}"] = framing.strip()
+        st.session_state[f"show_signals_{card_key}"] = True
+
+
+def _render_signals_button(card_key: str, concern: str, explanation: str, score: int) -> None:
+    """Render the 'What this signals' button or its generated result."""
+    if st.session_state.get(f"show_signals_{card_key}"):
+        framing = st.session_state.get(f"signals_{card_key}", "")
+        st.warning(f"📈 **What this signals for investors:** {framing}")
+    else:
+        st.button(
+            "📈 What this signals for investors",
+            key=f"signals_btn_{card_key}",
+            on_click=_handle_signals_click,
+            args=(card_key, concern, explanation, score),
+            use_container_width=True,
+        )
+
+
 def _handle_feynman_shift_click(shift_text: str) -> None:
     """Set the Feynman topic to the strategic shift text when the button is clicked."""
     st.session_state.feynman_topic = shift_text
@@ -478,10 +531,12 @@ def render_metadata_panel(
         with st.expander(_step_label("Step 3 · Said vs. Avoided", 3, completed_steps)):
             if evasion:
                 st.markdown(f"**📋 Prepared Remarks** {_AI_BADGE}", unsafe_allow_html=True)
-                for analyst_concern, defensiveness_score, evasion_explanation in evasion:
+                for idx, (analyst_concern, defensiveness_score, evasion_explanation) in enumerate(evasion):
                     st.markdown(f"**Concern:** {analyst_concern}")
                     st.markdown(f"*Defensiveness: {_defensiveness_label(defensiveness_score)}*")
                     st.markdown(f"**Why it was flagged:** {evasion_explanation}")
+                    card_key = f"{ticker}_prepared_{idx}"
+                    _render_signals_button(card_key, analyst_concern, evasion_explanation, defensiveness_score)
                     st.divider()
 
             if qa_evasion:
@@ -499,6 +554,8 @@ def render_metadata_panel(
                             st.markdown(answer_text)
                         with st.expander("What the executive avoided"):
                             st.markdown(explanation)
+                        card_key = f"{ticker}_qa_{i}"
+                        _render_signals_button(card_key, question_topic or concern, explanation, score)
                     if i < len(qa_evasion) - 1:
                         st.divider()
 
