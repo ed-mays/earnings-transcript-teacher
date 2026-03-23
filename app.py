@@ -149,27 +149,6 @@ with left_col:
                 st.session_state[start_prompt_key] = True
                 st.rerun()
 
-    # Jargon discovery banner (#67): show once per ticker until dismissed.
-    jargon_count = len(financial_terms) + len(industry_terms)
-    banner_dismissed_key = f"jargon_banner_dismissed_{selected_ticker}"
-    if selected_ticker and jargon_count > 0 and not st.session_state.get(banner_dismissed_key):
-        banner_col, dismiss_col = st.columns([9, 1])
-        with banner_col:
-            st.info(
-                f"This transcript contains **{jargon_count} industry & financial terms** worth knowing — "
-                "review them in **Step 6 · Language Lab** below before reading."
-            )
-        with dismiss_col:
-            if st.button("✕", key=f"dismiss_jargon_banner_{selected_ticker}", help="Dismiss"):
-                st.session_state[banner_dismissed_key] = True
-                st.rerun()
-
-    render_transcript_browser(
-        spans,
-        jargon=jargon,
-        initial_search=st.session_state.get("transcript_search_term", ""),
-    )
-    st.divider()
     render_metadata_panel(
         conn_str=CONN_STR,
         ticker=st.session_state.active_ticker,
@@ -186,6 +165,28 @@ with left_col:
         qa_evasion=qa_evasion,
         call_summary=call_summary,
         speaker_dynamics=speaker_dynamics,
+    )
+    st.divider()
+
+    # Jargon discovery banner (#67): show once per ticker until dismissed.
+    jargon_count = len(financial_terms) + len(industry_terms)
+    banner_dismissed_key = f"jargon_banner_dismissed_{selected_ticker}"
+    if selected_ticker and jargon_count > 0 and not st.session_state.get(banner_dismissed_key):
+        banner_col, dismiss_col = st.columns([9, 1])
+        with banner_col:
+            st.info(
+                f"This transcript contains **{jargon_count} industry & financial terms** worth knowing — "
+                "review them in **Step 6 · Language Lab** above before reading."
+            )
+        with dismiss_col:
+            if st.button("✕", key=f"dismiss_jargon_banner_{selected_ticker}", help="Dismiss"):
+                st.session_state[banner_dismissed_key] = True
+                st.rerun()
+
+    render_transcript_browser(
+        spans,
+        jargon=jargon,
+        initial_search=st.session_state.get("transcript_search_term", ""),
     )
 
 with right_col:
