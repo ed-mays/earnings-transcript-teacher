@@ -1,7 +1,7 @@
 import streamlit as st
 
 from db.repositories import LearningRepository
-from ui.data_loaders import load_transcripts
+from ui.data_loaders import load_all_step_counts, load_transcripts
 
 
 def render_library(conn_str: str, on_select: callable) -> None:
@@ -19,9 +19,10 @@ def render_library(conn_str: str, on_select: callable) -> None:
         ticker: (total, completed)
         for ticker, total, completed in learning_repo.get_ticker_session_counts()
     }
+    step_counts: dict[str, int] = load_all_step_counts(conn_str)
 
     _render_filter_bar(available_calls)
-    _render_transcript_table(available_calls, ticker_counts, on_select)
+    _render_transcript_table(available_calls, ticker_counts, step_counts, on_select)
 
 
 def _render_zero_state() -> None:
@@ -81,6 +82,7 @@ def _render_filter_bar(available_calls: list[tuple]) -> None:
 def _render_transcript_table(
     available_calls: list[tuple],
     ticker_counts: dict[str, tuple[int, int]],
+    step_counts: dict[str, int],
     on_select: callable,
 ) -> None:
     """Render the filterable, sortable transcript cards."""
@@ -94,14 +96,15 @@ def _render_transcript_table(
             if filter_text not in searchable:
                 continue
         total, completed = ticker_counts.get(ticker, (0, 0))
-        rows.append((ticker, fiscal_quarter, company_name, call_date, total, completed))
+        steps_done = step_counts.get(ticker, 0)
+        rows.append((ticker, fiscal_quarter, company_name, call_date, total, completed, steps_done))
 
     if sort_order == "Date (oldest)":
         rows.sort(key=lambda r: r[3] or "", reverse=False)
     elif sort_order == "Ticker (A–Z)":
         rows.sort(key=lambda r: r[0])
     elif sort_order == "Study progress":
-        rows.sort(key=lambda r: r[4], reverse=True)
+        rows.sort(key=lambda r: r[6], reverse=True)
     # Default: Date (newest) — already newest-first from DB
 
     if not rows:
@@ -109,22 +112,24 @@ def _render_transcript_table(
         return
 
     st.markdown("---")
-    header_cols = st.columns([2, 3, 2, 2, 2])
-    for col, label in zip(header_cols, ["Ticker", "Company", "Quarter", "Date", "Sessions"]):
+    header_cols = st.columns([2, 3, 2, 2, 3])
+    for col, label in zip(header_cols, ["Ticker", "Company", "Quarter", "Date", "Progress"]):
         col.markdown(f"**{label}**")
     st.markdown("---")
 
-    for ticker, fiscal_quarter, company_name, call_date, total, completed in rows:
-        row_cols = st.columns([2, 3, 2, 2, 2])
+    for ticker, fiscal_quarter, company_name, call_date, total, completed, steps_done in rows:
+        row_cols = st.columns([2, 3, 2, 2, 3])
         row_cols[0].markdown(f"**{ticker}**")
         row_cols[1].markdown(company_name or "—")
         row_cols[2].markdown(fiscal_quarter or "—")
         date_str = _format_date(call_date)
         row_cols[3].markdown(date_str)
+        progress_parts = []
+        if steps_done > 0:
+            progress_parts.append(f"{steps_done}/6 steps")
         if total > 0:
-            row_cols[4].markdown(f"{completed}/{total} ✓")
-        else:
-            row_cols[4].markdown("Not started")
+            progress_parts.append(f"{completed}/{total} sessions")
+        row_cols[4].markdown(" · ".join(progress_parts) if progress_parts else "Not started")
 
         if row_cols[4].button("Study →", key=f"lib_study_{ticker}"):
             on_select(ticker)

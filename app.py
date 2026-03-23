@@ -4,7 +4,7 @@ import os
 import streamlit as st
 
 from db.repositories import LearningRepository, SchemaRepository
-from ui.data_loaders import load_analyst_view, load_call_summary, load_metadata, load_qa_evasion, load_speaker_dynamics, load_speakers, load_strategic_shifts, load_transcript_spans
+from ui.data_loaders import load_analyst_view, load_call_summary, load_metadata, load_qa_evasion, load_speaker_dynamics, load_speakers, load_step_progress, load_strategic_shifts, load_transcript_spans
 from ui.feynman import render_chat_interface
 from ui.library import render_library
 from ui.metadata_panel import build_feynman_suggestions, render_metadata_panel
@@ -115,6 +115,7 @@ strategic_shifts = load_strategic_shifts(CONN_STR, st.session_state.active_ticke
 qa_evasion = load_qa_evasion(CONN_STR, st.session_state.active_ticker)
 call_summary = load_call_summary(CONN_STR, st.session_state.active_ticker)
 speaker_dynamics = load_speaker_dynamics(CONN_STR, st.session_state.active_ticker)
+completed_steps = set(load_step_progress(CONN_STR, st.session_state.active_ticker))
 suggested_topics = build_feynman_suggestions(strategic_shifts, evasion, qa_evasion)
 
 # ------------- Layout -------------
@@ -165,6 +166,7 @@ with left_col:
         qa_evasion=qa_evasion,
         call_summary=call_summary,
         speaker_dynamics=speaker_dynamics,
+        completed_steps=completed_steps,
     )
     st.divider()
 
