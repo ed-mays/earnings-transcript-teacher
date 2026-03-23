@@ -13,7 +13,7 @@ class OutdatedSchemaError(Exception):
     """Exception raised when the database schema is out of date."""
     pass
 
-REQUIRED_SCHEMA_VERSION = 8
+REQUIRED_SCHEMA_VERSION = 9
 
 
 def reset_all_data(conn_str: str) -> None:
@@ -719,10 +719,10 @@ class AnalysisRepository:
             cur.execute(
                 """
                 INSERT INTO call_topics (
-                    call_id, label, terms, weight, rank_order
-                ) VALUES (%s, %s, %s, %s, %s)
+                    call_id, label, terms, weight, rank_order, topic_name
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (str(call_id), topic.label, topic.terms, topic.weight, topic.rank_order)
+                (str(call_id), topic.label, topic.terms, topic.weight, topic.rank_order, getattr(topic, "name", ""))
             )
 
     def _save_keywords(self, cur, call_id, keywords):

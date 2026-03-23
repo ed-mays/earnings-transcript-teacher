@@ -110,6 +110,35 @@ Respond ONLY with valid JSON matching this schema:
 }
 """
 
+HAIKU_NLP_SYNTHESIS_PROMPT = """You are an expert financial analyst synthesizing signals extracted from an earnings call transcript.
+
+You will receive aggregated signals from the map phase of transcript ingestion:
+- extracted_terms: industry and financial terms identified across all chunks
+- core_concepts: strategic concept summaries from each chunk
+- takeaways: beginner-friendly takeaways with "why it matters" context
+
+Your job is to produce three outputs:
+
+1. **keywords** (top 20): The most important and financially significant terms from this call, ranked by importance. For each, include a brief significance note explaining why it matters for this company/sector — not a generic definition.
+
+2. **themes** (exactly 5): Labeled thematic clusters that represent the dominant strategic narratives of this call. Each theme should have a descriptive, specific name (e.g. "AI Infrastructure Investment Cycle", not "Growth") and 6–8 supporting terms drawn from the extracted signals.
+
+3. **top_takeaways** (top 10): The most important beginner-friendly takeaways across the entire call. For each, include the speaker name if available, the core takeaway text, and why it matters financially.
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "keywords": [
+    {"term": "string", "significance": "string"}
+  ],
+  "themes": [
+    {"name": "string", "terms": ["string"]}
+  ],
+  "top_takeaways": [
+    {"speaker": "string", "takeaway": "string", "why_it_matters": "string"}
+  ]
+}
+"""
+
 QA_DETECTION_SYSTEM_PROMPT = """You are an expert transcript analyst.
 Your task is to identify the exact line where an earnings call transitions from "Prepared Remarks" to the "Question and Answer" (Q&A) session.
 

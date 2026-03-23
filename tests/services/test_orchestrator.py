@@ -21,54 +21,65 @@ def mock_external_calls(mocker):
     They actually increased due to efficiency.
     """)
     mocker.patch("services.orchestrator.read_text_file", return_value=json.dumps({"transcript": raw_text}))
-    
-    # Mock NLP functions to avoid length/dimension errors on tiny texts
-    mocker.patch("services.orchestrator.extract_keywords", return_value=[("cloud", 0.9), ("growth", 0.8)])
-    
-    mock_theme = MagicMock()
-    mock_theme.label = 0
-    mock_theme.terms = ["cloud", "azure"]
-    mock_theme.weight = 1.5
-    mocker.patch("services.orchestrator.extract_themes", return_value=[mock_theme])
-    
-    mock_takeaway = MagicMock()
-    mock_takeaway.speaker = "Satya Nadella"
-    mock_takeaway.text = "Cloud growth was tremendous this quarter."
-    mock_takeaway.score = 2.0
-    mocker.patch("services.orchestrator.extract_takeaways", return_value=[mock_takeaway])
-    
+
+    # Mock schema health check to pass without a real DB connection
+    mock_schema_repo = MagicMock()
+    mock_schema_repo.check_health.return_value = (True, "ok")
+    mocker.patch("services.orchestrator.SchemaRepository", return_value=mock_schema_repo)
+
     # Mock DB/Embedder
     mocker.patch("services.orchestrator.fetch_existing_embeddings", return_value={"Thank you.": [0.1, 0.1, 0.1]})
-    mocker.patch("services.orchestrator.get_embeddings", return_value=[[0.2, 0.2, 0.2]] * 10) # arbitrary sufficient list
-    
-    # Mock IngestionPipeline to prevent API calls
+    mocker.patch("services.orchestrator.get_embeddings", return_value=[[0.2, 0.2, 0.2]] * 10)
+
+    # Mock IngestionPipeline — return 4-tuple including NLP synthesis output
+    from core.models import CallSynthesisRecord, TokenUsageSummary
+    mock_synthesis = CallSynthesisRecord(
+        overall_sentiment="positive",
+        executive_tone="confident",
+        key_themes=["cloud"],
+        strategic_shifts=[],
+        analyst_sentiment="cautious",
+    )
+    nlp_synthesis = {
+        "keywords": [
+            {"term": "cloud", "significance": "core growth driver"},
+            {"term": "azure", "significance": "flagship product"},
+        ],
+        "themes": [
+            {"name": "Cloud Expansion", "terms": ["cloud", "azure", "growth"]},
+        ],
+        "top_takeaways": [
+            {"speaker": "Satya Nadella", "takeaway": "Cloud growth was tremendous.", "why_it_matters": "Signals accelerating adoption."},
+        ],
+    }
     mock_pipeline_class = mocker.patch("ingestion.pipeline.IngestionPipeline")
     mock_pipeline_instance = MagicMock()
-    mock_pipeline_instance.process.return_value = []
+    mock_pipeline_instance.process.return_value = ([], mock_synthesis, TokenUsageSummary(), nlp_synthesis)
     mock_pipeline_class.return_value = mock_pipeline_instance
+
 
 def test_analyze_orchestrator(mock_external_calls):
     result = analyze("MSFT")
-    
+
     # Verify the structure of the returned CallAnalysis
     assert isinstance(result, CallAnalysis)
     assert result.call.ticker == "MSFT"
     assert result.call.token_count > 0
-    
-    # Check that speakers were extracted (Operator, Satya, Jane)
+
+    # Check that speakers were extracted (Operator, Satya, John Doe)
     assert len(result.speakers) == 3
-    
-    # Check that keywords, topics, and takeaways are linked
+
+    # Keywords come from NLP synthesis
     assert len(result.keywords) == 2
     assert result.keywords[0].term == "cloud"
-    
+
+    # Topics come from NLP synthesis
     assert len(result.topics) == 1
-    assert result.topics[0].terms == ["cloud", "azure"]
-    
-    # The takeaway should have been linked to a span, or created as a standalone span
-    assert len(result.takeaways) == 1
-    assert result.takeaways[0].text == "Cloud growth was tremendous this quarter."
-    assert result.takeaways[0].speaker_name == "Satya Nadella"
-    
+    assert result.topics[0].terms == ["cloud", "azure", "growth"]
+    assert result.topics[0].name == "Cloud Expansion"
+
+    # Takeaways list is empty (scikit-learn TextRank removed; NLP takeaways go to console)
+    assert result.takeaways == []
+
     # QA Pair extraction
     assert len(result.qa_pairs) > 0

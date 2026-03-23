@@ -186,7 +186,7 @@ class IngestionPipeline:
         from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
 
-    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord, TokenUsageSummary]:
+    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord, TokenUsageSummary, dict]:
         """Run the full ingestion pipeline on a parsed CallAnalysis."""
         logger.info(f"Starting agentic ingestion for {analysis.call.ticker}")
 
@@ -207,7 +207,7 @@ class IngestionPipeline:
             return [], CallSynthesisRecord(
                 overall_sentiment="", executive_tone="", key_themes=[],
                 strategic_shifts=[], analyst_sentiment="",
-            ), TokenUsageSummary()
+            ), TokenUsageSummary(), {}
 
         # Phase 2: Map Phase (Concurrent Extraction)
         # Process chunks in parallel using a ThreadPoolExecutor
@@ -292,8 +292,65 @@ class IngestionPipeline:
                 synthesis_usage["completion_tokens"],
             )
 
+        # Phase 4: NLP Synthesis (Haiku — keywords, themes, top_takeaways)
+        print(f"\n[NLP Synthesis Phase] Extracting keywords, themes, and top takeaways via Haiku...")
+        nlp_synthesis: dict = {}
+        try:
+            signals = self._build_nlp_signals_payload(chunks)
+            nlp_data = self.extractor.extract_nlp_synthesis(signals)
+            nlp_usage = nlp_data.pop("_usage_stats", None)
+            if nlp_usage:
+                token_usage.add(
+                    nlp_usage["model"],
+                    nlp_usage["prompt_tokens"],
+                    nlp_usage["completion_tokens"],
+                )
+                print(f"    ↳ NLP Synthesis [Model: {nlp_usage['model']} | In: {nlp_usage['prompt_tokens']} | Out: {nlp_usage['completion_tokens']}]")
+            nlp_synthesis = nlp_data
+
+            top_takeaways = nlp_synthesis.get("top_takeaways", [])
+            if top_takeaways:
+                print("\n📌 Top Takeaways:")
+                for i, t in enumerate(top_takeaways, 1):
+                    speaker = t.get("speaker", "")
+                    prefix = f"  {i}. [{speaker}] " if speaker else f"  {i}. "
+                    print(f"{prefix}{t.get('takeaway', '')}")
+                    why = t.get("why_it_matters", "")
+                    if why:
+                        print(f"       → {why}")
+        except Exception as e:
+            logger.warning(f"NLP synthesis phase failed: {e}")
+            print(f"⚠️  NLP synthesis phase failed: {e}")
+
         print("✅ Agentic ingestion complete.\n")
-        return chunks, synthesis, token_usage
+        return chunks, synthesis, token_usage, nlp_synthesis
+
+    def _build_nlp_signals_payload(self, chunks: List[TranscriptChunk]) -> str:
+        """Collect map-phase signals from all chunks into a JSON payload for NLP synthesis."""
+        all_terms: list[dict] = []
+        all_concepts: list[str] = []
+        all_takeaways: list[dict] = []
+
+        seen_terms: set[str] = set()
+        for chunk in chunks:
+            for t in chunk.extracted_terms:
+                term = t.get("term", "")
+                if term and term not in seen_terms:
+                    seen_terms.add(term)
+                    all_terms.append({"term": term, "definition": t.get("definition", ""), "category": t.get("category", "")})
+            for concept in chunk.core_concepts:
+                if concept:
+                    all_concepts.append(concept)
+            for takeaway in chunk.takeaways:
+                if takeaway.get("takeaway"):
+                    all_takeaways.append(takeaway)
+
+        payload = {
+            "extracted_terms": all_terms,
+            "core_concepts": all_concepts,
+            "takeaways": all_takeaways,
+        }
+        return json.dumps(payload, indent=2)
         
     def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int, company_context: str = "") -> list[dict]:
         """Helper method to process a single chunk, designed to run in a thread.
