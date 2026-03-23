@@ -66,7 +66,11 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
                 del st.session_state[thread_key]
         else:
             # Data ready — render it. run_every keeps firing but this branch is fast.
-            st.caption("Top news from around the earnings call, ranked by relevance to transcript themes.")
+            st.caption(
+                "These articles provide context around the themes discussed in this call. "
+                "Read them alongside the transcript to understand the market backdrop. "
+                "Use **Explain relevance** on any article to see how it connects to this specific call."
+            )
             for i, item in enumerate(news_items):
                 article_key = f"{ticker}_news_{i}"
                 if item.url:
@@ -78,15 +82,19 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
                     st.caption(" · ".join(meta_parts))
                 if item.summary:
                     st.markdown(item.summary)
-                st.button(
-                    "Explain relevance",
-                    key=f"relevance_btn_{article_key}",
-                    on_click=_handle_relevance_click,
-                    args=(article_key, item.headline, item.summary, themes),
-                )
-                if st.session_state.get(f"show_relevance_{article_key}"):
+
+                already_explained = st.session_state.get(f"show_relevance_{article_key}")
+                if already_explained:
                     explanation = st.session_state.get(f"relevance_{article_key}", "")
-                    st.markdown(f"💡 **Relevance:** {explanation}")
+                    st.info(f"💡 **Why this matters for this call:** {explanation}")
+                else:
+                    st.button(
+                        "💡 Explain relevance to this call",
+                        key=f"relevance_btn_{article_key}",
+                        on_click=_handle_relevance_click,
+                        args=(article_key, item.headline, item.summary, themes),
+                        use_container_width=True,
+                    )
                 if i < len(news_items) - 1:
                     st.divider()
             return
@@ -129,17 +137,36 @@ def _render_competitors_fragment(conn_str: str, ticker: str) -> None:
     if competitors is not None:
         # Data ready — render it.
         if competitors:
-            st.caption("Direct competitors identified for this company and industry.")
-            for c in competitors:
-                name_line = f"**{c.name}**"
-                if c.ticker:
-                    name_line += f" `{c.ticker}`"
-                if c.mentioned_in_transcript:
-                    name_line += " 🔖 *mentioned in transcript*"
-                st.markdown(name_line)
-                if c.description:
-                    st.markdown(f"_{c.description}_")
-                st.divider()
+            st.caption(
+                "Understanding the competitive landscape helps you read between the lines. "
+                "When a competitor is mentioned in an earnings call, ask: *Why now? Is management "
+                "on the defensive, or signalling confidence? What does this reveal about market dynamics?*"
+            )
+            mentioned = [c for c in competitors if c.mentioned_in_transcript]
+            not_mentioned = [c for c in competitors if not c.mentioned_in_transcript]
+
+            if mentioned:
+                st.markdown(f"**📌 Referenced in this call ({len(mentioned)})**")
+                for c in mentioned:
+                    name_line = f"**{c.name}**"
+                    if c.ticker:
+                        name_line += f" `{c.ticker}`"
+                    st.markdown(name_line)
+                    if c.description:
+                        st.markdown(f"_{c.description}_")
+                    st.divider()
+
+            if not_mentioned:
+                if mentioned:
+                    st.markdown("**Other competitors**")
+                for c in not_mentioned:
+                    name_line = f"**{c.name}**"
+                    if c.ticker:
+                        name_line += f" `{c.ticker}`"
+                    st.markdown(name_line)
+                    if c.description:
+                        st.markdown(f"_{c.description}_")
+                    st.divider()
         else:
             st.info("No competitor data available.")
 
@@ -265,6 +292,36 @@ def _render_mark_read_button(conn_str: str, ticker: str, step_number: int, compl
         )
 
 
+_PRE_READING_ITEMS = [
+    ("Step 1 · Overview", "Read the key themes and takeaways before diving in"),
+    ("Step 2 · Tone & Speakers", "Know who is presenting and what roles they play"),
+    ("Step 3 · Said vs. Avoided", "Prime yourself to spot what management avoids"),
+    ("Step 4 · What Changed", "Note the strategic shifts from prior quarters"),
+    ("Step 5 · The Bigger Picture", "Understand the market and competitive context"),
+    ("Step 6 · Language Lab", "Familiarise yourself with the jargon"),
+]
+
+
+def render_pre_reading_checklist(ticker: str) -> None:
+    """Render a collapsible pre-reading checklist to structure engagement before the transcript."""
+    done_count = sum(
+        1
+        for i in range(len(_PRE_READING_ITEMS))
+        if st.session_state.get(f"prereading_{ticker}_{i}", False)
+    )
+    label = f"📋 Before you read — {done_count}/{len(_PRE_READING_ITEMS)} steps prepared"
+    with st.expander(label):
+        st.caption(
+            "Work through the analysis steps below before reading the raw transcript. "
+            "Each step builds the context you need to read the call critically."
+        )
+        for i, (step_name, description) in enumerate(_PRE_READING_ITEMS):
+            st.checkbox(
+                f"**{step_name}** — {description}",
+                key=f"prereading_{ticker}_{i}",
+            )
+
+
 def render_learning_objectives(themes: list, takeaways: list, call_summary: str | None) -> None:
     """Render a learning objectives section derived from synthesis data."""
     with st.expander("🎯 Learning objectives"):
@@ -315,6 +372,7 @@ def render_metadata_panel(
     else:
         st.progress(0.0, text=f"0/{_TOTAL_STEPS} steps read")
 
+    render_pre_reading_checklist(ticker)
     render_learning_objectives(themes, takeaways, call_summary)
 
     with st.expander(_step_label("Step 1 · Overview", 1, completed_steps)):
@@ -391,6 +449,27 @@ def render_metadata_panel(
                 if top["firm"]:
                     label += f", {top['firm']}"
                 st.markdown(f"Most active analyst: **{label}** — {top['turn_count']} exchanges in Q&A")
+            # Analyst firm diversity
+            analyst_firms = {
+                r["firm"]
+                for r in speaker_dynamics
+                if r["role"] == "analyst" and r.get("firm")
+            }
+            analyst_names = {r["speaker"] for r in speaker_dynamics if r["role"] == "analyst"}
+            if analyst_firms:
+                st.markdown(
+                    f"Questions came from **{len(analyst_firms)} firm{'s' if len(analyst_firms) != 1 else ''}** "
+                    f"({len(analyst_names)} analyst{'s' if len(analyst_names) != 1 else ''})"
+                )
+            # Exec vs analyst word share
+            exec_words = sum(r["word_count"] for r in speaker_dynamics if r["role"] == "executive")
+            analyst_words = sum(r["word_count"] for r in speaker_dynamics if r["role"] == "analyst")
+            total_words = exec_words + analyst_words
+            if total_words > 0:
+                exec_pct = round(exec_words / total_words * 100)
+                st.markdown(
+                    f"Talk time: executives **{exec_pct}%**, analysts **{100 - exec_pct}%**"
+                )
 
         st.markdown("---")
         _render_mark_read_button(conn_str, ticker, 2, completed_steps)
