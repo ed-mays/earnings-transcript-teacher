@@ -158,8 +158,12 @@ def _apply_jargon_tooltips(escaped_text: str, jargon: dict[str, str]) -> str:
 def render_transcript_browser(
     spans: list[tuple[str, str, str]],
     jargon: dict[str, str] | None = None,
+    initial_search: str = "",
 ) -> None:
-    """Render the searchable HTML transcript browser."""
+    """Render the searchable HTML transcript browser.
+
+    initial_search: pre-populate the search box and run a search on load.
+    """
     st.markdown("### 📄 Transcript")
 
     if not spans:
@@ -176,10 +180,18 @@ def render_transcript_browser(
         lines_html.append(f"<p><strong>{s}:</strong> {t}</p>")
     transcript_body = "\n".join(lines_html)
 
+    escaped_initial = _html.escape(initial_search, quote=True)
+    init_js = (
+        "(function(){"
+        "var input=document.getElementById('search-input');"
+        f"if(input.value){{onSearch();}}"
+        "})();"
+    )
+
     component_html = (
         f"<!DOCTYPE html>\n<html><head>\n<style>\n{_BROWSER_CSS}\n</style>\n</head><body>\n"
         '<div class="search-bar">\n'
-        '  <input type="text" id="search-input" placeholder="Search transcript..." oninput="onSearch()">\n'
+        f'  <input type="text" id="search-input" placeholder="Search transcript..." oninput="onSearch()" value="{escaped_initial}">\n'
         '  <span class="match-count" id="match-count"></span>\n'
         '  <button class="nav-btn" id="prev-btn" onclick="navigate(-1)" title="Previous match" disabled>&#9650;</button>\n'
         '  <button class="nav-btn" id="next-btn" onclick="navigate(1)" title="Next match" disabled>&#9660;</button>\n'
@@ -187,7 +199,7 @@ def render_transcript_browser(
         '<div class="transcript" id="transcript">\n'
         + transcript_body
         + "\n</div>\n"
-        f"<script>\n{_BROWSER_JS}\n</script>\n"
+        f"<script>\n{_BROWSER_JS}\n{init_js}\n</script>\n"
         "</body></html>"
     )
 

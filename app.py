@@ -49,6 +49,9 @@ if "feynman_synthesis_notes" not in st.session_state:
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
 
+if "transcript_search_term" not in st.session_state:
+    st.session_state.transcript_search_term = ""
+
 # ------------- Schema Health Check -------------
 
 def _auto_migrate() -> bool:
@@ -111,7 +114,26 @@ jargon: dict[str, str] = {
 }
 
 with left_col:
-    render_transcript_browser(spans, jargon=jargon)
+    # Jargon discovery banner (#67): show once per ticker until dismissed.
+    jargon_count = len(financial_terms) + len(industry_terms)
+    banner_dismissed_key = f"jargon_banner_dismissed_{selected_ticker}"
+    if selected_ticker and jargon_count > 0 and not st.session_state.get(banner_dismissed_key):
+        banner_col, dismiss_col = st.columns([9, 1])
+        with banner_col:
+            st.info(
+                f"This transcript contains **{jargon_count} industry & financial terms** worth knowing — "
+                "review them in **Step 6 · Language Lab** below before reading."
+            )
+        with dismiss_col:
+            if st.button("✕", key=f"dismiss_jargon_banner_{selected_ticker}", help="Dismiss"):
+                st.session_state[banner_dismissed_key] = True
+                st.rerun()
+
+    render_transcript_browser(
+        spans,
+        jargon=jargon,
+        initial_search=st.session_state.get("transcript_search_term", ""),
+    )
     st.divider()
     render_metadata_panel(
         conn_str=CONN_STR,

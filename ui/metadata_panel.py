@@ -59,8 +59,13 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
     news_items = st.session_state.get(data_key)
 
     if news_items is not None:
-        # Data ready — render it. run_every keeps firing but this branch is fast.
-        if news_items:
+        # Empty result — clear the cache so the next run retries the fetch.
+        if not news_items:
+            del st.session_state[data_key]
+            if thread_key in st.session_state:
+                del st.session_state[thread_key]
+        else:
+            # Data ready — render it. run_every keeps firing but this branch is fast.
             st.caption("Top news from around the earnings call, ranked by relevance to transcript themes.")
             for i, item in enumerate(news_items):
                 article_key = f"{ticker}_news_{i}"
@@ -84,9 +89,7 @@ def _render_news_fragment(conn_str: str, ticker: str, themes: list[str]) -> None
                     st.markdown(f"💡 **Relevance:** {explanation}")
                 if i < len(news_items) - 1:
                     st.divider()
-        else:
-            st.info("No recent news found.")
-        return
+            return
 
     # Still loading — show placeholder and start the background thread once.
     st.caption("Fetching recent news in the background… ⏳")
@@ -384,10 +387,23 @@ def render_metadata_panel(
     with st.expander("Step 6 · Language Lab"):
         if misconceptions:
             st.markdown(f"**Common Misconceptions** {_AI_BADGE}", unsafe_allow_html=True)
-            for fact, misinterpretation, correction in misconceptions:
+            reveal_all_key = f"reveal_all_misconceptions_{ticker}"
+            if st.button("Expand all corrections", key=f"expand_all_misc_{ticker}"):
+                st.session_state[reveal_all_key] = True
+            reveal_all = st.session_state.get(reveal_all_key, False)
+            for i, (fact, misinterpretation, correction) in enumerate(misconceptions):
+                reveal_key = f"reveal_misconception_{ticker}_{i}"
                 st.markdown(f"*Context: {fact}*")
                 st.markdown(f"**Misconception:** {misinterpretation}")
-                st.markdown(f"**Correction:** {correction}")
+                revealed = reveal_all or st.session_state.get(reveal_key, False)
+                if revealed:
+                    st.markdown(f"**Correction:** {correction}")
+                else:
+                    st.button(
+                        "Reveal correction",
+                        key=f"reveal_btn_misc_{ticker}_{i}",
+                        on_click=lambda k=reveal_key: st.session_state.update({k: True}),
+                    )
                 st.divider()
 
         st.markdown("**Financial Jargon**")
@@ -408,11 +424,16 @@ def render_metadata_panel(
 
 
 
+def _handle_find_in_transcript(term: str) -> None:
+    """Set the transcript search term when Find in transcript is clicked."""
+    st.session_state["transcript_search_term"] = term
+
+
 def _render_term_list(conn_str: str, ticker: str, terms: list, key_prefix: str) -> None:
-    """Render a list of (term, definition, explanation) rows with Define/Explain buttons."""
+    """Render a list of (term, definition, explanation) rows with Define/Explain/Find buttons."""
     for i, (term, definition, explanation) in enumerate(terms):
         st.markdown(f"**{term.title()}**")
-        btn_col1, btn_col2, _ = st.columns([0.5, 0.5, 0.1])
+        btn_col1, btn_col2, btn_col3 = st.columns([0.4, 0.4, 0.4])
         with btn_col1:
             st.button(
                 "Define",
@@ -426,6 +447,13 @@ def _render_term_list(conn_str: str, ticker: str, terms: list, key_prefix: str) 
                 key=f"{key_prefix}_exp_{i}_{term}",
                 on_click=handle_explain_click,
                 args=(conn_str, ticker, term, explanation),
+            )
+        with btn_col3:
+            st.button(
+                "Find in transcript",
+                key=f"{key_prefix}_find_{i}_{term}",
+                on_click=_handle_find_in_transcript,
+                args=(term,),
             )
         show_def = st.session_state.get(f"show_def_{ticker}_{term}", False)
         show_exp = st.session_state.get(f"show_exp_{ticker}_{term}", False)
