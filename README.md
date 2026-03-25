@@ -188,9 +188,10 @@ earnings-transcript-teacher/
 ├── parsing/            # Transcript loading, section extraction, financial term scanner
 ├── nlp/                # NLP algorithms (TF-IDF keywords, NMF themes, TextRank takeaways)
 ├── services/           # Orchestration and external service integrations
-│   ├── orchestrator.py # Main analysis pipeline — wires all modules together
-│   ├── company_info.py # SEC EDGAR company lookup and context formatting
-│   └── llm.py          # Anthropic/Perplexity API clients with rate limiting
+│   ├── orchestrator.py  # Main analysis pipeline — wires all modules together
+│   ├── company_info.py  # SEC EDGAR company lookup and context formatting
+│   ├── competitors.py   # Competitor identification via Claude Haiku
+│   └── llm.py           # Anthropic API client with rate limiting (Haiku + Sonnet)
 ├── ingestion/          # Three-tier agentic LLM enrichment pipeline (Claude Haiku + Sonnet)
 ├── cli/                # Console UI display and interactive menu
 ├── db/                 # PostgreSQL repository layer and semantic search

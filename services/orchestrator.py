@@ -4,9 +4,6 @@ import logging
 from parsing.loader import read_text_file, extract_transcript_text
 from services.company_info import fetch_company_info
 from nlp.analysis import clean_text, tokenize
-from nlp.keywords import extract_keywords
-from nlp.themes import extract_themes
-from nlp.takeaways import extract_takeaways
 from parsing.sections import (
     extract_transcript_sections,
     extract_qa_exchanges,
@@ -153,47 +150,11 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
         key = (s.speaker_name, s.text[:80])
         span_lookup[key] = s
 
-    # Keywords
-    keyword_results = extract_keywords(raw_text)
-    keywords = [
-        KeywordRecord(term=term, score=score)
-        for term, score in keyword_results
-    ]
-
-    # Topics
-    theme_results = extract_themes(raw_text)
-    topics = [
-        TopicRecord(
-            label=t.label,
-            terms=t.terms,
-            weight=t.weight,
-            rank_order=rank,
-        )
-        for rank, t in enumerate(theme_results, 1)
-    ]
-
-    # Takeaways — link back to span records
-    takeaway_results = extract_takeaways(raw_text)
+    # Keywords and topics are populated by the Haiku NLP synthesis phase (Phase 4 of ingestion).
+    # Initialise as empty lists here; the pipeline will replace them below.
+    keywords: list[KeywordRecord] = []
+    topics: list[TopicRecord] = []
     takeaway_spans: list[SpanRecord] = []
-    for t in takeaway_results:
-        key = (t.speaker, t.text[:80])
-        if key in span_lookup:
-            span = span_lookup[key]
-            span.textrank_score = t.score
-            takeaway_spans.append(span)
-        else:
-            # Takeaway didn't match a span (e.g. sentence-level split);
-            # create a standalone span for it.
-            takeaway_span = SpanRecord(
-                call_id=call.id,
-                speaker_name=t.speaker,
-                section="qa",
-                span_type="turn",
-                sequence_order=-1,
-                text=t.text,
-                textrank_score=t.score,
-            )
-            takeaway_spans.append(takeaway_span)
 
     # Q&A pairs — link exchanges to span IDs
     exchanges = extract_qa_exchanges(qa, prepared_remarks=prepared_remarks)
@@ -239,10 +200,28 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     try:
         from ingestion.pipeline import IngestionPipeline
         pipeline = IngestionPipeline()
-        chunks, synthesis, token_usage = pipeline.process(analysis)
+        chunks, synthesis, token_usage, nlp_synthesis = pipeline.process(analysis)
         analysis.chunks = chunks
         analysis.synthesis = synthesis
         analysis.token_usage = token_usage
+
+        if nlp_synthesis:
+            raw_keywords = nlp_synthesis.get("keywords", [])
+            analysis.keywords = [
+                KeywordRecord(term=k["term"], score=len(raw_keywords) - i)
+                for i, k in enumerate(raw_keywords)
+                if k.get("term")
+            ]
+            analysis.topics = [
+                TopicRecord(
+                    label=i,
+                    name=t.get("name", ""),
+                    terms=t.get("terms", []),
+                    weight=1.0,
+                    rank_order=i + 1,
+                )
+                for i, t in enumerate(nlp_synthesis.get("themes", []))
+            ]
     except Exception as e:
         print(f"❌ Agentic pipeline failed: {e}")
         logger.warning(f"Agentic pipeline failed or skipped: {e}")

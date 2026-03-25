@@ -147,8 +147,15 @@ try:
             cur.execute(
                 "INSERT INTO schema_version (version) VALUES (8) ON CONFLICT DO NOTHING;"
             )
+            # v8 → v9: add topic_name column to call_topics for Haiku NLP synthesis
+            cur.execute(
+                "ALTER TABLE call_topics ADD COLUMN IF NOT EXISTS topic_name TEXT DEFAULT '';"
+            )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (9) ON CONFLICT DO NOTHING;"
+            )
 
         conn.commit()
-    print("Migration successful — schema is at version 8.")
+    print("Migration successful — schema is at version 9.")
 except Exception as e:
     print(f"Error during migration: {e}")

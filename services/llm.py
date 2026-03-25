@@ -12,7 +12,7 @@ from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_i
 _CITATION_PATTERN = re.compile(r'\[(?:\d+|[a-z_]+)\]')
 
 import anthropic
-from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT
+from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT, HAIKU_NLP_SYNTHESIS_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -172,14 +172,21 @@ class AgenticExtractor:
         """Parse an Anthropic message response into a result dict with usage stats."""
         content = message.content[0].text.strip()
         if content.startswith("```json"):
-            content = content[7:-3].strip()
+            end = content.rfind("```", 7)
+            content = (content[7:end] if end != -1 else content[7:]).strip()
         elif content.startswith("```"):
-            content = content[3:-3].strip()
+            end = content.rfind("```", 3)
+            content = (content[3:end] if end != -1 else content[3:]).strip()
         try:
             result = json.loads(content)
-        except json.JSONDecodeError as e:
-            logger.error("Failed to parse LLM JSON response: %s. Content: %.200s", e, content)
-            raise ValueError(f"LLM returned malformed JSON: {e}") from e
+        except json.JSONDecodeError:
+            # Fall back to raw_decode: parses the first valid JSON object and
+            # ignores any trailing text/prose the model appended after closing brace.
+            try:
+                result, _ = json.JSONDecoder().raw_decode(content)
+            except json.JSONDecodeError as e:
+                logger.error("Failed to parse LLM JSON response: %s. Content: %.200s", e, content)
+                raise ValueError(f"LLM returned malformed JSON: {e}") from e
         result["_usage_stats"] = {
             "model": message.model,
             "prompt_tokens": message.usage.input_tokens,
@@ -218,7 +225,7 @@ class AgenticExtractor:
         self.rate_limiter.wait()
         message = self.client.messages.create(
             model=self.tier2_model,
-            max_tokens=4096,
+            max_tokens=8192,
             system=TIER_2_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
@@ -241,6 +248,24 @@ class AgenticExtractor:
             messages=[{"role": "user", "content": user_prompt}]
         )
         return self._parse_response(message)
+    @retry(
+        wait=wait_exponential_jitter(initial=2, max=60),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception(_should_retry_error),
+        reraise=True
+    )
+    def extract_nlp_synthesis(self, signals_payload: str) -> Dict[str, Any]:
+        """Run Phase 4 NLP synthesis: produce keywords, themes, and top takeaways via Haiku."""
+        user_prompt = f"### Aggregated Signals from Map Phase:\n{signals_payload}\n\nProduce the NLP synthesis JSON."
+        self.rate_limiter.wait()
+        message = self.client.messages.create(
+            model=self.tier3_model,
+            max_tokens=4096,
+            system=HAIKU_NLP_SYNTHESIS_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+        return self._parse_response(message)
+
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),

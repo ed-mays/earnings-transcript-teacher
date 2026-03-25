@@ -149,6 +149,7 @@ class TopicRecord:
     terms: list[str]
     weight: float
     rank_order: int
+    name: str = ""
 
 
 # ---------------------------------------------------------------------------
