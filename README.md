@@ -223,6 +223,9 @@ earnings-transcript-teacher/
 | `VOYAGE_API_KEY` | Required for the `/search` endpoint; the other endpoints work without it |
 
 ```bash
+# Source env vars first — the API refuses to start without them
+source set_env.sh   # or: . .\set_env.ps1 on Windows
+
 # FastAPI backend — PYTHONPATH must include the project root so api/routes can
 # import from db/, nlp/, etc.
 cd api && PYTHONPATH=.. uvicorn main:app --reload
