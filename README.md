@@ -213,9 +213,19 @@ earnings-transcript-teacher/
 
 ### Local development (new stack)
 
+**Required environment variables for the FastAPI backend** (add to `set_env.sh` / `set_env.ps1`):
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string (e.g. `postgresql://localhost/earnings_teacher`) |
+| `SUPABASE_JWT_SECRET` | JWT secret from Supabase → Project Settings → API |
+| `ADMIN_SECRET_TOKEN` | Arbitrary secret for admin-only routes — set to any strong random string |
+| `VOYAGE_API_KEY` | Required for the `/search` endpoint; the other endpoints work without it |
+
 ```bash
-# FastAPI backend
-cd api && uvicorn main:app --reload
+# FastAPI backend — PYTHONPATH must include the project root so api/routes can
+# import from db/, nlp/, etc.
+cd api && PYTHONPATH=.. uvicorn main:app --reload
 
 # Next.js frontend
 cd web && npm run dev
@@ -224,14 +234,48 @@ cd web && npm run dev
 modal run pipeline/ingest.py --ticker AAPL
 ```
 
+**Verify the API is running:**
+
+```bash
+curl http://localhost:8000/health
+# → {"status":"ok"}
+```
+
+**Smoke-test the /api/calls endpoints** (requires at least one ingested transcript):
+
+```bash
+# List all calls
+curl http://localhost:8000/api/calls
+
+# Full detail for a ticker
+curl http://localhost:8000/api/calls/AAPL
+
+# Paginated transcript turns (prepared remarks only)
+curl "http://localhost:8000/api/calls/AAPL/spans?section=prepared&page=1&page_size=10"
+
+# Semantic search (requires VOYAGE_API_KEY)
+curl "http://localhost:8000/api/calls/AAPL/search?q=AI+infrastructure+spending"
+```
+
+**Run the API unit tests:**
+
+```bash
+pytest tests/unit/api/ -v
+```
+
 ---
 
 ## Environment variable reference
 
-| Variable | Required | Description |
+| Variable | Used by | Description |
 |---|---|---|
-| `API_NINJAS_KEY` | Yes | API key for fetching raw transcripts ([api-ninjas.com](https://api-ninjas.com)) |
-| `VOYAGE_API_KEY` | Yes | Voyage AI key for semantic embeddings ([voyageai.com](https://www.voyageai.com)) |
-| `PERPLEXITY_API_KEY` | Yes | Perplexity key for Feynman learning chat ([perplexity.ai](https://www.perplexity.ai)) |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
-| `DATABASE_URL` | No | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
+| `API_NINJAS_KEY` | Legacy pipeline | API key for fetching raw transcripts ([api-ninjas.com](https://api-ninjas.com)) |
+| `VOYAGE_API_KEY` | Legacy pipeline, FastAPI `/search` | Voyage AI key for semantic embeddings ([voyageai.com](https://www.voyageai.com)) |
+| `PERPLEXITY_API_KEY` | Legacy pipeline | Perplexity key for Feynman learning chat ([perplexity.ai](https://www.perplexity.ai)) |
+| `ANTHROPIC_API_KEY` | Legacy pipeline | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
+| `DATABASE_URL` | Legacy pipeline, FastAPI | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
+| `SUPABASE_JWT_SECRET` | FastAPI | JWT secret — Supabase → Project Settings → API |
+| `ADMIN_SECRET_TOKEN` | FastAPI | Secret for admin-only routes — any strong random string |
+| `NEXT_PUBLIC_SUPABASE_URL` | Next.js frontend | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Next.js frontend | Supabase anon key |
+| `NEXT_PUBLIC_VERCEL_URL` | FastAPI CORS | Set automatically by Vercel; omit in local dev |
