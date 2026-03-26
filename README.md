@@ -177,12 +177,23 @@ If the database schema has changed or the database is in an inconsistent state, 
 
 ```
 earnings-transcript-teacher/
-├── main.py             # Console UI entry point
-├── app.py              # Web UI entry point (Streamlit)
+├── api/                # FastAPI backend (new)
+│   ├── main.py          # FastAPI app entry point
+│   ├── routes/          # Route modules
+│   ├── Dockerfile
+│   └── requirements.txt
+├── web/                # Next.js frontend (new)
+│   └── ...
+├── pipeline/           # Modal ingestion functions (new)
+│   ├── ingest.py
+│   └── requirements.txt
+│
+├── main.py             # Console UI entry point (legacy)
+├── app.py              # Web UI entry point — Streamlit (legacy)
 ├── migrate.py          # Schema migration script — run after upgrades
 ├── setup.sh            # One-time setup script (macOS/Linux)
 ├── setup.ps1           # One-time setup script (Windows)
-├── requirements.txt    # Python dependencies
+├── requirements.txt    # Python dependencies (legacy pipeline)
 │
 ├── core/               # Shared data models (CallAnalysis, TranscriptChunk, SpanRecord, etc.)
 ├── parsing/            # Transcript loading, section extraction, financial term scanner
@@ -198,6 +209,19 @@ earnings-transcript-teacher/
 ├── utils/              # Shared utilities
 ├── prompts/feynman/    # Pedagogical prompt files for the Feynman learning loop
 └── tests/              # pytest test suite (unit + integration)
+```
+
+### Local development (new stack)
+
+```bash
+# FastAPI backend
+cd api && uvicorn main:app --reload
+
+# Next.js frontend
+cd web && npm run dev
+
+# Modal ingestion pipeline (test run)
+modal run pipeline/ingest.py --ticker AAPL
 ```
 
 ---
