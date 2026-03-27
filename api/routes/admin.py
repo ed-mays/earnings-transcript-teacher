@@ -1,13 +1,17 @@
 """Admin routes — protected ingestion dispatch."""
 
+import asyncio
 import logging
+import os
 import re
 from datetime import UTC, datetime
 
+import httpx
 import modal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 
+from db.repositories import SchemaRepository
 from dependencies import AdminDep
 
 logger = logging.getLogger(__name__)
@@ -28,6 +32,47 @@ class IngestRequest(BaseModel):
         if not _TICKER_RE.match(upper):
             raise ValueError("ticker must be 2–5 alphabetic characters")
         return upper
+
+
+_HEALTH_ENV_VARS = ["VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID", "SUPABASE_JWT_SECRET"]
+_VOYAGE_URL = "https://api.voyageai.com"
+_PERPLEXITY_URL = "https://api.perplexity.ai"
+
+
+@router.get("/health")
+async def system_health(_: AdminDep) -> dict:
+    """Return system health: DB connection, env var presence, and external API reachability."""
+    db_url = os.environ.get("DATABASE_URL", "")
+    repo = SchemaRepository(db_url)
+    version: int = await asyncio.to_thread(repo.get_current_version)
+
+    env_vars = {key: bool(os.environ.get(key)) for key in _HEALTH_ENV_VARS}
+
+    voyage_reachable = False
+    perplexity_reachable = False
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            await client.head(_VOYAGE_URL)
+            voyage_reachable = True
+        except Exception:
+            pass
+        try:
+            await client.head(_PERPLEXITY_URL)
+            perplexity_reachable = True
+        except Exception:
+            pass
+
+    return {
+        "db": {
+            "connected": version > 0,
+            "schema_version": version,
+        },
+        "env_vars": env_vars,
+        "external_apis": {
+            "voyage": {"reachable": voyage_reachable},
+            "perplexity": {"reachable": perplexity_reachable},
+        },
+    }
 
 
 @router.post("/ingest", status_code=202)

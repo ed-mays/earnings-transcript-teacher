@@ -2,7 +2,7 @@
 
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -133,3 +133,133 @@ def test_ingest_looks_up_correct_modal_function(client):
     )
 
     MODAL_STUB.Function.lookup.assert_called_with("earnings-ingestion", "ingest_ticker")
+
+
+# ---------------------------------------------------------------------------
+# GET /admin/health
+# ---------------------------------------------------------------------------
+
+def _make_healthy_httpx_mock():
+    """Return a mock httpx module with AsyncClient that succeeds on HEAD."""
+    mock_response = MagicMock(status_code=200)
+    mock_http_client = AsyncMock()
+    mock_http_client.head = AsyncMock(return_value=mock_response)
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=mock_http_client)
+    mock_cm.__aexit__ = AsyncMock(return_value=False)
+    mock_httpx = MagicMock()
+    mock_httpx.AsyncClient.return_value = mock_cm
+    return mock_httpx
+
+
+def _make_schema_repo_mock(version: int = 9):
+    """Return a patched SchemaRepository class whose instance returns `version`."""
+    mock_repo = MagicMock()
+    mock_repo.get_current_version.return_value = version
+    mock_cls = MagicMock(return_value=mock_repo)
+    return mock_cls
+
+
+def test_health_returns_200_with_valid_token(client):
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
+         patch("routes.admin.httpx", _make_healthy_httpx_mock()):
+        resp = client.get(
+            "/admin/health",
+            headers={"X-Admin-Token": "test-admin-token"},
+        )
+    assert resp.status_code == 200
+
+
+def test_health_missing_token_returns_403(client):
+    resp = client.get("/admin/health")
+    assert resp.status_code == 403
+
+
+def test_health_wrong_token_returns_403(client):
+    resp = client.get(
+        "/admin/health",
+        headers={"X-Admin-Token": "wrong"},
+    )
+    assert resp.status_code == 403
+
+
+def test_health_response_has_expected_keys(client):
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
+         patch("routes.admin.httpx", _make_healthy_httpx_mock()):
+        resp = client.get(
+            "/admin/health",
+            headers={"X-Admin-Token": "test-admin-token"},
+        )
+    body = resp.json()
+    assert "db" in body
+    assert "env_vars" in body
+    assert "external_apis" in body
+    assert "connected" in body["db"]
+    assert "schema_version" in body["db"]
+    assert {"VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID", "SUPABASE_JWT_SECRET"} == set(
+        body["env_vars"].keys()
+    )
+    assert "voyage" in body["external_apis"]
+    assert "perplexity" in body["external_apis"]
+
+
+def test_health_db_connected_when_version_nonzero(client):
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(version=9)), \
+         patch("routes.admin.httpx", _make_healthy_httpx_mock()):
+        resp = client.get(
+            "/admin/health",
+            headers={"X-Admin-Token": "test-admin-token"},
+        )
+    body = resp.json()
+    assert body["db"]["connected"] is True
+    assert body["db"]["schema_version"] == 9
+
+
+def test_health_db_disconnected_when_version_zero(client):
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(version=0)), \
+         patch("routes.admin.httpx", _make_healthy_httpx_mock()):
+        resp = client.get(
+            "/admin/health",
+            headers={"X-Admin-Token": "test-admin-token"},
+        )
+    body = resp.json()
+    assert body["db"]["connected"] is False
+    assert body["db"]["schema_version"] == 0
+
+
+def test_health_env_vars_present_when_set(client):
+    extra_env = {
+        "VOYAGE_API_KEY": "vk",
+        "PERPLEXITY_API_KEY": "pk",
+        "MODAL_TOKEN_ID": "mk",
+        "SUPABASE_JWT_SECRET": "sk",
+    }
+    with patch.dict(os.environ, extra_env), \
+         patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
+         patch("routes.admin.httpx", _make_healthy_httpx_mock()):
+        resp = client.get(
+            "/admin/health",
+            headers={"X-Admin-Token": "test-admin-token"},
+        )
+    body = resp.json()
+    assert all(body["env_vars"].values())
+
+
+def test_health_external_apis_unreachable_on_exception(client):
+    mock_http_client = AsyncMock()
+    mock_http_client.head = AsyncMock(side_effect=Exception("connection refused"))
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=mock_http_client)
+    mock_cm.__aexit__ = AsyncMock(return_value=False)
+    mock_httpx = MagicMock()
+    mock_httpx.AsyncClient.return_value = mock_cm
+
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
+         patch("routes.admin.httpx", mock_httpx):
+        resp = client.get(
+            "/admin/health",
+            headers={"X-Admin-Token": "test-admin-token"},
+        )
+    body = resp.json()
+    assert body["external_apis"]["voyage"]["reachable"] is False
+    assert body["external_apis"]["perplexity"]["reachable"] is False
