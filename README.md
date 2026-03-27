@@ -250,10 +250,27 @@ cp web/.env.example web/.env.local
 
 The script reads env vars from `api/.env` and `web/.env.local` directly — no need to source them manually.
 
-#### Modal ingestion pipeline (test run)
+#### Modal ingestion pipeline
+
+**One-time setup:**
+
+1. Authenticate: `modal setup` (opens browser)
+2. Create a custom secret named `earnings-secrets` in the [Modal dashboard](https://modal.com/secrets) with these keys:
+   - `DATABASE_URL`
+   - `API_NINJAS_KEY`
+   - `VOYAGE_API_KEY`
+   - `ANTHROPIC_API_KEY`
+
+**Test run** (executes in Modal cloud, streams logs locally):
 
 ```bash
 modal run pipeline/ingest.py --ticker AAPL
+```
+
+**Deploy** (required before the FastAPI admin endpoint can dispatch jobs):
+
+```bash
+modal deploy pipeline/ingest.py
 ```
 
 #### Verify the API is running
@@ -298,11 +315,11 @@ pytest tests/unit/api/ -v
 
 | Variable | Used by | Description |
 |---|---|---|
-| `API_NINJAS_KEY` | Legacy pipeline | API key for fetching raw transcripts ([api-ninjas.com](https://api-ninjas.com)) |
-| `VOYAGE_API_KEY` | Legacy pipeline, FastAPI `/search` | Voyage AI key for semantic embeddings ([voyageai.com](https://www.voyageai.com)) |
+| `API_NINJAS_KEY` | Modal pipeline, legacy pipeline | API key for fetching raw transcripts ([api-ninjas.com](https://api-ninjas.com)) |
+| `VOYAGE_API_KEY` | Modal pipeline, legacy pipeline, FastAPI `/search` | Voyage AI key for semantic embeddings ([voyageai.com](https://www.voyageai.com)) |
 | `PERPLEXITY_API_KEY` | Legacy pipeline | Perplexity key for Feynman learning chat ([perplexity.ai](https://www.perplexity.ai)) |
-| `ANTHROPIC_API_KEY` | Legacy pipeline | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
-| `DATABASE_URL` | Legacy pipeline, FastAPI | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
+| `ANTHROPIC_API_KEY` | Modal pipeline, legacy pipeline | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
+| `DATABASE_URL` | Modal pipeline, legacy pipeline, FastAPI | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
 | `SUPABASE_JWT_SECRET` | FastAPI | JWT secret — Supabase → Project Settings → API |
 | `ADMIN_SECRET_TOKEN` | FastAPI | Secret for admin-only routes — any strong random string |
 | `NEXT_PUBLIC_SUPABASE_URL` | Next.js frontend | Supabase project URL |
