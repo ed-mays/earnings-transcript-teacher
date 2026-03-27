@@ -1,0 +1,12 @@
+.venv/
+web/node_modules/
+web/.next/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.git/
+.github/
+transcripts/
+coverage.xml
+.coverage
