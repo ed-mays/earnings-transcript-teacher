@@ -213,38 +213,56 @@ earnings-transcript-teacher/
 
 ### Local development (new stack)
 
-**Required environment variables for the FastAPI backend** (add to `set_env.sh` / `set_env.ps1`):
+#### First-time setup
+
+1. Copy the env templates and fill in your values:
+
+```bash
+cp api/.env.example api/.env
+cp web/.env.example web/.env.local
+```
+
+**`api/.env` variables:**
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string (e.g. `postgresql://localhost/earnings_teacher`) |
-| `SUPABASE_JWT_SECRET` | JWT secret from Supabase → Project Settings → API |
-| `ADMIN_SECRET_TOKEN` | Arbitrary secret for admin-only routes — set to any strong random string |
-| `VOYAGE_API_KEY` | Required for the `/search` endpoint; the other endpoints work without it |
+| `DATABASE_URL` | Supabase connection string (Supabase → Project Settings → Database → URI) |
+| `SUPABASE_JWT_SECRET` | JWT secret (Supabase → Project Settings → API) |
+| `ADMIN_SECRET_TOKEN` | Any strong random string — protects admin-only routes |
+| `VOYAGE_API_KEY` | Required for the `/search` endpoint; other endpoints work without it |
+| `PERPLEXITY_API_KEY` | Required for the Feynman chat endpoint |
+
+**`web/.env.local` variables:**
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+
+#### Starting the dev servers
 
 ```bash
-# Source env vars first — the API refuses to start without them
-source set_env.sh   # or: . .\set_env.ps1 on Windows
+./dev.sh          # start API + Next.js together (Ctrl-C stops both)
+./dev.sh api      # API only (http://localhost:8000)
+./dev.sh web      # Next.js only (http://localhost:3000)
+```
 
-# FastAPI backend — PYTHONPATH must include the project root so api/routes can
-# import from db/, nlp/, etc.
-cd api && PYTHONPATH=.. uvicorn main:app --reload
+The script reads env vars from `api/.env` and `web/.env.local` directly — no need to source them manually.
 
-# Next.js frontend
-cd web && npm run dev
+#### Modal ingestion pipeline (test run)
 
-# Modal ingestion pipeline (test run)
+```bash
 modal run pipeline/ingest.py --ticker AAPL
 ```
 
-**Verify the API is running:**
+#### Verify the API is running
 
 ```bash
 curl http://localhost:8000/health
 # → {"status":"ok"}
 ```
 
-**Smoke-test the /api/calls endpoints** (requires at least one ingested transcript):
+#### Smoke-test the /api/calls endpoints (requires at least one ingested transcript)
 
 ```bash
 # List all calls
@@ -258,9 +276,16 @@ curl "http://localhost:8000/api/calls/AAPL/spans?section=prepared&page=1&page_si
 
 # Semantic search (requires VOYAGE_API_KEY)
 curl "http://localhost:8000/api/calls/AAPL/search?q=AI+infrastructure+spending"
+
+# Trigger ingestion (requires Modal deployed + ADMIN_SECRET_TOKEN)
+curl -X POST http://localhost:8000/admin/ingest \
+  -H "X-Admin-Token: $ADMIN_SECRET_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL"}'
+# → {"status":"accepted","ticker":"AAPL","message":"Ingestion dispatched"}
 ```
 
-**Run the API unit tests:**
+#### Run the API unit tests
 
 ```bash
 pytest tests/unit/api/ -v

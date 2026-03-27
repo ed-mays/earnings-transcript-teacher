@@ -6,3 +6,4 @@ PyJWT>=2.8.0
 python-multipart>=0.0.9
 voyageai>=0.3.0
 pgvector>=0.3.0
+modal>=0.73.0
