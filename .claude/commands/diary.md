@@ -57,17 +57,25 @@ Create or update today's diary entry.
    # YYYY-MM-DD
 
    ## Completed
-   - **#NNN** title — N days (Mon DD → Mon DD)
+   - [**#NNN**](https://github.com/ed-mays/earnings-transcript-teacher/pull/NNN) title — N days (Mon DD → Mon DD)
+
+   ## Details
+   <!-- Outcome-focused summary of the day's work. Focus on what the system can now do, and why this work happened. No metrics (no LOC, file counts, or test counts). -->
 
    ## In Progress
-   - **#NNN** title — N days open
+   - [**#NNN**](https://github.com/ed-mays/earnings-transcript-teacher/pull/NNN) title — N days open
 
    ## Observations
    <!-- added below -->
    ```
 
-   If no PRs were merged today, write `- none` under Completed.
+   If no PRs were merged today, write `- none` under Completed and omit the Details section.
    If no open PRs, write `- none` under In Progress.
+
+   **Details section guidance:** Fetch each merged PR's body (`gh pr view NNN --json body`) to read the full description. Synthesise into 2–4 sentences that answer:
+   - What can the user or system now do that it couldn't before?
+   - Why was this work done today — what strategic goal or problem does it serve?
+   Focus on outcomes, not implementation. Omit all metrics (LOC, file counts, test counts, number of endpoints). PR references within the Details prose should be hyperlinks: `[#NNN](https://github.com/ed-mays/earnings-transcript-teacher/pull/NNN)`.
 
 6. **Ask the user for observations:**
    > "Any observations to record for today? (press Enter to skip)"
@@ -129,8 +137,9 @@ Generate retrospective bullet-summary entries for all merged PRs, grouped by mer
 2. **Group PRs by merge date** (`mergedAt` date, `YYYY-MM-DD`).
 
 3. **For each date, generate an entry** using the Daily Entry template:
-   - Completed: PRs merged on that date with implementation time
-   - In Progress: PRs that were open (created before, not yet merged) on that date — omit this section for historical entries to keep it simple
+   - Completed: PRs merged on that date with implementation time (hyperlinked PR numbers)
+   - Details: fetch each PR's body (`gh pr view NNN --json body,title`) and synthesise an outcome-focused summary — what the system could now do and why the work happened. No metrics. PR references as hyperlinks.
+   - In Progress: omit this section for historical entries to keep them simple
    - Observations: leave the section present but empty (HTML comment only)
 
 4. **Check for existing files** — skip dates that already have a diary file (do not overwrite).
