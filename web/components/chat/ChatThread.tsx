@@ -6,10 +6,13 @@ import type { ChatMessage } from "@/lib/chat";
 interface ChatThreadProps {
   messages: ChatMessage[];
   streamingContent: string;
+  suggestions?: string[];
+  loadingSuggestions?: boolean;
+  onSuggestionClick?: (suggestion: string) => void;
 }
 
 /** Renders the full conversation history plus any in-progress streamed assistant response. */
-export function ChatThread({ messages, streamingContent }: ChatThreadProps) {
+export function ChatThread({ messages, streamingContent, suggestions, loadingSuggestions, onSuggestionClick }: ChatThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,8 +21,29 @@ export function ChatThread({ messages, streamingContent }: ChatThreadProps) {
 
   if (messages.length === 0 && !streamingContent) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
-        Ask a question about this earnings call to get started.
+      <div className="flex flex-1 flex-col items-center justify-center gap-6">
+        <p className="text-sm text-zinc-400">
+          Ask a question about this earnings call to get started.
+        </p>
+        {loadingSuggestions ? (
+          <div className="flex flex-wrap justify-center gap-2">
+            <div className="animate-pulse rounded-full bg-zinc-100 px-4 py-2 text-sm text-zinc-400">
+              Loading suggested starter questions…
+            </div>
+          </div>
+        ) : suggestions && suggestions.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-2">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => onSuggestionClick?.(suggestion)}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     );
   }

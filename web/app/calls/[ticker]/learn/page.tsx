@@ -1,11 +1,14 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { streamChat } from "@/lib/chat";
+import { api } from "@/lib/api";
+import { buildSuggestions } from "@/lib/suggestions";
 import type { ChatMessage } from "@/lib/chat";
+import type { CallDetail } from "@/components/transcript/types";
 
 /** Feynman-style learning chat for a given ticker's transcript. */
 export default function LearnPage({
@@ -21,6 +24,18 @@ export default function LearnPage({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<CallDetail>(`/api/calls/${ticker}`)
+      .then((detail) => setSuggestions(buildSuggestions(detail.themes, detail.keywords)))
+      .catch(() => {
+        // Silent degradation — suggestions are a progressive enhancement
+      })
+      .finally(() => setLoadingSuggestions(false));
+  }, [ticker]);
 
   async function handleSend(message: string) {
     setError(null);
@@ -94,7 +109,13 @@ export default function LearnPage({
       )}
 
       {/* Chat thread */}
-      <ChatThread messages={messages} streamingContent={streamingContent} />
+      <ChatThread
+        messages={messages}
+        streamingContent={streamingContent}
+        suggestions={suggestions}
+        loadingSuggestions={loadingSuggestions}
+        onSuggestionClick={handleSend}
+      />
 
       {/* Input */}
       <div className="mt-4">
