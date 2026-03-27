@@ -219,7 +219,7 @@ earnings-transcript-teacher/
 
 ```bash
 cp api/.env.example api/.env
-cp web/.env.example web/.env.local
+cp web/env.example web/.env.local
 ```
 
 **`api/.env` variables:**
@@ -311,6 +311,29 @@ pytest tests/unit/api/ -v
 
 ---
 
+## Deployment
+
+### Railway (FastAPI API)
+
+1. railway.app → **New Project** → **Deploy from GitHub repo** → select this repo
+2. Service → **Variables** — add the env vars from the table below (API column)
+3. Saving variables auto-triggers a redeploy; verify at `https://<railway-domain>/health`
+4. Copy the Railway public domain — you'll need it for the Vercel `NEXT_PUBLIC_API_URL` var
+
+> **DATABASE_URL**: use the Supabase **Transaction pooler** URL (port 6543), not the direct connection (port 5432). The direct connection has DNS reliability issues on newer Supabase projects.
+
+### Vercel (Next.js frontend)
+
+1. vercel.com → **Add New → Project** → import this repo
+2. Set **Root Directory** to `web`
+3. Add env vars (Frontend column below) under **Environment Variables → Production**
+4. After deploy, copy the Vercel production domain
+5. Back in Railway → Variables → set `NEXT_PUBLIC_VERCEL_URL` to the Vercel domain (without `https://`)
+
+Vercel automatically creates preview deployments for every PR. To allow a preview URL through Railway's CORS, add it to `CORS_EXTRA_ORIGINS` (comma-separated) in the Railway staging environment.
+
+---
+
 ## Environment variable reference
 
 | Variable | Used by | Description |
@@ -321,7 +344,9 @@ pytest tests/unit/api/ -v
 | `ANTHROPIC_API_KEY` | Modal pipeline, legacy pipeline | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
 | `DATABASE_URL` | Modal pipeline, legacy pipeline, FastAPI | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
 | `SUPABASE_JWT_SECRET` | FastAPI | JWT secret — Supabase → Project Settings → API |
-| `ADMIN_SECRET_TOKEN` | FastAPI | Secret for admin-only routes — any strong random string |
+| `ADMIN_SECRET_TOKEN` | FastAPI | Secret for admin-only routes — generate with `openssl rand -hex 32` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Next.js frontend | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Next.js frontend | Supabase anon key |
-| `NEXT_PUBLIC_VERCEL_URL` | FastAPI CORS | Set automatically by Vercel; omit in local dev |
+| `NEXT_PUBLIC_API_URL` | Next.js frontend | FastAPI base URL (Railway domain in production, `http://localhost:8000` locally) |
+| `NEXT_PUBLIC_VERCEL_URL` | FastAPI CORS | Vercel production domain (without `https://`) — set in Railway production |
+| `CORS_EXTRA_ORIGINS` | FastAPI CORS | Optional comma-separated extra allowed origins (e.g. Vercel preview URLs in staging) |

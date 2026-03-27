@@ -28,6 +28,9 @@ def build_cors_origins() -> list[str]:
     production_url = os.environ.get("NEXT_PUBLIC_VERCEL_URL")
     if production_url:
         origins.append(f"https://{production_url}")
+    extra = os.environ.get("CORS_EXTRA_ORIGINS", "")
+    if extra:
+        origins.extend(o.strip() for o in extra.split(",") if o.strip())
     return origins
 
 
