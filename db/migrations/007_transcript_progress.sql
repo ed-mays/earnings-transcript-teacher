@@ -9,4 +9,4 @@ CREATE TABLE IF NOT EXISTS transcript_progress (
 
 CREATE INDEX IF NOT EXISTS idx_transcript_progress_call ON transcript_progress(call_id);
 
-INSERT INTO schema_version (version) VALUES (8) ON CONFLICT DO NOTHING;
+INSERT INTO schema_version (version) VALUES (7) ON CONFLICT DO NOTHING;

@@ -156,7 +156,7 @@ When upgrading from an older version, apply any schema changes before starting t
 ```bash
 python3 migrate.py
 ```
-This is idempotent — safe to run multiple times. The web UI (`app.py`) now only checks that the schema is current; it no longer auto-migrates on startup. The script currently migrates up to **schema version 10**.
+This is idempotent — safe to run multiple times. The web UI (`app.py`) now only checks that the schema is current; it no longer auto-migrates on startup. Migration files live in `db/migrations/` as `NNN_name.sql`; add a new file there to introduce future schema changes.
 
 ### Clearing data
 To delete all stored analysis while keeping the database schema intact:
