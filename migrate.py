@@ -154,8 +154,18 @@ try:
             cur.execute(
                 "INSERT INTO schema_version (version) VALUES (9) ON CONFLICT DO NOTHING;"
             )
+            # v9 → v10: add user_id to learning_sessions for per-user session scoping
+            cur.execute(
+                "ALTER TABLE learning_sessions ADD COLUMN IF NOT EXISTS user_id UUID;"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_sessions_user ON learning_sessions (user_id);"
+            )
+            cur.execute(
+                "INSERT INTO schema_version (version) VALUES (10) ON CONFLICT DO NOTHING;"
+            )
 
         conn.commit()
-    print("Migration successful — schema is at version 9.")
+    print("Migration successful — schema is at version 10.")
 except Exception as e:
     print(f"Error during migration: {e}")

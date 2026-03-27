@@ -156,7 +156,7 @@ When upgrading from an older version, apply any schema changes before starting t
 ```bash
 python3 migrate.py
 ```
-This is idempotent — safe to run multiple times. The web UI (`app.py`) now only checks that the schema is current; it no longer auto-migrates on startup.
+This is idempotent — safe to run multiple times. The web UI (`app.py`) now only checks that the schema is current; it no longer auto-migrates on startup. The script currently migrates up to **schema version 10**.
 
 ### Clearing data
 To delete all stored analysis while keeping the database schema intact:
@@ -236,8 +236,9 @@ cp web/.env.example web/.env.local
 
 | Variable | Description |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (Supabase → Project Settings → API) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (same page) |
+| `NEXT_PUBLIC_API_URL` | FastAPI base URL — use `http://localhost:8000` for local dev |
 
 #### Starting the dev servers
 
