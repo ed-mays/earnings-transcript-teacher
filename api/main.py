@@ -34,11 +34,17 @@ def build_cors_origins() -> list[str]:
     return origins
 
 
+def build_cors_origin_regex() -> str | None:
+    """Return a regex matching allowed origin patterns from CORS_ORIGIN_REGEX env var."""
+    return os.environ.get("CORS_ORIGIN_REGEX") or None
+
+
 app = FastAPI(title="EarningsFluency API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=build_cors_origins(),
+    allow_origin_regex=build_cors_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
