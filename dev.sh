@@ -39,7 +39,7 @@ start_api() {
 }
 
 start_web() {
-    check_env_file "$WEB_ENV" "web/.env.example" "Web"
+    check_env_file "$WEB_ENV" "web/env.example" "Web"
     echo "→ Starting Next.js (http://localhost:3000)"
     cd "$REPO_ROOT/web"
     npm run dev
