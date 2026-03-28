@@ -8,9 +8,11 @@ from datetime import UTC, datetime
 
 import httpx
 import modal
+import psycopg
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 
+from db.analytics import track
 from db.repositories import SchemaRepository
 from dependencies import RequireAdminDep
 
@@ -73,6 +75,29 @@ async def system_health(_: RequireAdminDep) -> dict:
             "perplexity": {"reachable": perplexity_reachable},
         },
     }
+
+
+def _db_url() -> str:
+    """Return the database connection URL from environment."""
+    return os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+
+
+@router.get("/analytics/sessions")
+def analytics_sessions(_: RequireAdminDep) -> list[dict]:
+    """Return daily session_start counts for the last 30 days."""
+    with psycopg.connect(_db_url()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DATE(created_at) AS date, COUNT(*) AS count
+                FROM analytics_events
+                WHERE event_name = 'session_start'
+                  AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY date
+                ORDER BY date
+                """
+            )
+            return [{"date": str(row[0]), "count": row[1]} for row in cur.fetchall()]
 
 
 @router.post("/ingest", status_code=202)

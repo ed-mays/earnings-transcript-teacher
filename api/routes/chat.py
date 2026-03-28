@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from db.analytics import track
 from dependencies import CurrentUserDep
 
 router = APIRouter(prefix="/api/calls", tags=["chat"])
@@ -187,6 +188,7 @@ def chat(
         topic = body.message
         stage = max(1, min(body.stage, 5))
         history = []
+        track("session_start", session_id=session_id, properties={"ticker": ticker, "stage": stage})
 
     system_prompt = _load_prompt(stage)
     messages = history + [{"role": "user", "content": body.message}]

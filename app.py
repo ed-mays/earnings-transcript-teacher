@@ -3,6 +3,7 @@ import os
 
 import streamlit as st
 
+from db.analytics import track
 from db.repositories import LearningRepository, SchemaRepository
 from ui.data_loaders import load_analyst_view, load_call_summary, load_metadata, load_qa_evasion, load_speaker_dynamics, load_speakers, load_step_progress, load_strategic_shifts, load_transcript_spans
 from ui.feynman import render_chat_interface
@@ -49,6 +50,10 @@ if "feynman_synthesis_notes" not in st.session_state:
 
 if "confirm_reset" not in st.session_state:
     st.session_state.confirm_reset = False
+
+if "analytics_tracked_start" not in st.session_state:
+    st.session_state.analytics_tracked_start = True
+    track("session_start", properties={"source": "streamlit"})
 
 if "transcript_search_term" not in st.session_state:
     st.session_state.transcript_search_term = ""
