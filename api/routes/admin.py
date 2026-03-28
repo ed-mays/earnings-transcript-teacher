@@ -100,6 +100,41 @@ def analytics_sessions(_: RequireAdminDep) -> list[dict]:
             return [{"date": str(row[0]), "count": row[1]} for row in cur.fetchall()]
 
 
+@router.get("/analytics/chat")
+def analytics_chat(_: RequireAdminDep) -> dict:
+    """Return daily chat_turn counts and average turns per session for the last 30 days."""
+    with psycopg.connect(_db_url()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DATE(created_at) AS date, COUNT(*) AS turns
+                FROM analytics_events
+                WHERE event_name = 'chat_turn'
+                  AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY date
+                ORDER BY date
+                """
+            )
+            daily = [{"date": str(row[0]), "turns": row[1]} for row in cur.fetchall()]
+
+            cur.execute(
+                """
+                SELECT AVG(turns_per_session)
+                FROM (
+                    SELECT session_id, COUNT(*) AS turns_per_session
+                    FROM analytics_events
+                    WHERE event_name = 'chat_turn'
+                      AND created_at >= NOW() - INTERVAL '30 days'
+                    GROUP BY session_id
+                ) sub
+                """
+            )
+            row = cur.fetchone()
+            avg = round(float(row[0]), 1) if row and row[0] is not None else 0.0
+
+    return {"daily": daily, "avg_turns_per_session": avg}
+
+
 @router.post("/ingest", status_code=202)
 async def trigger_ingestion(body: IngestRequest, _: RequireAdminDep) -> dict:
     """Dispatch ticker to the Modal ingestion pipeline and return 202 immediately."""

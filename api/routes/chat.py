@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 
@@ -119,6 +120,7 @@ def _sse_stream(
     from services.llm import stream_chat
 
     accumulated: list[str] = []
+    start = time.monotonic()
     try:
         for chunk in stream_chat(messages, system_prompt):
             if isinstance(chunk, str):
@@ -129,6 +131,15 @@ def _sse_stream(
         assistant_turn = {"role": "assistant", "content": "".join(accumulated)}
         updated_messages = messages + [assistant_turn]
         _upsert_session(ticker, session_id, user_id, topic, stage, updated_messages, completed=False)
+        track(
+            "chat_turn",
+            session_id=session_id,
+            properties={
+                "turn_number": len(messages),
+                "message_length": len(messages[-1]["content"]),
+                "latency_ms": int((time.monotonic() - start) * 1000),
+            },
+        )
         yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
 
     except Exception as exc:
