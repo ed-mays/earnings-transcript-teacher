@@ -46,6 +46,7 @@ create extension if not exists vector;
 
 From the repo root, using the **Session mode pooler** connection string (port 5432, not 6543):
 
+
 ```bash
 source .venv/bin/activate
 DATABASE_URL="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres" \
@@ -53,6 +54,21 @@ DATABASE_URL="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supab
 ```
 
 Migrations are in `db/migrations/` and are applied in order. The `schema_version` table tracks which have run.
+
+### 1.3a Provision the admin user role (one-time manual step)
+
+After running migrations, backfill existing users and promote the first admin. Run in the Supabase SQL Editor:
+
+```sql
+-- Backfill any users who signed up before this migration
+INSERT INTO public.profiles (id, role)
+  SELECT id, 'learner' FROM auth.users ON CONFLICT DO NOTHING;
+
+-- Promote your admin user (find the UUID in Authentication → Users)
+UPDATE public.profiles SET role = 'admin' WHERE id = '<user-uuid>';
+```
+
+All future sign-ups get a learner row automatically via the trigger.
 
 ### 1.4 Configure Google OAuth
 
@@ -115,7 +131,6 @@ Set these in both **production** and **staging** environments (with different va
 |---|---|
 | `DATABASE_URL` | Supabase Session mode pooler connection string (port 5432) |
 | `SUPABASE_JWT_SECRET` | From Supabase → Settings → API → JWT Settings |
-| `ADMIN_SECRET_TOKEN` | Secret token for `POST /admin/ingest` (generate a strong random string) |
 | `NEXT_PUBLIC_VERCEL_URL` | The bare Vercel production domain, e.g. `earningsfluency.vercel.app` — used to build the CORS allow-list |
 | `CORS_ORIGIN_REGEX` | Regex matching allowed Vercel origins, e.g. `https://earningsfluency(-[a-z0-9-]+)?\.vercel\.app` — covers production and all preview deployments |
 | `VOYAGE_API_KEY` | VoyageAI API key (semantic embeddings) |
@@ -151,10 +166,8 @@ In Vercel project → Settings → Environment Variables, add these with the cor
 | `NEXT_PUBLIC_SUPABASE_URL` | Production Supabase URL | Staging Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production anon key | Staging anon key |
 | `NEXT_PUBLIC_API_URL` | Railway production URL | Railway staging URL |
-| `ADMIN_SECRET_TOKEN` | Same value as Railway | Same value as Railway staging |
 
 > **How to scope**: When adding each variable, check only the environment checkboxes that apply (Production / Preview / Development).
-> **`ADMIN_SECRET_TOKEN` on Vercel**: required server-side by the `/admin/health` proxy route handler — it is never exposed to the browser.
 
 ### 3.3 Automatic preview deployments
 
@@ -215,11 +228,11 @@ This builds the Docker image, pushes it to Modal, and registers the `ingest_tick
 
 ### 4.4 Verify
 
-Trigger a test ingestion via the API:
+Trigger a test ingestion via the API (requires an admin user JWT — obtain from the Supabase dashboard under Authentication → Users → select admin user → copy access token, or from a signed-in browser session):
 
 ```bash
 curl -X POST https://[railway-domain]/admin/ingest \
-  -H "X-Admin-Token: [ADMIN_SECRET_TOKEN]" \
+  -H "Authorization: Bearer <admin-user-jwt>" \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL"}'
 # Expected: 202 Accepted
@@ -231,8 +244,8 @@ You can also verify overall system health:
 
 ```bash
 curl https://[railway-domain]/admin/health \
-  -H "X-Admin-Token: [ADMIN_SECRET_TOKEN]"
-# Expected: {"db":{"connected":true,"schema_version":9},"env_vars":{...},"external_apis":{...}}
+  -H "Authorization: Bearer <admin-user-jwt>"
+# Expected: {"db":{"connected":true,"schema_version":10},"env_vars":{...},"external_apis":{...}}
 ```
 
 ---
@@ -246,7 +259,6 @@ Complete reference of all env vars, grouped by where they're set:
 ```
 DATABASE_URL=postgresql://postgres.[ref]:[pw]@aws-0-[region].pooler.supabase.com:5432/postgres
 SUPABASE_JWT_SECRET=
-ADMIN_SECRET_TOKEN=
 NEXT_PUBLIC_VERCEL_URL=
 CORS_ORIGIN_REGEX=
 VOYAGE_API_KEY=
@@ -261,7 +273,6 @@ API_NINJAS_KEY=
 NEXT_PUBLIC_SUPABASE_URL=https://[ref].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_API_URL=http://localhost:8000
-ADMIN_SECRET_TOKEN=
 ```
 
 ### Modal (secrets group `earnings-secrets`)
@@ -282,10 +293,12 @@ If starting from zero:
 - [ ] Create Supabase production project
 - [ ] Enable pgvector extension on production
 - [ ] Run migrations on production (`python migrate.py`)
+- [ ] Backfill profiles table and promote admin user on production (see §1.3a)
 - [ ] Configure Google OAuth on production (redirect URLs)
 - [ ] Create Supabase staging project
 - [ ] Enable pgvector extension on staging
 - [ ] Run migrations on staging
+- [ ] Backfill profiles table and promote admin user on staging (see §1.3a)
 - [ ] Configure Google OAuth on staging (redirect URLs)
 - [ ] Create Railway project from GitHub repo
 - [ ] Set production env vars in Railway

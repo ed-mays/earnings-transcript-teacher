@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 
 from db.repositories import SchemaRepository
-from dependencies import AdminDep
+from dependencies import RequireAdminDep
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ _PERPLEXITY_URL = "https://api.perplexity.ai"
 
 
 @router.get("/health")
-async def system_health(_: AdminDep) -> dict:
+async def system_health(_: RequireAdminDep) -> dict:
     """Return system health: DB connection, env var presence, and external API reachability."""
     db_url = os.environ.get("DATABASE_URL", "")
     repo = SchemaRepository(db_url)
@@ -76,7 +76,7 @@ async def system_health(_: AdminDep) -> dict:
 
 
 @router.post("/ingest", status_code=202)
-async def trigger_ingestion(body: IngestRequest, _: AdminDep) -> dict:
+async def trigger_ingestion(body: IngestRequest, _: RequireAdminDep) -> dict:
     """Dispatch ticker to the Modal ingestion pipeline and return 202 immediately."""
     fn = modal.Function.lookup("earnings-ingestion", "ingest_ticker")
     fn.spawn(body.ticker)
