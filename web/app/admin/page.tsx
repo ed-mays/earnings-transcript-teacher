@@ -35,6 +35,15 @@ interface FeynmanData {
   by_stage: StageCount[];
 }
 
+interface IngestionEntry {
+  ticker: string;
+  requested_at: string;
+}
+
+interface IngestionsData {
+  ingestions: IngestionEntry[];
+}
+
 async function getSession() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -76,6 +85,25 @@ async function fetchFeynman(): Promise<FeynmanData | null> {
     });
     if (!resp.ok) return null;
     return resp.json() as Promise<FeynmanData>;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchIngestions(): Promise<IngestionsData | null> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) return null;
+
+  const session = await getSession();
+  if (!session) return null;
+
+  try {
+    const resp = await fetch(`${apiUrl}/admin/analytics/ingestions`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+    if (!resp.ok) return null;
+    return resp.json() as Promise<IngestionsData>;
   } catch {
     return null;
   }
@@ -131,11 +159,12 @@ function AnalyticsCard({ title, children }: { title: string; children: React.Rea
 }
 
 export default async function AdminAnalyticsPage() {
-  const [sessions, chat, costs, feynman] = await Promise.all([
+  const [sessions, chat, costs, feynman, ingestions] = await Promise.all([
     fetchSessions(),
     fetchChat(),
     fetchCosts(),
     fetchFeynman(),
+    fetchIngestions(),
   ]);
 
   const totalSessions = sessions?.reduce((sum, row) => sum + row.count, 0) ?? 0;
@@ -255,6 +284,32 @@ export default async function AdminAnalyticsPage() {
                   <tr key={row.stage} className="border-b border-zinc-50">
                     <td className="py-1.5 text-zinc-700">Stage {row.stage}</td>
                     <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </AnalyticsCard>
+        <AnalyticsCard title="Ingestion History — most recent 100 requests">
+          {ingestions === null ? (
+            <p className="text-sm text-red-500">Unable to load ingestion data.</p>
+          ) : ingestions.ingestions.length === 0 ? (
+            <p className="text-sm text-zinc-500">No ingestions recorded yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-100">
+                  <th className="py-1.5 text-left font-medium text-zinc-500">Ticker</th>
+                  <th className="py-1.5 text-right font-medium text-zinc-500">Requested At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingestions.ingestions.map((row, i) => (
+                  <tr key={i} className="border-b border-zinc-50">
+                    <td className="py-1.5 font-mono text-zinc-900">{row.ticker}</td>
+                    <td className="py-1.5 text-right text-zinc-700">
+                      {new Date(row.requested_at).toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>

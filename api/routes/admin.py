@@ -180,12 +180,35 @@ def analytics_feynman(_: RequireAdminDep) -> dict:
     return {"by_stage": by_stage}
 
 
+@router.get("/analytics/ingestions")
+def analytics_ingestions(_: RequireAdminDep) -> dict:
+    """Return ingestion_requested events ordered by recency."""
+    with psycopg.connect(_db_url()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT properties->>'ticker', created_at
+                FROM analytics_events
+                WHERE event_name = 'ingestion_requested'
+                ORDER BY created_at DESC
+                LIMIT 100
+                """
+            )
+            ingestions = [
+                {"ticker": row[0], "requested_at": row[1].isoformat()}
+                for row in cur.fetchall()
+                if row[0]
+            ]
+    return {"ingestions": ingestions}
+
+
 @router.post("/ingest", status_code=202)
 async def trigger_ingestion(body: IngestRequest, _: RequireAdminDep) -> dict:
     """Dispatch ticker to the Modal ingestion pipeline and return 202 immediately."""
     fn = modal.Function.lookup("earnings-ingestion", "ingest_ticker")
     fn.spawn(body.ticker)
     logger.info("Ingestion dispatched: ticker=%s at=%s", body.ticker, datetime.now(UTC).isoformat())
+    track("ingestion_requested", properties={"ticker": body.ticker})
     return {
         "status": "accepted",
         "ticker": body.ticker,
