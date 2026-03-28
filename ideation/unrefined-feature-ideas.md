@@ -38,5 +38,14 @@ The app has no feature flag system. We want one for production control, A/B test
 ### BUG-vercel-preview-cors
 Vercel preview URLs don't work — appears to be a CORS issue. The app was updated to dynamically generate allowed origins at deployment/runtime, but that hasn't worked for preview environments. Production is unaffected. Need to investigate root cause and find a fix that makes preview URLs functional.
 
+### FEAT-geopolitical-risk
+Tag companies by how often their transcripts mention specific countries and regions (e.g., "China," "Europe," "Russia," "supply chain"). Overlay with macro risk signals per country — inflation, sanctions exposure, FX volatility — to surface which companies are most exposed to geopolitical risk. No idea on implementation yet, but it's an important consideration in global finance.
+
+### FEAT-macro-overlay
+Augment transcript analysis with macroeconomic indicators (CPI, interest rates, FX) to add real-world context to what management is saying. Example questions this could answer: "Which companies mention inflation most frequently?", "Which sectors show the most rate sensitivity in their guidance?" The macro data would come from an external source; the transcript signals come from the existing pipeline.
+
+### FEAT-sentiment-divergence
+Surface cases where a generic external sentiment score disagrees with the app's domain-aware risk scoring on the same transcript snippet. A "disagreement finder" that highlights calls where generic sentiment reads as bullish but the app's model flags risk — useful as a model validation and research tool.
+
 ### BUG-speaker-attribution
 Speaker attribution in Q&A is sometimes off by one sentence. The operator's closing line ("We'll go ahead and take our first question from X") introduces the next speaker but gets attributed to that speaker instead. In the AAPL transcript, "We'll go ahead and take our first question from Amit Daryanani of Evercore." appears in Amit's speech bubble rather than the operator's. Each speaker's text block needs to be trimmed of any leading sentence that belongs to the prior speaker.
