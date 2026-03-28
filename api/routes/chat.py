@@ -120,13 +120,15 @@ def _sse_stream(
     from services.llm import stream_chat
 
     accumulated: list[str] = []
+    usage: dict | None = None
     start = time.monotonic()
     try:
         for chunk in stream_chat(messages, system_prompt):
             if isinstance(chunk, str):
                 accumulated.append(chunk)
                 yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-            # usage dict is silently skipped — not surfaced to the client
+            elif isinstance(chunk, dict) and "usage" in chunk:
+                usage = chunk
 
         assistant_turn = {"role": "assistant", "content": "".join(accumulated)}
         updated_messages = messages + [assistant_turn]
@@ -140,6 +142,17 @@ def _sse_stream(
                 "latency_ms": int((time.monotonic() - start) * 1000),
             },
         )
+        if usage:
+            track(
+                "api_call_completed",
+                session_id=session_id,
+                properties={
+                    "service": "perplexity",
+                    "operation": "feynman",
+                    "input_tokens": usage["usage"].get("prompt_tokens", 0),
+                    "output_tokens": usage["usage"].get("completion_tokens", 0),
+                },
+            )
         yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
 
     except Exception as exc:

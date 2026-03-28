@@ -5,7 +5,7 @@ import logging
 import requests
 import threading
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_if_exception
 
 # Matches Perplexity inline citation markers: [1], [2], [transcript_context], etc.
@@ -168,6 +168,22 @@ class AgenticExtractor:
         self.tier3_model = "claude-haiku-4-5-20251001"
         self.rate_limiter = RateLimiter(requests_per_minute=rpm_limit, requests_per_second=rps_limit)
 
+    def _track_usage(self, message, operation: str) -> None:
+        """Fire-and-forget analytics event for a completed Claude API call."""
+        try:
+            from db.analytics import track
+            track(
+                "api_call_completed",
+                properties={
+                    "service": "claude",
+                    "operation": operation,
+                    "input_tokens": message.usage.input_tokens,
+                    "output_tokens": message.usage.output_tokens,
+                },
+            )
+        except Exception:
+            pass  # tracking must never block extraction
+
     def _parse_response(self, message) -> Dict[str, Any]:
         """Parse an Anthropic message response into a result dict with usage stats."""
         content = message.content[0].text.strip()
@@ -211,6 +227,7 @@ class AgenticExtractor:
             system=TIER_1_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
+        self._track_usage(message, "tier1")
         return self._parse_response(message)
 
     @retry(
@@ -229,6 +246,7 @@ class AgenticExtractor:
             system=TIER_2_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
+        self._track_usage(message, "tier2")
         return self._parse_response(message)
 
     @retry(
@@ -247,7 +265,9 @@ class AgenticExtractor:
             system=TIER_3_SYNTHESIS_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
+        self._track_usage(message, "tier3")
         return self._parse_response(message)
+
     @retry(
         wait=wait_exponential_jitter(initial=2, max=60),
         stop=stop_after_attempt(5),
@@ -264,6 +284,7 @@ class AgenticExtractor:
             system=HAIKU_NLP_SYNTHESIS_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
+        self._track_usage(message, "nlp_synthesis")
         return self._parse_response(message)
 
     @retry(
@@ -287,4 +308,5 @@ class AgenticExtractor:
             system=QA_DETECTION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
+        self._track_usage(message, "qa_detection")
         return self._parse_response(message)

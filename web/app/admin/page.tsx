@@ -17,6 +17,15 @@ interface ChatData {
   avg_turns_per_session: number;
 }
 
+interface ServiceTokens {
+  input_tokens: number;
+  output_tokens: number;
+}
+
+interface CostsData {
+  by_service: Record<string, ServiceTokens>;
+}
+
 async function getSession() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -39,6 +48,25 @@ async function fetchSessions(): Promise<DailyCount[] | null> {
     });
     if (!resp.ok) return null;
     return resp.json() as Promise<DailyCount[]>;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchCosts(): Promise<CostsData | null> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) return null;
+
+  const session = await getSession();
+  if (!session) return null;
+
+  try {
+    const resp = await fetch(`${apiUrl}/admin/analytics/costs`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+    if (!resp.ok) return null;
+    return resp.json() as Promise<CostsData>;
   } catch {
     return null;
   }
@@ -75,7 +103,7 @@ function AnalyticsCard({ title, children }: { title: string; children: React.Rea
 }
 
 export default async function AdminAnalyticsPage() {
-  const [sessions, chat] = await Promise.all([fetchSessions(), fetchChat()]);
+  const [sessions, chat, costs] = await Promise.all([fetchSessions(), fetchChat(), fetchCosts()]);
 
   const totalSessions = sessions?.reduce((sum, row) => sum + row.count, 0) ?? 0;
   const totalTurns = chat?.daily.reduce((sum, row) => sum + row.turns, 0) ?? 0;
@@ -111,6 +139,37 @@ export default async function AdminAnalyticsPage() {
                   <tr key={row.date} className="border-b border-zinc-50">
                     <td className="py-1.5 text-zinc-700">{row.date}</td>
                     <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </AnalyticsCard>
+
+        <AnalyticsCard title="API Cost — last 30 days (tokens by service)">
+          {costs === null ? (
+            <p className="text-sm text-red-500">Unable to load cost data.</p>
+          ) : Object.keys(costs.by_service).length === 0 ? (
+            <p className="text-sm text-zinc-500">No API calls recorded yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-100">
+                  <th className="py-1.5 text-left font-medium text-zinc-500">Service</th>
+                  <th className="py-1.5 text-right font-medium text-zinc-500">Input</th>
+                  <th className="py-1.5 text-right font-medium text-zinc-500">Output</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(costs.by_service).map(([service, tokens]) => (
+                  <tr key={service} className="border-b border-zinc-50">
+                    <td className="py-1.5 capitalize text-zinc-700">{service}</td>
+                    <td className="py-1.5 text-right tabular-nums text-zinc-900">
+                      {tokens.input_tokens.toLocaleString()}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-zinc-900">
+                      {tokens.output_tokens.toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
