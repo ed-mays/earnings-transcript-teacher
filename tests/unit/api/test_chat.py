@@ -20,7 +20,6 @@ if PROJECT_ROOT not in sys.path:
 ENV = {
     "DATABASE_URL": "postgresql://test",
     "SUPABASE_JWT_SECRET": "secret",
-    "ADMIN_SECRET_TOKEN": "token",
     "PERPLEXITY_API_KEY": "pplx-test",
 }
 

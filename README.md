@@ -228,7 +228,6 @@ cp web/env.example web/.env.local
 |---|---|
 | `DATABASE_URL` | Supabase connection string (Supabase → Project Settings → Database → URI) |
 | `SUPABASE_JWT_SECRET` | JWT secret (Supabase → Project Settings → API) |
-| `ADMIN_SECRET_TOKEN` | Any strong random string — protects admin-only routes |
 | `VOYAGE_API_KEY` | Required for the `/search` endpoint; other endpoints work without it |
 | `PERPLEXITY_API_KEY` | Required for the Feynman chat endpoint |
 
@@ -239,7 +238,6 @@ cp web/env.example web/.env.local
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (Supabase → Project Settings → API) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (same page) |
 | `NEXT_PUBLIC_API_URL` | FastAPI base URL — use `http://localhost:8000` for local dev |
-| `ADMIN_SECRET_TOKEN` | Same value as Railway — used server-side by the `/admin/health` proxy route |
 
 #### Starting the dev servers
 
@@ -296,17 +294,17 @@ curl "http://localhost:8000/api/calls/AAPL/spans?section=prepared&page=1&page_si
 # Semantic search (requires VOYAGE_API_KEY)
 curl "http://localhost:8000/api/calls/AAPL/search?q=AI+infrastructure+spending"
 
-# Trigger ingestion (requires Modal deployed + ADMIN_SECRET_TOKEN)
+# Trigger ingestion (requires Modal deployed + admin JWT)
 curl -X POST http://localhost:8000/admin/ingest \
-  -H "X-Admin-Token: $ADMIN_SECRET_TOKEN" \
+  -H "Authorization: Bearer <admin-user-jwt>" \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL"}'
 # → {"status":"accepted","ticker":"AAPL","message":"Ingestion dispatched"}
 
-# Check system health (requires ADMIN_SECRET_TOKEN)
+# Check system health (requires admin JWT)
 curl http://localhost:8000/admin/health \
-  -H "X-Admin-Token: $ADMIN_SECRET_TOKEN"
-# → {"db":{"connected":true,"schema_version":9},"env_vars":{...},"external_apis":{...}}
+  -H "Authorization: Bearer <admin-user-jwt>"
+# → {"db":{"connected":true,"schema_version":10},"env_vars":{...},"external_apis":{...}}
 ```
 
 #### Run the API unit tests
@@ -350,7 +348,6 @@ Vercel automatically creates preview deployments for every PR. To allow all prev
 | `ANTHROPIC_API_KEY` | Modal pipeline, legacy pipeline | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
 | `DATABASE_URL` | Modal pipeline, legacy pipeline, FastAPI | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
 | `SUPABASE_JWT_SECRET` | FastAPI | JWT secret — Supabase → Project Settings → API |
-| `ADMIN_SECRET_TOKEN` | FastAPI | Secret for admin-only routes — generate with `openssl rand -hex 32` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Next.js frontend | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Next.js frontend | Supabase anon key |
 | `NEXT_PUBLIC_API_URL` | Next.js frontend | FastAPI base URL (Railway domain in production, `http://localhost:8000` locally) |

@@ -14,7 +14,6 @@ if API_DIR not in sys.path:
 ENV = {
     "DATABASE_URL": "postgresql://test",
     "SUPABASE_JWT_SECRET": "secret",
-    "ADMIN_SECRET_TOKEN": "token",
 }
 
 
