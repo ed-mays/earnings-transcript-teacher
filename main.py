@@ -43,6 +43,8 @@ if __name__ == "__main__":
     # If run without arguments (and mode is cli), use interactive menu
     if not args.ticker:
         try:
+            from db.analytics import track
+            track("session_start", properties={"source": "cli"})
             interactive_menu()
         except KeyboardInterrupt:
             print("\nGoodbye!")

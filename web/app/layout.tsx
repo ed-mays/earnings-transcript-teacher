@@ -58,6 +58,12 @@ export default async function RootLayout({
                 {isAdmin && (
                   <>
                     <a
+                      href="/admin"
+                      className="text-sm text-zinc-500 hover:text-zinc-700"
+                    >
+                      Admin Analytics
+                    </a>
+                    <a
                       href="/admin/health"
                       className="text-sm text-zinc-500 hover:text-zinc-700"
                     >
