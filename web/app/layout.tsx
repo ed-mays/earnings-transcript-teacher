@@ -29,6 +29,16 @@ export default async function RootLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    isAdmin = profile?.role === "admin";
+  }
+
   return (
     <html
       lang="en"
@@ -45,6 +55,22 @@ export default async function RootLayout({
                 EarningsFluency
               </a>
               <div className="flex items-center gap-4">
+                {isAdmin && (
+                  <>
+                    <a
+                      href="/admin/health"
+                      className="text-sm text-zinc-500 hover:text-zinc-700"
+                    >
+                      Admin Health
+                    </a>
+                    <a
+                      href="/admin/ingest"
+                      className="text-sm text-zinc-500 hover:text-zinc-700"
+                    >
+                      Admin Ingest
+                    </a>
+                  </>
+                )}
                 <span className="text-sm text-zinc-500">{user.email}</span>
                 <SignOutButton />
               </div>
