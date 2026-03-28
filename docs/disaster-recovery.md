@@ -117,13 +117,11 @@ Set these in both **production** and **staging** environments (with different va
 | `SUPABASE_JWT_SECRET` | From Supabase → Settings → API → JWT Settings |
 | `ADMIN_SECRET_TOKEN` | Secret token for `POST /admin/ingest` (generate a strong random string) |
 | `NEXT_PUBLIC_VERCEL_URL` | The bare Vercel production domain, e.g. `earningsfluency.vercel.app` — used to build the CORS allow-list |
-| `CORS_EXTRA_ORIGINS` | Comma-separated extra origins. For staging: `https://earningsfluency-git-feat-*.vercel.app,https://earningsfluency-git-fix-*.vercel.app` |
+| `CORS_ORIGIN_REGEX` | Regex matching allowed Vercel origins, e.g. `https://earningsfluency(-[a-z0-9-]+)?\.vercel\.app` — covers production and all preview deployments |
 | `VOYAGE_API_KEY` | VoyageAI API key (semantic embeddings) |
 | `PERPLEXITY_API_KEY` | Perplexity API key (Feynman chat) |
 | `ANTHROPIC_API_KEY` | Anthropic API key (Claude for agentic ingestion) |
 | `API_NINJAS_KEY` | API Ninjas key (transcript download) |
-
-> **Note**: `CORS_EXTRA_ORIGINS` on production should be empty or omitted. It's only needed on staging to allow Vercel preview URLs.
 
 ### 2.5 Verify the deploy
 
@@ -153,8 +151,10 @@ In Vercel project → Settings → Environment Variables, add these with the cor
 | `NEXT_PUBLIC_SUPABASE_URL` | Production Supabase URL | Staging Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production anon key | Staging anon key |
 | `NEXT_PUBLIC_API_URL` | Railway production URL | Railway staging URL |
+| `ADMIN_SECRET_TOKEN` | Same value as Railway | Same value as Railway staging |
 
 > **How to scope**: When adding each variable, check only the environment checkboxes that apply (Production / Preview / Development).
+> **`ADMIN_SECRET_TOKEN` on Vercel**: required server-side by the `/admin/health` proxy route handler — it is never exposed to the browser.
 
 ### 3.3 Automatic preview deployments
 
@@ -164,7 +164,7 @@ No additional configuration needed. Every PR automatically gets a preview deploy
 https://[project-name]-git-[branch-slug]-[vercel-username].vercel.app
 ```
 
-The `CORS_EXTRA_ORIGINS` wildcard on Railway staging covers these domains.
+The `CORS_ORIGIN_REGEX` on Railway covers these domains automatically.
 
 ---
 
@@ -227,6 +227,14 @@ curl -X POST https://[railway-domain]/admin/ingest \
 
 Check Modal dashboard → Apps → earnings-ingestion → Logs to confirm the job ran.
 
+You can also verify overall system health:
+
+```bash
+curl https://[railway-domain]/admin/health \
+  -H "X-Admin-Token: [ADMIN_SECRET_TOKEN]"
+# Expected: {"db":{"connected":true,"schema_version":9},"env_vars":{...},"external_apis":{...}}
+```
+
 ---
 
 ## Environment variable summary
@@ -240,7 +248,7 @@ DATABASE_URL=postgresql://postgres.[ref]:[pw]@aws-0-[region].pooler.supabase.com
 SUPABASE_JWT_SECRET=
 ADMIN_SECRET_TOKEN=
 NEXT_PUBLIC_VERCEL_URL=
-CORS_EXTRA_ORIGINS=
+CORS_ORIGIN_REGEX=
 VOYAGE_API_KEY=
 PERPLEXITY_API_KEY=
 ANTHROPIC_API_KEY=
@@ -253,6 +261,7 @@ API_NINJAS_KEY=
 NEXT_PUBLIC_SUPABASE_URL=https://[ref].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_API_URL=http://localhost:8000
+ADMIN_SECRET_TOKEN=
 ```
 
 ### Modal (secrets group `earnings-secrets`)
@@ -281,7 +290,7 @@ If starting from zero:
 - [ ] Create Railway project from GitHub repo
 - [ ] Set production env vars in Railway
 - [ ] Create Railway staging environment
-- [ ] Set staging env vars in Railway (including `CORS_EXTRA_ORIGINS`)
+- [ ] Set staging env vars in Railway (including `CORS_ORIGIN_REGEX`)
 - [ ] Create Vercel project from GitHub repo (root directory: `web`)
 - [ ] Set production-scoped env vars in Vercel
 - [ ] Set preview-scoped env vars in Vercel (staging Supabase + Railway staging)
