@@ -26,6 +26,15 @@ interface CostsData {
   by_service: Record<string, ServiceTokens>;
 }
 
+interface StageCount {
+  stage: number;
+  count: number;
+}
+
+interface FeynmanData {
+  by_stage: StageCount[];
+}
+
 async function getSession() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -48,6 +57,25 @@ async function fetchSessions(): Promise<DailyCount[] | null> {
     });
     if (!resp.ok) return null;
     return resp.json() as Promise<DailyCount[]>;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFeynman(): Promise<FeynmanData | null> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) return null;
+
+  const session = await getSession();
+  if (!session) return null;
+
+  try {
+    const resp = await fetch(`${apiUrl}/admin/analytics/feynman`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+    if (!resp.ok) return null;
+    return resp.json() as Promise<FeynmanData>;
   } catch {
     return null;
   }
@@ -103,7 +131,12 @@ function AnalyticsCard({ title, children }: { title: string; children: React.Rea
 }
 
 export default async function AdminAnalyticsPage() {
-  const [sessions, chat, costs] = await Promise.all([fetchSessions(), fetchChat(), fetchCosts()]);
+  const [sessions, chat, costs, feynman] = await Promise.all([
+    fetchSessions(),
+    fetchChat(),
+    fetchCosts(),
+    fetchFeynman(),
+  ]);
 
   const totalSessions = sessions?.reduce((sum, row) => sum + row.count, 0) ?? 0;
   const totalTurns = chat?.daily.reduce((sum, row) => sum + row.turns, 0) ?? 0;
@@ -197,6 +230,31 @@ export default async function AdminAnalyticsPage() {
                   <tr key={row.date} className="border-b border-zinc-50">
                     <td className="py-1.5 text-zinc-700">{row.date}</td>
                     <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.turns}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </AnalyticsCard>
+
+        <AnalyticsCard title="Feynman Engagement — stage funnel, last 30 days">
+          {feynman === null ? (
+            <p className="text-sm text-red-500">Unable to load Feynman data.</p>
+          ) : feynman.by_stage.length === 0 ? (
+            <p className="text-sm text-zinc-500">No Feynman sessions recorded yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-100">
+                  <th className="py-1.5 text-left font-medium text-zinc-500">Stage</th>
+                  <th className="py-1.5 text-right font-medium text-zinc-500">Sessions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feynman.by_stage.map((row) => (
+                  <tr key={row.stage} className="border-b border-zinc-50">
+                    <td className="py-1.5 text-zinc-700">Stage {row.stage}</td>
+                    <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.count}</td>
                   </tr>
                 ))}
               </tbody>
