@@ -1,6 +1,6 @@
 # Learning Flow Design: EarningsFluency UX Ideation
 
-_Working document for [#202](https://github.com/ed-mays/earnings-transcript-teacher/issues/202) — updated 2026-03-28 after PR #203 review_
+_Working document for [#202](https://github.com/ed-mays/earnings-transcript-teacher/issues/202) — updated 2026-03-28 after PR #203 review (rounds 1 and 2)_
 
 ---
 
@@ -22,7 +22,7 @@ _Working document for [#202](https://github.com/ed-mays/earnings-transcript-teac
 
 ---
 
-## Decisions from PR #203 Review
+## Decisions Log
 
 | Question | Decision |
 |---|---|
@@ -31,9 +31,15 @@ _Working document for [#202](https://github.com/ed-mays/earnings-transcript-teac
 | Direction 2 (Annotated Transcript) viable? | Dropped — inline annotations deferred. Transcript as primary surface is not the right model. |
 | Chosen direction? | **Brief + Progressive Disclosure hybrid.** |
 | Bigger Picture timing (pre vs. post-reading)? | Pre-reading. Context before engaging with analysis, especially for beginner learners. |
-| Analytical structure? | Progressive disclosure layers should map to the steps an analyst takes — not data types, not a numbered learning path. |
+| Analytical structure? | Progressive disclosure layers map to the steps an analyst takes — not data types, not a numbered learning path. |
 | Library cards? | Enrich with signal data (evasion level, sentiment, top shift) so learners can triage before opening a call. |
 | Feynman redesign? | Separate ideation thread. |
+| Learner level selector: manual or inferred? | Manual to start; path to inferred via session history later. |
+| Where do misconceptions live? | Brief layer — at the bottom of the brief, before the learner starts the analysis. |
+| Bigger Picture snapshot vs. Step 6 full section? | Same information at different zoom levels. Brief = 2–3 non-interactive bullets; Step 6 = full-fidelity with LLM buttons and drill-down. |
+| Progress model: sections explored or activity log? | **Activity log** — track intentional engagement events per session, aggregate across sessions for the same transcript. No "check the boxes" progress. |
+| Brief generation: ingest-time or on-demand? | Ingest-time. Latency is already a concern; consistent availability is higher priority than personalization at this stage. |
+| Evasion item interaction pattern? | Reveal-card — default shows question + severity badge + topic; click reveals full analysis + "What this signals" button. |
 
 ---
 
@@ -54,13 +60,13 @@ This is the organizing principle for the progressive disclosure. Six steps, deri
 | Step | Question | Analysis types mapped |
 |---|---|---|
 | 1. Orient | What is this call about, and what was expected? | Call brief, key takeaways, overall sentiment signal |
-| 2. Read the room | How did management sound? | Executive vs. analyst sentiment, speaker dynamics, call dynamics |
-| 3. Understand the narrative | What story did management tell? | Themes, prepared remarks, strategic shifts |
-| 4. Notice what was avoided | What wasn't said? | Evasion — prepared remarks + Q&A by analyst |
-| 5. Track what changed | What's different from last quarter? | Strategic shifts, guidance changes |
-| 6. Situate in context | How does this fit the bigger picture? | Recent news, competitors |
+| 2. Read the Room | How did management sound? | Executive vs. analyst sentiment, speaker dynamics, call dynamics |
+| 3. Understand the Narrative | What story did management tell? | Themes, prepared remarks, strategic shifts |
+| 4. Notice What Was Avoided | What wasn't said? | Evasion — prepared remarks + Q&A by analyst |
+| 5. Track What Changed | What's different from last quarter? | Strategic shifts, guidance changes |
+| 6. Situate in Context | How does this fit the bigger picture? | Recent news, competitors |
 
-Language (keywords, jargon, misconceptions) is threaded across all steps — available where relevant rather than isolated in its own tier.
+Language (keywords, jargon) is threaded across all steps — available where relevant rather than isolated in its own tier. Misconceptions are surfaced in the brief layer (see below).
 
 This framework has two benefits: it produces a learnable sequence without enforcing it, and it makes the pedagogical intent visible. The learner isn't just browsing analysis — they're being taught a transferable method.
 
@@ -70,24 +76,25 @@ This framework has two benefits: it produces a learnable sequence without enforc
 
 #### 1. Call Brief (pre-reading, always visible)
 
-The call page opens to a compact brief before any analysis is shown. This is the pre-reading layer — designed to be read in 60–90 seconds:
+The call page opens to a compact brief before any analysis is shown. This is the pre-reading layer — designed to be read in 60–90 seconds. Generated at ingest time.
 
 - **Context line:** Company, quarter, call date, and a single sentence framing why this call matters (e.g. "First post-acquisition report — analysts focused on integration costs and margin guidance").
-- **Bigger Picture snapshot:** What's happening in the company's environment right now — 2–3 bullets drawn from recent news and competitors. Pre-reading, not post-reading, because a learner can't interpret a call without this context, especially a beginner.
+- **Bigger Picture snapshot:** What's happening in the company's environment right now — 2–3 non-interactive bullets drawn from recent news and competitors. Pre-reading context, not post-reading synthesis.
 - **3 key takeaways:** The most important conclusions a skilled reader would draw — not summaries, but interpretations.
-- **3 interpretation questions:** Things to hold in mind as you work through the analysis. E.g. "Did management's confidence on margins match the actual guidance numbers?" These are Feynman seeds — questions the learner should be able to answer by the end of the session.
-- **Overall signal strip:** Sentiment (executive vs. analyst), evasion level (low/medium/high), strategic shift flagged (yes/no). At-a-glance orientation before the learner dives in.
+- **3 interpretation questions:** Things to hold in mind as you work through the analysis. E.g. "Did management's confidence on margins match the actual guidance numbers?" These seed Feynman sessions — questions the learner should be able to answer by the end of the session.
+- **Overall signal strip:** Sentiment (executive vs. analyst), evasion level (low/medium/high), strategic shift flagged (yes/no).
+- **Misconceptions:** 2–3 reveal-cards at the bottom of the brief. See Card Interaction Language section below. Positioned here so learners encounter them before they form incorrect assumptions during analysis.
 
-The brief is the replacement for the old pre-reading checklist and the adaptive start prompt banner. It's opinionated and LLM-generated rather than a mechanical checkbox list.
+The brief replaces the old pre-reading checklist and the adaptive start prompt banner. It is opinionated and LLM-generated rather than a mechanical checkbox list.
 
 #### 2. Analysis: Progressive Disclosure by Analyst Step
 
-Below the brief, the analysis is organized around the six-step analyst framework. Each step is a section that starts collapsed to a one-line summary and expands on demand:
+Below the brief, the analysis is organized around the six-step analyst framework. Each step starts collapsed to a one-line summary and expands on demand.
 
 **Step 1 · Orient** _(always expanded by default)_
 - Overall sentiment summary
-- Key takeaways (expandable from brief)
-- One-sentence context
+- Key takeaways (same as brief, expandable for more context)
+- One-sentence call context
 
 **Step 2 · Read the Room**
 - Executive sentiment vs. analyst sentiment side-by-side
@@ -95,14 +102,17 @@ Below the brief, the analysis is organized around the six-step analyst framework
 - Call dynamics: most active executive, most active analyst, analyst firm diversity, talk-time split
 
 **Step 3 · Understand the Narrative**
-- Top themes (theme cards, each expandable)
+- Top themes (theme cards, each expandable with "What this signals for investors" button)
 - Prepared remarks summary
 - Strategic shifts (each with "Explore with Feynman" link)
 
 **Step 4 · Notice What Was Avoided**
-- Prepared remarks evasion items with "What this signals for investors" button
-- Q&A evasion: per-analyst expandable rows with severity badges (🔴/🟡/🟢), "What this signals" button per item
-- Evasion index: overall evasion level contextualized
+
+Evasion items use the reveal-card pattern (see Card Interaction Language below):
+- **Default visible:** analyst question + severity badge (🔴/🟡/🟢) + topic label
+- **On click:** full evasion analysis + "What this signals for investors" button
+- Prepared remarks and Q&A evasion are shown in separate sub-sections
+- Evasion index (overall level) shown at the top of the step
 
 **Step 5 · Track What Changed**
 - Strategic shifts (full detail, linked from Step 3)
@@ -111,61 +121,105 @@ Below the brief, the analysis is organized around the six-step analyst framework
 **Step 6 · Situate in Context**
 - Recent news (headline, source, date, "Why does this matter for this call?" LLM button per article)
 - Competitors: referenced in this call + other competitors
+- This is the full-fidelity version of the Bigger Picture snapshot in the brief — same information, deeper zoom level.
 
-**Language layer** (available throughout, surfaced at the bottom of the analysis or accessible via keywords):
+**Language layer** (accessible throughout, surfaced at the bottom or via a persistent keywords entry point):
 - Keywords
-- Financial/industry jargon (define / explain / find)
-- Misconceptions (reveal-on-click cards — see note below)
+- Financial/industry jargon (define / explain / find in transcript)
 
-Each step section has a "Explore with Feynman" entry point, pre-seeded with the step's topic.
+Each step section has an "Explore with Feynman" entry point, pre-seeded with the step's topic.
 
 #### 3. Transcript: Secondary, Drill-down Surface
 
-The transcript is always accessible — a tab or "Read transcript" link from the call page. When a learner navigates to the transcript from an analysis item (e.g. an evasion entry, a theme card, a strategic shift), the relevant passage is scrolled into view and highlighted. This "drill down" mechanic connects analysis back to evidence without making the transcript the primary surface.
+The transcript is always accessible — a tab or "Read transcript" link from the call page. When a learner navigates to it from an analysis item (evasion entry, theme card, strategic shift), the relevant passage is scrolled into view and highlighted. This connects analysis to evidence without making the transcript the primary surface.
 
-Client-side text search (with highlight and navigation) makes the transcript usable as a reference. "Find in transcript" from Language Lab triggers the same mechanism.
+Client-side text search (highlight + navigation) makes it usable as a reference. "Find in transcript" from Language Lab triggers the same mechanism.
 
-Inline annotations (evasion highlights, sentiment markers, jargon underlines in the transcript body) are **deferred** — a future enhancement once the primary analysis flow is solid.
+Inline annotations (evasion highlights, sentiment markers, jargon underlines) are **deferred** — a future enhancement once the primary analysis flow is solid.
+
+---
+
+### Card Interaction Language
+
+A consistent interaction vocabulary across the app: a card with a badge or label signals "something here — click to investigate." The learner only has to learn this pattern once; the content of the reveal varies.
+
+**Misconception cards (brief layer)**
+- **Default visible:** the common misinterpretation, stated plainly (e.g. "Management's confidence on margins signals a strong recovery")
+- **On click:** the correction — why this reading is wrong or incomplete, grounded in what the call actually said
+- Mechanic: judgment-first reveal. The learner reads the claim and implicitly evaluates it before seeing the correction. The pedagogical value is in the gap between expectation and reality.
+- "Expand all" toggle available if multiple misconceptions are present.
+
+**Evasion cards (Step 4)**
+- **Default visible:** analyst question + severity badge (🔴/🟡/🟢) + topic label (e.g. "margin guidance")
+- **On click:** full evasion analysis (what was evaded, how) + "What this signals for investors" button
+- Mechanic: curiosity-first reveal. The severity badge invites investigation; the learner chooses which items to dig into. Manages cognitive load when many evasion items are present.
+
+**Distinction:** Misconception cards ask "do you believe this?" (judgment). Evasion cards ask "what happened here?" (investigation). Both are intentional engagement mechanics; both produce loggable events.
+
+This pattern can extend to theme cards and strategic shift cards as those components are developed.
+
+---
+
+### Engagement Activity Log
+
+Progress is not tracked as "sections completed." Instead, the app logs intentional engagement events per session and aggregates them across sessions for the same transcript. A learner who returns to a call can see what they engaged with previously — without any checkbox pressure.
+
+**Event taxonomy — intentional engagements only (initial scope):**
+- Feynman session started (topic recorded)
+- "What this signals for investors" button triggered (which item)
+- Definition requested for a term
+- "Explain in context" requested for a term
+- "Find in transcript" triggered (which term)
+- Misconception card revealed (which misconception)
+- Evasion card revealed (which item)
+
+Passive navigation (opening/closing a step section, scrolling) is not logged. The event must require a deliberate action.
+
+**Per-session view:** when a learner revisits a transcript, the activity from prior sessions is surfaced — e.g. "Last session: explored margin guidance with Feynman, revealed 2 evasion items, requested definition of 'adjusted EBITDA'." This is not a checklist; it's a memory aid that helps the learner pick up where they left off.
+
+**Cross-session aggregation:** events from all sessions on the *same transcript* are combined. A learner who has opened AAPL Q4 three times sees a combined picture of their engagement with that call.
+
+Cross-call aggregation (e.g. AAPL across multiple quarters) is explicitly out of scope for now — a future feature once the per-transcript model is established.
+
+**Session history readiness:** the activity log is the foundation for session history features (resume, synthesis, revisit flow). Logging events now doesn't require building the UI; it just means the data is available when that work is prioritized.
 
 ---
 
 ### Call Library: Enriched Signal Cards
 
-The library entry for each call surfaces a compressed version of the signal dashboard — enough to triage before opening:
+The library entry for each call surfaces a compressed version of the brief signal — enough to triage before opening:
 
 - Evasion level (low / medium / high)
 - Overall sentiment (bullish / neutral / bearish)
 - Top strategic shift (one line, if present)
 - Date and ticker (already present)
 
-This allows a learner to scan the library and decide which call deserves deep attention — a skill in itself (not every call is equally informative).
+This allows a learner to scan the library and decide which call deserves deep attention — a skill in itself.
 
 ---
 
-### Learner Level Selector (new idea)
+### Learner Level Selector
 
-A "learner level" toggle — Beginner / Intermediate / Advanced — could adjust the experience without changing the underlying data:
+A manual toggle — Beginner / Intermediate / Advanced — adjusts the experience without changing the underlying data:
 
-- **Beginner:** Brief is expanded and prominent; interpretation questions are explicit; "What this signals for investors" framing is shown by default on analysis items; Feynman on-ramp is more prominent.
-- **Intermediate:** Brief is shown but compact; analysis is shown without scaffolding text; signals framing is available on demand.
-- **Advanced:** Brief is collapsed by default; raw analysis without interpretation scaffolding; Feynman available but not prompted.
+- **Beginner:** Brief is expanded and prominent; interpretation questions are explicit; "What this signals" framing shown by default; Feynman on-ramp is more prominent.
+- **Intermediate:** Brief shown but compact; analysis without scaffolding text; signals framing available on demand.
+- **Advanced:** Brief collapsed by default; raw analysis without interpretation scaffolding; Feynman available but not prompted.
 
-This also provides an extensibility hook: the learner level could eventually adapt based on session history (how many calls has this user analyzed? how far do they typically go?).
-
-Whether this is a manual selector or inferred is an open question.
+Manual to start. Path to inference later via session history (how many calls has this user analyzed? how deeply do they typically engage?).
 
 ---
 
 ### Investor Mode (future extension)
 
-A future "Investor Mode" — toggled in settings or as a view option — would reconfigure the experience for pure signal extraction rather than skill development:
+A future mode — toggled in settings — would reconfigure the experience for pure signal extraction:
 
 - Brief replaced by a compact signal dashboard
 - Analysis steps accessible but not framed pedagogically
-- "What this signals for investors" buttons prominent
+- "What this signals" buttons prominent
 - Feynman de-emphasized
 
-The content and data are identical; only the framing and defaults change. This keeps the learning tool as the primary experience while accommodating users who already have the mental model.
+Content and data are identical; only framing and defaults change.
 
 ---
 
@@ -178,18 +232,18 @@ The content and data are identical; only the framing and defaults change. This k
 | Learning objectives | → Brief: interpretation questions |
 | Pre-reading checklist | → Replaced by brief entirely |
 | Adaptive start prompt banner | → Folded into brief (context line) |
+| Misconceptions | → Brief layer: reveal-cards at bottom of brief |
 | Speaker list | → Step 2: Read the Room |
 | Call dynamics | → Step 2: Read the Room |
-| Recent news | → Step 6 pre-reading brief snapshot + Situate in Context section |
+| Recent news | → Brief snapshot (2–3 bullets) + Step 6 full section |
 | Competitor intelligence | → Step 6: Situate in Context |
-| Q&A evasion panel | → Step 4: Notice What Was Avoided |
-| "What this signals" button | → Step 4 (evasion items); extend to themes and shifts |
+| Q&A evasion panel | → Step 4: reveal-card pattern |
+| "What this signals" button | → Step 4 (evasion); extend to themes and shifts |
 | Language Lab jargon | → Language layer (threaded through all steps) |
-| Misconceptions | → Language layer (elevated — see note below) |
 | Jargon discovery banner | → Language layer |
 | Jargon tooltips in transcript | → Deferred with inline annotations |
 | Learning path header / progress | → Replaced by analyst steps structure |
-| Step progress tracking | → "Sections explored" lightweight state (session history readiness) |
+| Step progress tracking | → Replaced by activity log model |
 | Learning statistics | → Out of scope (cross-session) |
 
 ---
@@ -197,44 +251,40 @@ The content and data are identical; only the framing and defaults change. This k
 ## Cross-Cutting Observations
 
 **1. Relabel analysis around interpretation, not data type.**
-The current tabs (Summary / Keywords / Themes / Evasion / Shifts) describe data. The analyst steps structure replaces this — but the relabeling principle applies everywhere: labels should answer "what am I looking for here?" not "what data is stored here."
+The current tabs (Summary / Keywords / Themes / Evasion / Shifts) describe data. The analyst steps structure replaces this — labels should answer "what am I looking for here?" not "what data is stored here."
 
 **2. Extend "What this signals for investors" to all major analysis types.**
-This button currently exists only on evasion items in Streamlit. The pattern — "here's what this means, framed for the investor" — is the core interpretation scaffold the tool offers. It should appear on themes, strategic shifts, speaker dynamics, and sentiment — not just evasion.
+This button currently exists only on evasion items in Streamlit. The pattern is the core interpretation scaffold the tool offers. It should appear on themes, strategic shifts, speaker dynamics, and sentiment — not just evasion.
 
-**3. Elevate misconceptions.**
-Reveal-on-click misconception cards are a high-value active learning mechanic — the learner forms a judgment, then sees the correction. This should not be buried in a language tab. A "Common mistakes about this call" surface in a visible position (perhaps at the bottom of the brief, or after Step 3) could drive genuine engagement.
+**3. Misconceptions and evasion share a reveal-card interaction pattern.**
+Both use the same mechanic (badge/label visible → click to reveal detail) but serve different cognitive purposes. Misconceptions: judgment-first (do you believe this?). Evasion: curiosity-first (what happened here?). The shared pattern creates a consistent vocabulary; the distinct copy and framing preserve their different pedagogical roles.
 
 **4. Feynman needs a better on-ramp.**
-"Learn" in the nav bar is too abstract. The call to action should answer: "Want to test whether you actually understood this call?" Each analyst step having its own "Explore with Feynman" entry point is part of the solution — but the top-level nav framing also needs to change.
+"Learn" in the nav bar is too abstract. The call to action should answer "Want to test whether you actually understood this call?" Each analyst step having its own Feynman entry point is part of the solution — but the top-level nav framing also needs to change.
 
 **5. Extensibility for future learning models.**
-The analyst steps structure is content architecture, not a learning mode. Feynman, Socratic method, self-assessment — these are modes that sit on top of the same content. The design should keep these layers clean. When the Socratic mode is built, it should be able to use the same brief + progressive disclosure structure, just with different prompting and progression mechanics.
+The analyst steps structure is content architecture, not a learning mode. Feynman, Socratic method, self-assessment — these are modes that sit on top of the same structure. When Socratic mode is built, it should be able to use the same brief + progressive disclosure flow, just with different prompting and progression mechanics.
 
 ---
 
 ## Open Questions
 
-1. **Is the learner level selector manual (the user picks) or inferred (the app adapts)?** Manual is simpler to build; inferred is more powerful but requires session history. Could start as manual with a path to inference later.
+1. **Does the 6-step analyst framework need validation?** Does the sequence match how you'd want a beginner to approach a call? Are any steps missing, misordered, or redundant? (e.g. Steps 3 and 5 both involve strategic shifts — is there overlap that should be resolved?)
 
-2. **Where do misconceptions live?** They're currently a language layer item but are pedagogically closer to the brief (pre-reading, set expectations) or to the evasion step (common misinterpretations are often about what management avoided). Worth deciding placement deliberately.
+2. **What triggers the learner level selector UI?** Is it a first-launch prompt ("how familiar are you with earnings calls?"), a persistent settings control, or both?
 
-3. **How does the "Bigger Picture" snapshot in the brief differ from the full Step 6 section?** The brief snapshot should be extremely compact (2–3 bullets, no interaction). Step 6 is full-fidelity with drill-down. Needs to be designed so they feel like the same information at different zoom levels, not redundant.
-
-4. **What triggers a "sections explored" state?** Does opening a step count, or does some active engagement (expanding a card, clicking a signals button, starting a Feynman session) need to happen? This decision defines what "progress" means and shapes the session history model.
-
-5. **How does the call brief get generated — at ingest time or on-demand?** If at ingest, it's always available instantly. If on-demand, it could be personalized (e.g. adaptive to learner level) but adds latency. Ingest-time generation is simpler and more consistent.
+3. **How is the activity log displayed on revisit?** A raw event list could be noisy at 20+ events. Grouping by analyst step is one option; a summary ("you explored 4 items in Step 4, started 1 Feynman session") is another. Worth designing the revisit view before the log is built.
 
 ---
 
 ## Recommended Next Steps
 
-1. **Validate the analyst framework steps** — does the 6-step sequence match how you'd want a beginner to approach a call? Are any steps missing, misordered, or redundant?
+1. **Validate the analyst framework steps** — confirm the 6-step sequence, resolve any overlap between steps.
 
-2. **Design the brief in detail** — the brief is the entry point and the most important single component. Worth sketching the exact fields, their sources, and how they're generated before any other design work.
+2. **Design the brief in detail** — the brief is the most important single component. Sketch the exact fields, their sources, LLM prompts required, and how learner level affects what's shown.
 
-3. **Decide on learner level selector** — manual or inferred, and what it actually changes in the experience.
+3. **Design the activity log revisit view** — decide how prior session events are grouped and displayed before implementing the logging infrastructure.
 
-4. **Map parity items to issues** — the deferred items table above resolves most of the dropped items. Each resolved item needs to be reopened as an issue (or bundled with related items) for implementation.
+4. **Map parity items to issues** — the deferred items table above resolves most of the dropped items. Each resolved item needs to be opened as an issue (or bundled) for implementation.
 
-5. **Start Feynman ideation thread** — now that the content architecture is settled, the Feynman redesign has a clearer context to design within.
+5. **Start Feynman ideation thread** — now that the content architecture is settled, the Feynman redesign has a clearer context to work within.
