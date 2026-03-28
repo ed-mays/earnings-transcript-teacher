@@ -22,4 +22,13 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Allow authenticated users to read their own profile row.
+-- Required for the Next.js server client (anon key + user JWT) to query role.
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "users_read_own_profile"
+    ON public.profiles
+    FOR SELECT
+    USING (auth.uid() = id);
+
 INSERT INTO schema_version (version) VALUES (10) ON CONFLICT DO NOTHING;
