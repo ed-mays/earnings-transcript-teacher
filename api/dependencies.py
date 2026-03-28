@@ -5,8 +5,24 @@ from collections.abc import Generator
 from typing import Annotated
 
 import jwt
-import psycopg
+from jwt import PyJWKClient
 from fastapi import Depends, Header, HTTPException, status
+import psycopg
+
+# Module-level JWKS client — initialized lazily, cached across requests.
+_jwks_client: PyJWKClient | None = None
+
+
+def _get_jwks_client() -> PyJWKClient:
+    """Return the module-level PyJWKClient, initializing it on first call."""
+    global _jwks_client
+    if _jwks_client is None:
+        supabase_url = os.environ["SUPABASE_URL"].rstrip("/")
+        _jwks_client = PyJWKClient(
+            f"{supabase_url}/auth/v1/.well-known/jwks.json",
+            cache_keys=True,
+        )
+    return _jwks_client
 
 
 def get_db() -> Generator[psycopg.Connection, None, None]:
@@ -20,7 +36,7 @@ def get_db() -> Generator[psycopg.Connection, None, None]:
 
 
 def get_current_user(authorization: Annotated[str | None, Header()] = None) -> str:
-    """Verify the Supabase JWT from Authorization: Bearer and return the user UUID."""
+    """Verify the Supabase JWT via JWKS and return the user UUID."""
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -28,16 +44,21 @@ def get_current_user(authorization: Annotated[str | None, Header()] = None) -> s
         )
 
     token = authorization.removeprefix("Bearer ")
-    jwt_secret = os.environ.get("SUPABASE_JWT_SECRET", "")
 
     try:
-        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+        signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "ES256"],
+            audience="authenticated",
+        )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
         )
-    except jwt.InvalidTokenError:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",

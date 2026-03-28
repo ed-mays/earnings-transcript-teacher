@@ -130,7 +130,7 @@ Set these in both **production** and **staging** environments (with different va
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Supabase Session mode pooler connection string (port 5432) |
-| `SUPABASE_JWT_SECRET` | From Supabase → Settings → API → JWT Settings |
+| `SUPABASE_URL` | Supabase project URL, e.g. `https://[ref].supabase.co` — used to fetch JWKS public keys for JWT verification |
 | `NEXT_PUBLIC_VERCEL_URL` | The bare Vercel production domain, e.g. `earningsfluency.vercel.app` — used to build the CORS allow-list |
 | `CORS_ORIGIN_REGEX` | Regex matching allowed Vercel origins, e.g. `https://earningsfluency(-[a-z0-9-]+)?\.vercel\.app` — covers production and all preview deployments |
 | `VOYAGE_API_KEY` | VoyageAI API key (semantic embeddings) |
@@ -258,7 +258,7 @@ Complete reference of all env vars, grouped by where they're set:
 
 ```
 DATABASE_URL=postgresql://postgres.[ref]:[pw]@aws-0-[region].pooler.supabase.com:5432/postgres
-SUPABASE_JWT_SECRET=
+SUPABASE_URL=https://[ref].supabase.co
 NEXT_PUBLIC_VERCEL_URL=
 CORS_ORIGIN_REGEX=
 VOYAGE_API_KEY=

@@ -5,7 +5,10 @@ import os
 import json
 from unittest.mock import MagicMock, patch
 
+import jwt as pyjwt
 import pytest
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 # Add api/ directory so FastAPI can resolve `routes.*` imports.
 API_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../api"))
@@ -19,27 +22,46 @@ if PROJECT_ROOT not in sys.path:
 
 ENV = {
     "DATABASE_URL": "postgresql://test",
-    "SUPABASE_JWT_SECRET": "secret",
+    "SUPABASE_URL": "https://test.supabase.co",
     "PERPLEXITY_API_KEY": "pplx-test",
 }
 
-# A minimal valid JWT signed with "secret" for subject "user-uuid-001"
-# Generated with: jwt.encode({"sub": "user-uuid-001"}, "secret", algorithm="HS256")
-VALID_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLXV1aWQtMDAxIn0.RYKzCziAC_ylbXw8-VyzeO4Rd-3zNXpXgTUskpjnzgk"
-AUTH_HEADER = f"Bearer {VALID_TOKEN}"
+# RSA key pair used to sign and verify test JWTs.
+_RSA_PRIVATE_KEY = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    backend=default_backend(),
+)
+_RSA_PUBLIC_KEY = _RSA_PRIVATE_KEY.public_key()
+
 USER_ID = "user-uuid-001"
+VALID_TOKEN = pyjwt.encode(
+    {"sub": USER_ID, "aud": "authenticated"},
+    _RSA_PRIVATE_KEY,
+    algorithm="RS256",
+)
+AUTH_HEADER = f"Bearer {VALID_TOKEN}"
+
+
+def _mock_jwks_client() -> MagicMock:
+    mock_key = MagicMock()
+    mock_key.key = _RSA_PUBLIC_KEY
+    mock_client = MagicMock()
+    mock_client.get_signing_key_from_jwt.return_value = mock_key
+    return mock_client
 
 
 @pytest.fixture()
 def client():
     """Return a TestClient with env vars set and DB connections mocked."""
     with patch.dict(os.environ, ENV):
-        with patch("psycopg.connect"):
-            from fastapi.testclient import TestClient
-            from main import app
+        with patch("dependencies._get_jwks_client", return_value=_mock_jwks_client()):
+            with patch("psycopg.connect"):
+                from fastapi.testclient import TestClient
+                from main import app
 
-            with TestClient(app) as c:
-                yield c
+                with TestClient(app) as c:
+                    yield c
 
 
 class TestChatAuth:

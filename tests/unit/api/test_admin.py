@@ -2,10 +2,12 @@
 
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
 import pytest
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 API_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../api"))
 if API_DIR not in sys.path:
@@ -19,14 +21,41 @@ from main import app  # noqa: E402  (must come after sys.modules stub)
 
 ENV = {
     "DATABASE_URL": "postgresql://test",
-    "SUPABASE_JWT_SECRET": "secret",
+    "SUPABASE_URL": "https://test.supabase.co",
 }
+
+# RSA key pair used to sign and verify test JWTs.
+_RSA_PRIVATE_KEY = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    backend=default_backend(),
+)
+_RSA_PUBLIC_KEY = _RSA_PRIVATE_KEY.public_key()
 
 ADMIN_UUID = "00000000-0000-0000-0000-000000000001"
 LEARNER_UUID = "00000000-0000-0000-0000-000000000002"
 
-ADMIN_AUTH = {"Authorization": f"Bearer {pyjwt.encode({'sub': ADMIN_UUID}, 'secret', algorithm='HS256')}"}
-LEARNER_AUTH = {"Authorization": f"Bearer {pyjwt.encode({'sub': LEARNER_UUID}, 'secret', algorithm='HS256')}"}
+
+def _make_jwt(user_id: str) -> str:
+    """Sign a test JWT with the RSA private key."""
+    return pyjwt.encode(
+        {"sub": user_id, "aud": "authenticated"},
+        _RSA_PRIVATE_KEY,
+        algorithm="RS256",
+    )
+
+
+def _mock_jwks_client() -> MagicMock:
+    """Return a mock PyJWKClient that verifies tokens signed with _RSA_PRIVATE_KEY."""
+    mock_key = MagicMock()
+    mock_key.key = _RSA_PUBLIC_KEY
+    mock_client = MagicMock()
+    mock_client.get_signing_key_from_jwt.return_value = mock_key
+    return mock_client
+
+
+ADMIN_AUTH = {"Authorization": f"Bearer {_make_jwt(ADMIN_UUID)}"}
+LEARNER_AUTH = {"Authorization": f"Bearer {_make_jwt(LEARNER_UUID)}"}
 
 
 def _make_mock_conn(role: str = "admin") -> MagicMock:
@@ -40,11 +69,12 @@ def _make_mock_conn(role: str = "admin") -> MagicMock:
 def client():
     """Return a TestClient with required env vars set and the DB mocked for an admin user."""
     with patch.dict(os.environ, ENV):
-        with patch("psycopg.connect", return_value=_make_mock_conn("admin")):
-            from fastapi.testclient import TestClient
+        with patch("dependencies._get_jwks_client", return_value=_mock_jwks_client()):
+            with patch("psycopg.connect", return_value=_make_mock_conn("admin")):
+                from fastapi.testclient import TestClient
 
-            with TestClient(app) as c:
-                yield c
+                with TestClient(app) as c:
+                    yield c
 
 
 @pytest.fixture(autouse=True)
@@ -164,6 +194,7 @@ def test_ingest_looks_up_correct_modal_function(client):
 
 def _make_healthy_httpx_mock():
     """Return a mock httpx module with AsyncClient that succeeds on HEAD."""
+    from unittest.mock import AsyncMock
     mock_response = MagicMock(status_code=200)
     mock_http_client = AsyncMock()
     mock_http_client.head = AsyncMock(return_value=mock_response)
@@ -249,7 +280,7 @@ def test_health_env_vars_present_when_set(client):
         "VOYAGE_API_KEY": "vk",
         "PERPLEXITY_API_KEY": "pk",
         "MODAL_TOKEN_ID": "mk",
-        "SUPABASE_JWT_SECRET": "secret",  # must match the key used to sign ADMIN_AUTH
+        "SUPABASE_JWT_SECRET": "sk",
     }
     with patch.dict(os.environ, extra_env), \
          patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
@@ -260,6 +291,7 @@ def test_health_env_vars_present_when_set(client):
 
 
 def test_health_external_apis_unreachable_on_exception(client):
+    from unittest.mock import AsyncMock
     mock_http_client = AsyncMock()
     mock_http_client.head = AsyncMock(side_effect=Exception("connection refused"))
     mock_cm = AsyncMock()
