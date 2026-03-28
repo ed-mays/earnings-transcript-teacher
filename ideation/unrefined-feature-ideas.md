@@ -51,20 +51,34 @@ Surface cases where a generic external sentiment score disagrees with the app's 
 
 *The following ideas should be groomed under a "Technical and Architecture Review" milestone for the web rewrite codebase.*
 
-### INFRA-architecture-review
+### INFRA-architecture-review *(→ promoted to GitHub issues #195–#200)*
 The web rewrite (FastAPI + Next.js + Supabase + Modal) grew quickly across many sessions. Need a structured review of whether the layering holds up: does the FastAPI/Next.js boundary stay clean? Are there places where UI logic leaks into the API layer or vice versa? Are auth and error handling consistent across routes?
 
-### INFRA-pattern-consistency
+### INFRA-pattern-consistency *(→ promoted to GitHub issues #196, #197)*
 As the codebase grew, patterns for auth, error handling, API response shapes, and data fetching were added incrementally and may have drifted. Audit for inconsistencies and document the intended patterns so future slices follow a clear convention.
 
-### INFRA-refactoring-opportunities
+### INFRA-refactoring-opportunities *(→ promoted to GitHub issue #198)*
 Identify repeated patterns that should be abstracted, and any code that was written quickly to unblock a feature but should be cleaned up now that the structure is more settled.
 
-### INFRA-dead-code-cleanup
+### INFRA-dead-code-cleanup *(→ promoted to GitHub issue #199)*
 The project has a legacy Streamlit + CLI layer alongside the new web stack. Identify any code that's no longer reachable or relevant, and remove it to reduce maintenance surface.
 
-### INFRA-code-quality
+### INFRA-code-quality *(→ promoted to GitHub issue #200)*
 Review type coverage, missing error handling at system boundaries, and any other quality gaps introduced during the rapid build phase of the web rewrite.
+
+## 2026-03-28 (continued)
+
+### FEAT-socrates-mode
+"Explore with Socrates" — an alternative learning mode that teaches through the Socratic method: instead of explaining, the bot asks probing questions to guide the user toward insights themselves. Contrast with Feynman mode, which has the user explain concepts back. Socrates mode keeps the user in the interrogation seat.
+
+### FEAT-eliza-mode *(Easter egg)*
+"Explore with Eliza" — a hidden Easter egg mode that uses a faithful implementation of the original ELIZA chatbot (Weizenbaum, 1966). No LLMs involved. Eliza responds to transcript-related input using classic pattern-matching reflection. Purely for delight; the juxtaposition of 1960s AI with modern earnings analysis is the joke.
+
+### UX-mode-explainers
+Each learning mode (Feynman, Socrates, Eliza, any future additions) should have an accessible explainer: "Who is this?" and "How does this mode work?" Could be a tooltip, modal, or inline callout. Helps users understand what they're engaging with and sets expectations for the interaction style.
+
+### SPIKE-learning-methods
+Research and evaluate learning methods and frameworks relevant to the app's domain. Starting points: Feynman Technique, Socratic Method — but what else exists? (e.g. spaced repetition, elaborative interrogation, retrieval practice, case-based learning.) The output should be a short report on each method's fit for earnings call analysis, to inform future mode ideation.
 
 ### BUG-speaker-attribution
 Speaker attribution in Q&A is sometimes off by one sentence. The operator's closing line ("We'll go ahead and take our first question from X") introduces the next speaker but gets attributed to that speaker instead. In the AAPL transcript, "We'll go ahead and take our first question from Amit Daryanani of Evercore." appears in Amit's speech bubble rather than the operator's. Each speaker's text block needs to be trimmed of any leading sentence that belongs to the prior speaker.
