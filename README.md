@@ -239,6 +239,7 @@ cp web/env.example web/.env.local
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (Supabase → Project Settings → API) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (same page) |
 | `NEXT_PUBLIC_API_URL` | FastAPI base URL — use `http://localhost:8000` for local dev |
+| `ADMIN_SECRET_TOKEN` | Same value as Railway — used server-side by the `/admin/health` proxy route |
 
 #### Starting the dev servers
 
@@ -301,6 +302,11 @@ curl -X POST http://localhost:8000/admin/ingest \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL"}'
 # → {"status":"accepted","ticker":"AAPL","message":"Ingestion dispatched"}
+
+# Check system health (requires ADMIN_SECRET_TOKEN)
+curl http://localhost:8000/admin/health \
+  -H "X-Admin-Token: $ADMIN_SECRET_TOKEN"
+# → {"db":{"connected":true,"schema_version":9},"env_vars":{...},"external_apis":{...}}
 ```
 
 #### Run the API unit tests
@@ -330,7 +336,7 @@ pytest tests/unit/api/ -v
 4. After deploy, copy the Vercel production domain
 5. Back in Railway → Variables → set `NEXT_PUBLIC_VERCEL_URL` to the Vercel domain (without `https://`)
 
-Vercel automatically creates preview deployments for every PR. To allow a preview URL through Railway's CORS, add it to `CORS_EXTRA_ORIGINS` (comma-separated) in the Railway staging environment.
+Vercel automatically creates preview deployments for every PR. To allow all preview URLs through Railway's CORS, set `CORS_ORIGIN_REGEX` in Railway to a regex matching your app's preview URL pattern (e.g. `https://myapp(-[a-z0-9-]+)?\.vercel\.app`).
 
 ---
 
@@ -349,4 +355,4 @@ Vercel automatically creates preview deployments for every PR. To allow a previe
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Next.js frontend | Supabase anon key |
 | `NEXT_PUBLIC_API_URL` | Next.js frontend | FastAPI base URL (Railway domain in production, `http://localhost:8000` locally) |
 | `NEXT_PUBLIC_VERCEL_URL` | FastAPI CORS | Vercel production domain (without `https://`) — set in Railway production |
-| `CORS_EXTRA_ORIGINS` | FastAPI CORS | Optional comma-separated extra allowed origins (e.g. Vercel preview URLs in staging) |
+| `CORS_ORIGIN_REGEX` | FastAPI CORS | Regex matching allowed origin patterns — covers all Vercel preview URLs without enumerating them |
