@@ -1,5 +1,7 @@
 /** Admin health page — shows DB, env var, and external API status. Server component. */
 
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
 interface DbStatus {
   connected: boolean;
   schema_version: number;
@@ -24,13 +26,17 @@ const ENV_VAR_LABELS: Record<string, string> = {
 
 async function fetchHealth(): Promise<HealthData | null> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const adminToken = process.env.ADMIN_SECRET_TOKEN;
+  if (!apiUrl) return null;
 
-  if (!apiUrl || !adminToken) return null;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return null;
 
   try {
     const resp = await fetch(`${apiUrl}/admin/health`, {
-      headers: { "X-Admin-Token": adminToken },
+      headers: { Authorization: `Bearer ${session.access_token}` },
       cache: "no-store",
     });
     if (!resp.ok) return null;
