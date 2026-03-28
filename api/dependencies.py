@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: database connection, auth, admin token."""
+"""Shared FastAPI dependencies: database connection, auth, admin check."""
 
 import os
 from collections.abc import Generator
@@ -52,16 +52,21 @@ def get_current_user(authorization: Annotated[str | None, Header()] = None) -> s
     return user_id
 
 
-def verify_admin_token(x_admin_token: Annotated[str | None, Header()] = None) -> None:
-    """Raise 403 if X-Admin-Token header does not match ADMIN_SECRET_TOKEN env var."""
-    expected = os.environ.get("ADMIN_SECRET_TOKEN", "")
-    if not expected or x_admin_token != expected:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid or missing admin token",
-        )
-
-
 DbDep = Annotated[psycopg.Connection, Depends(get_db)]
 CurrentUserDep = Annotated[str, Depends(get_current_user)]
-AdminDep = Annotated[None, Depends(verify_admin_token)]
+
+
+def require_admin(user_id: CurrentUserDep, conn: DbDep) -> str:
+    """Raise 403 if the authenticated user does not have the admin role in profiles."""
+    row = conn.execute(
+        "SELECT role FROM public.profiles WHERE id = %s", (user_id,)
+    ).fetchone()
+    if row is None or row[0] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required",
+        )
+    return user_id
+
+
+RequireAdminDep = Annotated[str, Depends(require_admin)]

@@ -4,6 +4,7 @@ import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import jwt as pyjwt
 import pytest
 
 API_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../api"))
@@ -19,15 +20,27 @@ from main import app  # noqa: E402  (must come after sys.modules stub)
 ENV = {
     "DATABASE_URL": "postgresql://test",
     "SUPABASE_JWT_SECRET": "secret",
-    "ADMIN_SECRET_TOKEN": "test-admin-token",
 }
+
+ADMIN_UUID = "00000000-0000-0000-0000-000000000001"
+LEARNER_UUID = "00000000-0000-0000-0000-000000000002"
+
+ADMIN_AUTH = {"Authorization": f"Bearer {pyjwt.encode({'sub': ADMIN_UUID}, 'secret', algorithm='HS256')}"}
+LEARNER_AUTH = {"Authorization": f"Bearer {pyjwt.encode({'sub': LEARNER_UUID}, 'secret', algorithm='HS256')}"}
+
+
+def _make_mock_conn(role: str = "admin") -> MagicMock:
+    """Return a mock psycopg connection whose execute().fetchone() returns the given role."""
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = (role,)
+    return mock_conn
 
 
 @pytest.fixture()
 def client():
-    """Return a TestClient with required env vars set and side-effects mocked."""
+    """Return a TestClient with required env vars set and the DB mocked for an admin user."""
     with patch.dict(os.environ, ENV):
-        with patch("psycopg.connect"):
+        with patch("psycopg.connect", return_value=_make_mock_conn("admin")):
             from fastapi.testclient import TestClient
 
             with TestClient(app) as c:
@@ -47,7 +60,7 @@ def test_ingest_returns_202(client):
     resp = client.post(
         "/admin/ingest",
         json={"ticker": "AAPL"},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
 
     assert resp.status_code == 202
@@ -64,7 +77,7 @@ def test_ingest_uppercases_ticker(client):
     resp = client.post(
         "/admin/ingest",
         json={"ticker": "aapl"},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
 
     assert resp.status_code == 202
@@ -72,17 +85,27 @@ def test_ingest_uppercases_ticker(client):
     mock_fn.spawn.assert_called_once_with("AAPL")
 
 
-def test_ingest_missing_token_returns_403(client):
+def test_ingest_missing_auth_returns_401(client):
     resp = client.post("/admin/ingest", json={"ticker": "AAPL"})
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
-def test_ingest_wrong_token_returns_403(client):
+def test_ingest_invalid_jwt_returns_401(client):
     resp = client.post(
         "/admin/ingest",
         json={"ticker": "AAPL"},
-        headers={"X-Admin-Token": "wrong"},
+        headers={"Authorization": "Bearer not-a-real-jwt"},
     )
+    assert resp.status_code == 401
+
+
+def test_ingest_learner_role_returns_403(client):
+    with patch("psycopg.connect", return_value=_make_mock_conn("learner")):
+        resp = client.post(
+            "/admin/ingest",
+            json={"ticker": "AAPL"},
+            headers=LEARNER_AUTH,
+        )
     assert resp.status_code == 403
 
 
@@ -90,7 +113,7 @@ def test_ingest_missing_ticker_returns_422(client):
     resp = client.post(
         "/admin/ingest",
         json={},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
     assert resp.status_code == 422
 
@@ -99,7 +122,7 @@ def test_ingest_invalid_ticker_too_short_returns_422(client):
     resp = client.post(
         "/admin/ingest",
         json={"ticker": "A"},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
     assert resp.status_code == 422
 
@@ -108,7 +131,7 @@ def test_ingest_invalid_ticker_too_long_returns_422(client):
     resp = client.post(
         "/admin/ingest",
         json={"ticker": "TOOLONG"},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
     assert resp.status_code == 422
 
@@ -117,7 +140,7 @@ def test_ingest_invalid_ticker_non_alpha_returns_422(client):
     resp = client.post(
         "/admin/ingest",
         json={"ticker": "AP1L"},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
     assert resp.status_code == 422
 
@@ -129,7 +152,7 @@ def test_ingest_looks_up_correct_modal_function(client):
     client.post(
         "/admin/ingest",
         json={"ticker": "MSFT"},
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=ADMIN_AUTH,
     )
 
     MODAL_STUB.Function.lookup.assert_called_with("earnings-ingestion", "ingest_ticker")
@@ -160,36 +183,36 @@ def _make_schema_repo_mock(version: int = 9):
     return mock_cls
 
 
-def test_health_returns_200_with_valid_token(client):
+def test_health_returns_200(client):
     with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
-        resp = client.get(
-            "/admin/health",
-            headers={"X-Admin-Token": "test-admin-token"},
-        )
+        resp = client.get("/admin/health", headers=ADMIN_AUTH)
     assert resp.status_code == 200
 
 
-def test_health_missing_token_returns_403(client):
+def test_health_missing_auth_returns_401(client):
     resp = client.get("/admin/health")
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
-def test_health_wrong_token_returns_403(client):
+def test_health_invalid_jwt_returns_401(client):
     resp = client.get(
         "/admin/health",
-        headers={"X-Admin-Token": "wrong"},
+        headers={"Authorization": "Bearer not-a-real-jwt"},
     )
+    assert resp.status_code == 401
+
+
+def test_health_learner_role_returns_403(client):
+    with patch("psycopg.connect", return_value=_make_mock_conn("learner")):
+        resp = client.get("/admin/health", headers=LEARNER_AUTH)
     assert resp.status_code == 403
 
 
 def test_health_response_has_expected_keys(client):
     with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
-        resp = client.get(
-            "/admin/health",
-            headers={"X-Admin-Token": "test-admin-token"},
-        )
+        resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert "db" in body
     assert "env_vars" in body
@@ -206,10 +229,7 @@ def test_health_response_has_expected_keys(client):
 def test_health_db_connected_when_version_nonzero(client):
     with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(version=9)), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
-        resp = client.get(
-            "/admin/health",
-            headers={"X-Admin-Token": "test-admin-token"},
-        )
+        resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert body["db"]["connected"] is True
     assert body["db"]["schema_version"] == 9
@@ -218,10 +238,7 @@ def test_health_db_connected_when_version_nonzero(client):
 def test_health_db_disconnected_when_version_zero(client):
     with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(version=0)), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
-        resp = client.get(
-            "/admin/health",
-            headers={"X-Admin-Token": "test-admin-token"},
-        )
+        resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert body["db"]["connected"] is False
     assert body["db"]["schema_version"] == 0
@@ -232,15 +249,12 @@ def test_health_env_vars_present_when_set(client):
         "VOYAGE_API_KEY": "vk",
         "PERPLEXITY_API_KEY": "pk",
         "MODAL_TOKEN_ID": "mk",
-        "SUPABASE_JWT_SECRET": "sk",
+        "SUPABASE_JWT_SECRET": "secret",  # must match the key used to sign ADMIN_AUTH
     }
     with patch.dict(os.environ, extra_env), \
          patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
-        resp = client.get(
-            "/admin/health",
-            headers={"X-Admin-Token": "test-admin-token"},
-        )
+        resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert all(body["env_vars"].values())
 
@@ -256,10 +270,7 @@ def test_health_external_apis_unreachable_on_exception(client):
 
     with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
          patch("routes.admin.httpx", mock_httpx):
-        resp = client.get(
-            "/admin/health",
-            headers={"X-Admin-Token": "test-admin-token"},
-        )
+        resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert body["external_apis"]["voyage"]["reachable"] is False
     assert body["external_apis"]["perplexity"]["reachable"] is False

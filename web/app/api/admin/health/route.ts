@@ -1,23 +1,31 @@
-/** Server-side proxy for GET /admin/health — keeps ADMIN_SECRET_TOKEN off the client. */
+/** Server-side proxy for GET /admin/health — reads Supabase session and forwards JWT. */
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET(): Promise<NextResponse> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const adminToken = process.env.ADMIN_SECRET_TOKEN;
 
-  if (!apiUrl || !adminToken) {
+  if (!apiUrl) {
     return NextResponse.json(
-      { error: "Server misconfiguration: NEXT_PUBLIC_API_URL or ADMIN_SECRET_TOKEN is not set" },
+      { error: "Server misconfiguration: NEXT_PUBLIC_API_URL is not set" },
       { status: 500 }
     );
   }
 
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   try {
     const resp = await fetch(`${apiUrl}/admin/health`, {
-      headers: { "X-Admin-Token": adminToken },
+      headers: { Authorization: `Bearer ${session.access_token}` },
       cache: "no-store",
     });
-
     const data: unknown = await resp.json();
     return NextResponse.json(data, { status: resp.status });
   } catch {
