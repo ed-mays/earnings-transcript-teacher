@@ -135,6 +135,32 @@ def analytics_chat(_: RequireAdminDep) -> dict:
     return {"daily": daily, "avg_turns_per_session": avg}
 
 
+@router.get("/analytics/costs")
+def analytics_costs(_: RequireAdminDep) -> dict:
+    """Return token totals grouped by service for the last 30 days."""
+    with psycopg.connect(_db_url()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    properties->>'service' AS service,
+                    SUM((properties->>'input_tokens')::int) AS input_tokens,
+                    SUM((properties->>'output_tokens')::int) AS output_tokens
+                FROM analytics_events
+                WHERE event_name = 'api_call_completed'
+                  AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY service
+                ORDER BY service
+                """
+            )
+            by_service = {
+                row[0]: {"input_tokens": row[1] or 0, "output_tokens": row[2] or 0}
+                for row in cur.fetchall()
+                if row[0]
+            }
+    return {"by_service": by_service}
+
+
 @router.post("/ingest", status_code=202)
 async def trigger_ingestion(body: IngestRequest, _: RequireAdminDep) -> dict:
     """Dispatch ticker to the Modal ingestion pipeline and return 202 immediately."""

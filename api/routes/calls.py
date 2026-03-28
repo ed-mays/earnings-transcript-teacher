@@ -6,6 +6,7 @@ import psycopg
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
+from db.analytics import track
 from db.repositories import AnalysisRepository, CallRepository
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
@@ -257,7 +258,17 @@ def search_transcript(
     from pgvector.psycopg import register_vector
 
     client = voyageai.Client(api_key=api_key)
-    query_vector = client.embed([q], model="voyage-finance-2").embeddings[0]
+    embed_result = client.embed([q], model="voyage-finance-2")
+    query_vector = embed_result.embeddings[0]
+    track(
+        "api_call_completed",
+        properties={
+            "service": "voyage",
+            "operation": "search",
+            "input_tokens": embed_result.total_tokens,
+            "output_tokens": 0,
+        },
+    )
 
     with psycopg.connect(_db_url()) as conn:
         register_vector(conn)
