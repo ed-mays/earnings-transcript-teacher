@@ -227,7 +227,7 @@ cp web/env.example web/.env.local
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Supabase connection string (Supabase → Project Settings → Database → URI) |
-| `SUPABASE_JWT_SECRET` | JWT secret (Supabase → Project Settings → API) |
+| `SUPABASE_URL` | Supabase project URL, e.g. `https://[ref].supabase.co` (Supabase → Project Settings → API) |
 | `VOYAGE_API_KEY` | Required for the `/search` endpoint; other endpoints work without it |
 | `PERPLEXITY_API_KEY` | Required for the Feynman chat endpoint |
 
@@ -347,7 +347,7 @@ Vercel automatically creates preview deployments for every PR. To allow all prev
 | `PERPLEXITY_API_KEY` | Legacy pipeline | Perplexity key for Feynman learning chat ([perplexity.ai](https://www.perplexity.ai)) |
 | `ANTHROPIC_API_KEY` | Modal pipeline, legacy pipeline | Anthropic key for the LLM ingestion pipeline ([console.anthropic.com](https://console.anthropic.com)) |
 | `DATABASE_URL` | Modal pipeline, legacy pipeline, FastAPI | PostgreSQL connection string (default: `dbname=earnings_teacher`) |
-| `SUPABASE_JWT_SECRET` | FastAPI | JWT secret — Supabase → Project Settings → API |
+| `SUPABASE_URL` | FastAPI | Supabase project URL — used to fetch JWKS public keys for JWT verification |
 | `NEXT_PUBLIC_SUPABASE_URL` | Next.js frontend | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Next.js frontend | Supabase anon key |
 | `NEXT_PUBLIC_API_URL` | Next.js frontend | FastAPI base URL (Railway domain in production, `http://localhost:8000` locally) |

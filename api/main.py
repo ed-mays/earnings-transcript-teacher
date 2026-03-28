@@ -14,7 +14,7 @@ from routes import admin, calls, chat
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown hooks."""
     # Startup: validate required environment variables are present
-    required = ["DATABASE_URL", "SUPABASE_JWT_SECRET"]
+    required = ["DATABASE_URL", "SUPABASE_URL"]
     missing = [var for var in required if not os.environ.get(var)]
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")

@@ -13,7 +13,7 @@ if API_DIR not in sys.path:
 
 ENV = {
     "DATABASE_URL": "postgresql://test",
-    "SUPABASE_JWT_SECRET": "secret",
+    "SUPABASE_URL": "https://test.supabase.co",
 }
 
 
