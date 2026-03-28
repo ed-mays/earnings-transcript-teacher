@@ -161,6 +161,25 @@ def analytics_costs(_: RequireAdminDep) -> dict:
     return {"by_service": by_service}
 
 
+@router.get("/analytics/feynman")
+def analytics_feynman(_: RequireAdminDep) -> dict:
+    """Return feynman_stage_completed counts grouped by stage for the last 30 days."""
+    with psycopg.connect(_db_url()) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT (properties->>'stage')::int AS stage, COUNT(*) AS count
+                FROM analytics_events
+                WHERE event_name = 'feynman_stage_completed'
+                  AND created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY stage
+                ORDER BY stage
+                """
+            )
+            by_stage = [{"stage": row[0], "count": row[1]} for row in cur.fetchall() if row[0]]
+    return {"by_stage": by_stage}
+
+
 @router.post("/ingest", status_code=202)
 async def trigger_ingestion(body: IngestRequest, _: RequireAdminDep) -> dict:
     """Dispatch ticker to the Modal ingestion pipeline and return 202 immediately."""
