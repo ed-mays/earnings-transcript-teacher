@@ -47,5 +47,24 @@ Augment transcript analysis with macroeconomic indicators (CPI, interest rates, 
 ### FEAT-sentiment-divergence
 Surface cases where a generic external sentiment score disagrees with the app's domain-aware risk scoring on the same transcript snippet. A "disagreement finder" that highlights calls where generic sentiment reads as bullish but the app's model flags risk — useful as a model validation and research tool.
 
+## 2026-03-28
+
+*The following ideas should be groomed under a "Technical and Architecture Review" milestone for the web rewrite codebase.*
+
+### INFRA-architecture-review
+The web rewrite (FastAPI + Next.js + Supabase + Modal) grew quickly across many sessions. Need a structured review of whether the layering holds up: does the FastAPI/Next.js boundary stay clean? Are there places where UI logic leaks into the API layer or vice versa? Are auth and error handling consistent across routes?
+
+### INFRA-pattern-consistency
+As the codebase grew, patterns for auth, error handling, API response shapes, and data fetching were added incrementally and may have drifted. Audit for inconsistencies and document the intended patterns so future slices follow a clear convention.
+
+### INFRA-refactoring-opportunities
+Identify repeated patterns that should be abstracted, and any code that was written quickly to unblock a feature but should be cleaned up now that the structure is more settled.
+
+### INFRA-dead-code-cleanup
+The project has a legacy Streamlit + CLI layer alongside the new web stack. Identify any code that's no longer reachable or relevant, and remove it to reduce maintenance surface.
+
+### INFRA-code-quality
+Review type coverage, missing error handling at system boundaries, and any other quality gaps introduced during the rapid build phase of the web rewrite.
+
 ### BUG-speaker-attribution
 Speaker attribution in Q&A is sometimes off by one sentence. The operator's closing line ("We'll go ahead and take our first question from X") introduces the next speaker but gets attributed to that speaker instead. In the AAPL transcript, "We'll go ahead and take our first question from Amit Daryanani of Evercore." appears in Amit's speech bubble rather than the operator's. Each speaker's text block needs to be trimmed of any leading sentence that belongs to the prior speaker.
