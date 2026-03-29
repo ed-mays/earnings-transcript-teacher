@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from db.analytics import track
-from db.repositories import SchemaRepository
+from db.repositories import AnalyticsRepository, SchemaRepository
 from dependencies import RequireAdminDep
 
 logger = logging.getLogger(__name__)
@@ -86,19 +86,7 @@ def _db_url() -> str:
 def analytics_sessions(_: RequireAdminDep) -> list[dict]:
     """Return daily session_start counts for the last 30 days."""
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT DATE(created_at) AS date, COUNT(*) AS count
-                    FROM analytics_events
-                    WHERE event_name = 'session_start'
-                      AND created_at >= NOW() - INTERVAL '30 days'
-                    GROUP BY date
-                    ORDER BY date
-                    """
-                )
-                return [{"date": str(row[0]), "count": row[1]} for row in cur.fetchall()]
+        return AnalyticsRepository(_db_url()).get_daily_session_starts()
     except psycopg.Error as e:
         logger.error("DB error in analytics_sessions: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -108,36 +96,7 @@ def analytics_sessions(_: RequireAdminDep) -> list[dict]:
 def analytics_chat(_: RequireAdminDep) -> dict:
     """Return daily chat_turn counts and average turns per session for the last 30 days."""
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT DATE(created_at) AS date, COUNT(*) AS turns
-                    FROM analytics_events
-                    WHERE event_name = 'chat_turn'
-                      AND created_at >= NOW() - INTERVAL '30 days'
-                    GROUP BY date
-                    ORDER BY date
-                    """
-                )
-                daily = [{"date": str(row[0]), "turns": row[1]} for row in cur.fetchall()]
-
-                cur.execute(
-                    """
-                    SELECT AVG(turns_per_session)
-                    FROM (
-                        SELECT session_id, COUNT(*) AS turns_per_session
-                        FROM analytics_events
-                        WHERE event_name = 'chat_turn'
-                          AND created_at >= NOW() - INTERVAL '30 days'
-                        GROUP BY session_id
-                    ) sub
-                    """
-                )
-                row = cur.fetchone()
-                avg = round(float(row[0]), 1) if row and row[0] is not None else 0.0
-
-        return {"daily": daily, "avg_turns_per_session": avg}
+        return AnalyticsRepository(_db_url()).get_daily_chat_turns()
     except psycopg.Error as e:
         logger.error("DB error in analytics_chat: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -147,27 +106,7 @@ def analytics_chat(_: RequireAdminDep) -> dict:
 def analytics_costs(_: RequireAdminDep) -> dict:
     """Return token totals grouped by service for the last 30 days."""
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT
-                        properties->>'service' AS service,
-                        SUM((properties->>'input_tokens')::int) AS input_tokens,
-                        SUM((properties->>'output_tokens')::int) AS output_tokens
-                    FROM analytics_events
-                    WHERE event_name = 'api_call_completed'
-                      AND created_at >= NOW() - INTERVAL '30 days'
-                    GROUP BY service
-                    ORDER BY service
-                    """
-                )
-                by_service = {
-                    row[0]: {"input_tokens": row[1] or 0, "output_tokens": row[2] or 0}
-                    for row in cur.fetchall()
-                    if row[0]
-                }
-        return {"by_service": by_service}
+        return AnalyticsRepository(_db_url()).get_costs_by_service()
     except psycopg.Error as e:
         logger.error("DB error in analytics_costs: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -177,20 +116,7 @@ def analytics_costs(_: RequireAdminDep) -> dict:
 def analytics_feynman(_: RequireAdminDep) -> dict:
     """Return feynman_stage_completed counts grouped by stage for the last 30 days."""
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT (properties->>'stage')::int AS stage, COUNT(*) AS count
-                    FROM analytics_events
-                    WHERE event_name = 'feynman_stage_completed'
-                      AND created_at >= NOW() - INTERVAL '30 days'
-                    GROUP BY stage
-                    ORDER BY stage
-                    """
-                )
-                by_stage = [{"stage": row[0], "count": row[1]} for row in cur.fetchall() if row[0]]
-        return {"by_stage": by_stage}
+        return AnalyticsRepository(_db_url()).get_feynman_by_stage()
     except psycopg.Error as e:
         logger.error("DB error in analytics_feynman: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -200,23 +126,7 @@ def analytics_feynman(_: RequireAdminDep) -> dict:
 def analytics_ingestions(_: RequireAdminDep) -> dict:
     """Return ingestion_requested events ordered by recency."""
     try:
-        with psycopg.connect(_db_url()) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT properties->>'ticker', created_at
-                    FROM analytics_events
-                    WHERE event_name = 'ingestion_requested'
-                    ORDER BY created_at DESC
-                    LIMIT 100
-                    """
-                )
-                ingestions = [
-                    {"ticker": row[0], "requested_at": row[1].isoformat()}
-                    for row in cur.fetchall()
-                    if row[0]
-                ]
-        return {"ingestions": ingestions}
+        return AnalyticsRepository(_db_url()).get_recent_ingestions()
     except psycopg.Error as e:
         logger.error("DB error in analytics_ingestions: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable")

@@ -5,12 +5,26 @@ from collections.abc import Generator
 from typing import Annotated
 
 import jwt
+import psycopg
 from jwt import PyJWKClient
 from fastapi import Depends, Header, HTTPException, status
-import psycopg
+
+try:
+    from psycopg_pool import ConnectionPool as _ConnectionPool
+except ImportError:  # psycopg-pool not installed (e.g. test environments)
+    _ConnectionPool = None  # type: ignore[assignment,misc]
 
 # Module-level JWKS client — initialized lazily, cached across requests.
 _jwks_client: PyJWKClient | None = None
+
+# Module-level connection pool — set during app lifespan; None in tests.
+_pool: "_ConnectionPool | None" = None
+
+
+def set_pool(pool: object) -> None:
+    """Register the application-level connection pool (called from lifespan)."""
+    global _pool
+    _pool = pool  # type: ignore[assignment]
 
 
 def _get_jwks_client() -> PyJWKClient:
@@ -26,13 +40,21 @@ def _get_jwks_client() -> PyJWKClient:
 
 
 def get_db() -> Generator[psycopg.Connection, None, None]:
-    """Yield a psycopg connection from DATABASE_URL and close it after use."""
-    database_url = os.environ["DATABASE_URL"]
-    conn = psycopg.connect(database_url)
-    try:
-        yield conn
-    finally:
-        conn.close()
+    """Yield a psycopg connection, using the pool when available.
+
+    Falls back to a direct psycopg.connect() call when the pool is not set
+    (e.g. in unit tests that patch psycopg.connect directly).
+    """
+    if _pool is not None:
+        with _pool.connection() as conn:
+            yield conn
+    else:
+        database_url = os.environ["DATABASE_URL"]
+        conn = psycopg.connect(database_url)
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 
 def get_current_user(authorization: Annotated[str | None, Header()] = None) -> str:
