@@ -35,6 +35,8 @@ certifi==2026.2.25
     #   httpcore
     #   httpx
     #   requests
+cffi==2.0.0
+    # via cryptography
 charset-normalizer==3.4.6
     # via requests
 click==8.3.1
@@ -43,6 +45,8 @@ click==8.3.1
     #   typer
 coverage==7.13.5
     # via pytest-cov
+cryptography==46.0.6
+    # via pyjwt
 distro==1.9.0
     # via
     #   anthropic
@@ -166,6 +170,8 @@ psycopg-binary==3.3.3
     # via psycopg
 pyarrow==23.0.1
     # via streamlit
+pycparser==3.0
+    # via cffi
 pydantic==2.12.5
     # via
     #   anthropic
@@ -181,6 +187,8 @@ pygments==2.20.0
     # via
     #   pytest
     #   rich
+pyjwt==2.12.1
+    # via -r requirements.in
 pytest==9.0.2
     # via
     #   -r requirements.in
