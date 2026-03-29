@@ -367,31 +367,34 @@ def test_different_ticker_not_rate_limited(client):
 # Startup env var validation
 # ---------------------------------------------------------------------------
 
-def test_startup_fails_with_missing_required_var():
-    """App raises RuntimeError at startup when a required env var is absent."""
+def test_startup_marks_unhealthy_with_missing_required_var():
+    """App starts but marks itself unhealthy when a required env var is absent."""
     from fastapi.testclient import TestClient
 
     env_without_voyage = {k: v for k, v in ENV.items() if k != "VOYAGE_API_KEY"}
     with patch.dict(os.environ, env_without_voyage, clear=True):
-        with pytest.raises(RuntimeError, match="VOYAGE_API_KEY"):
-            with TestClient(app):
-                pass
+        with TestClient(app) as c:
+            resp = c.get("/health")
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["status"] == "unhealthy"
+    assert "VOYAGE_API_KEY" in body["missing_vars"]
 
 
-def test_startup_error_names_all_missing_vars():
-    """RuntimeError message lists every missing variable when multiple are absent."""
+def test_startup_names_all_missing_vars_in_health():
+    """Health endpoint lists every missing variable when multiple are absent."""
     from fastapi.testclient import TestClient
 
     db_only = {"DATABASE_URL": "postgresql://test", "SUPABASE_URL": "https://test.supabase.co"}
     with patch.dict(os.environ, db_only, clear=True):
-        with pytest.raises(RuntimeError) as exc_info:
-            with TestClient(app):
-                pass
-    message = str(exc_info.value)
-    assert "VOYAGE_API_KEY" in message
-    assert "PERPLEXITY_API_KEY" in message
-    assert "MODAL_TOKEN_ID" in message
-    assert "ANTHROPIC_API_KEY" in message
+        with TestClient(app) as c:
+            resp = c.get("/health")
+    assert resp.status_code == 503
+    missing = resp.json()["missing_vars"]
+    assert "VOYAGE_API_KEY" in missing
+    assert "PERPLEXITY_API_KEY" in missing
+    assert "MODAL_TOKEN_ID" in missing
+    assert "ANTHROPIC_API_KEY" in missing
 
 
 def test_startup_succeeds_with_all_required_vars():

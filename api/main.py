@@ -25,7 +25,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup: validate all required environment variables are present
     missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
     if missing:
-        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+        logger.critical("Missing required environment variables: %s", ", ".join(missing))
+        app.state.startup_ok = False
+        app.state.missing_vars = missing
+        yield
+        return
+
+    app.state.startup_ok = True
+    app.state.missing_vars = []
 
     # Cache validation snapshot for health endpoint reporting
     app.state.env_var_status = {var: bool(os.environ.get(var)) for var in REQUIRED_ENV_VARS}
@@ -92,6 +99,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 @app.get("/health")
-async def health() -> dict:
-    """Return service health status."""
-    return {"status": "ok"}
+async def health(request: Request) -> JSONResponse:
+    """Return service health status. Returns 503 if startup failed."""
+    if not getattr(request.app.state, "startup_ok", False):
+        missing = getattr(request.app.state, "missing_vars", [])
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "missing_vars": missing},
+        )
+    return JSONResponse(status_code=200, content={"status": "ok"})
