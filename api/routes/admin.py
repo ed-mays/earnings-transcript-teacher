@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 import httpx
 import modal
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
 from db.analytics import track
@@ -40,19 +40,18 @@ class IngestRequest(BaseModel):
         return upper
 
 
-_HEALTH_ENV_VARS = ["VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID"]
 _VOYAGE_URL = "https://api.voyageai.com"
 _PERPLEXITY_URL = "https://api.perplexity.ai"
 
 
 @router.get("/health")
-async def system_health(_: RequireAdminDep) -> dict:
+async def system_health(request: Request, _: RequireAdminDep) -> dict:
     """Return system health: DB connection, env var presence, and external API reachability."""
     db_url = os.environ.get("DATABASE_URL", "")
     repo = SchemaRepository(db_url)
     version: int = await asyncio.to_thread(repo.get_current_version)
 
-    env_vars = {key: bool(os.environ.get(key)) for key in _HEALTH_ENV_VARS}
+    env_vars = request.app.state.env_var_status
 
     voyage_reachable = False
     perplexity_reachable = False

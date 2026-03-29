@@ -23,7 +23,10 @@ if PROJECT_ROOT not in sys.path:
 ENV = {
     "DATABASE_URL": "postgresql://test",
     "SUPABASE_URL": "https://test.supabase.co",
-    "PERPLEXITY_API_KEY": "pplx-test",
+    "VOYAGE_API_KEY": "voyage-test-key",
+    "PERPLEXITY_API_KEY": "pplx-test-key",
+    "MODAL_TOKEN_ID": "modal-test-id",
+    "ANTHROPIC_API_KEY": "anth-test-key",
 }
 
 # RSA key pair used to sign and verify test JWTs.
