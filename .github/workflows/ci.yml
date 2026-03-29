@@ -92,6 +92,11 @@ jobs:
           PERPLEXITY_API_KEY: "dummy"
         run: ./scripts/run_tests.sh
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          fail_ci_if_error: false
+
   docker-build:
     runs-on: ubuntu-latest
 

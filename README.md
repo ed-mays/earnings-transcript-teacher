@@ -1,6 +1,10 @@
 # Earnings Transcript Teacher
 
 [![CI](https://github.com/ed-mays/earnings-transcript-teacher/actions/workflows/ci.yml/badge.svg)](https://github.com/ed-mays/earnings-transcript-teacher/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ed-mays/earnings-transcript-teacher/graph/badge.svg)](https://codecov.io/gh/ed-mays/earnings-transcript-teacher)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Docker](https://img.shields.io/badge/docker-ready-blue?logo=docker&logoColor=white)](api/Dockerfile)
 
 A Python pipeline that downloads, parses, and teaches earnings call transcripts. It extracts structured insights using classical NLP (TF-IDF, NMF, TextRank) and a three-tier LLM pipeline (Claude), stores everything in PostgreSQL, and surfaces it through two interfaces:
 
