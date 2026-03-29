@@ -1,6 +1,6 @@
 """Schema-aligned data models for the analysis pipeline.
 
-These dataclasses mirror the Postgres schema in db/schema.sql and serve
+These dataclasses mirror the Postgres schema (see db/migrations/) and serve
 as the structured output contract of the pipeline.  Downstream consumers
 (display, persistence, LLM prompts) all operate on a ``CallAnalysis``
 instance rather than raw print statements.

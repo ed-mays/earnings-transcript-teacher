@@ -128,9 +128,7 @@ $tableExists = docker exec $CONTAINER psql -U $DB_USER -d $DB_NAME -tAc `
     "SELECT EXISTS(SELECT FROM pg_tables WHERE schemaname='public' AND tablename='calls')" 2>$null
 
 if ($tableExists -eq "f") {
-    $schemaPath = (Resolve-Path "db\schema.sql").Path
-    docker cp $schemaPath "${CONTAINER}:/tmp/schema.sql" | Out-Null
-    docker exec $CONTAINER psql -U $DB_USER -d $DB_NAME -f /tmp/schema.sql | Out-Null
+    docker exec $CONTAINER python migrate.py | Out-Null
     Ok "Database schema applied"
 } else {
     Ok "Schema already applied - skipping"
