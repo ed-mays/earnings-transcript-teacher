@@ -31,7 +31,7 @@ Two projects: one for production, one for staging.
 1. Log in to [supabase.com](https://supabase.com) → New project
 2. Settings to record:
    - Project name: `earningsfluency` (prod) / `earningsfluency-staging` (staging)
-   - Region: `<!-- FILL IN: e.g. us-east-1 -->`
+   - Region: `us-east-2` (AWS Ohio)
    - Password: store in 1Password
 
 ### 1.2 Enable the pgvector extension
