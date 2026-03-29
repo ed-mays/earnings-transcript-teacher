@@ -38,7 +38,7 @@ BEGIN
         PERFORM cron.schedule(
             'cleanup-learning-sessions',
             '0 3 * * *',
-            $$DELETE FROM learning_sessions WHERE started_at < now() - INTERVAL '90 days'$$
+            'DELETE FROM learning_sessions WHERE started_at < now() - INTERVAL ''90 days'''
         );
     END IF;
 END $$;
@@ -51,7 +51,7 @@ BEGIN
         PERFORM cron.schedule(
             'cleanup-analytics-events',
             '30 3 * * *',
-            $$DELETE FROM analytics_events WHERE created_at < now() - INTERVAL '1 year'$$
+            'DELETE FROM analytics_events WHERE created_at < now() - INTERVAL ''1 year'''
         );
     END IF;
 END $$;
