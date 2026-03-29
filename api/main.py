@@ -8,10 +8,13 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
 from dependencies import set_pool
+from limiter import limiter
 from routes import admin, calls, chat
 
 
@@ -60,6 +63,9 @@ def build_cors_origin_regex() -> str | None:
 
 
 app = FastAPI(title="EarningsFluency API", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

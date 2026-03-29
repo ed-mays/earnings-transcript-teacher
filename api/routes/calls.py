@@ -3,11 +3,13 @@
 import os
 
 import psycopg
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
 from db.analytics import track
 from db.repositories import AnalysisRepository, CallRepository
+from limiter import limiter
+from settings import SEARCH_QUERY_MAX_LENGTH, SEARCH_RATE_LIMIT
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
 
@@ -235,9 +237,11 @@ def get_spans(
 
 
 @router.get("/{ticker}/search", response_model=SearchResponse)
+@limiter.limit(SEARCH_RATE_LIMIT)
 def search_transcript(
+    request: Request,
     ticker: str,
-    q: str = Query(min_length=1),
+    q: str = Query(min_length=1, max_length=SEARCH_QUERY_MAX_LENGTH),
     top_k: int = Query(default=5, ge=1, le=20),
 ) -> SearchResponse:
     """Semantic search within a transcript using pgvector similarity."""
