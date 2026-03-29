@@ -47,7 +47,7 @@ def test_get_all_calls(mock_psycopg_connect):
 
 
 def test_fetch_existing_embeddings(mock_psycopg_connect, mocker):
-    mocker.patch('db.repositories.register_vector')
+    mocker.patch('db.repositories.embeddings.register_vector')
     
     m_connect, m_cursor = mock_psycopg_connect
     

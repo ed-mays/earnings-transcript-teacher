@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
+from dependencies import set_pool
 from routes import admin, calls, chat
 
 
@@ -22,8 +23,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     missing = [var for var in required if not os.environ.get(var)]
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
+    # Start connection pool
+    try:
+        from psycopg_pool import ConnectionPool
+        pool = ConnectionPool(os.environ["DATABASE_URL"], min_size=2, max_size=10, open=True)
+        set_pool(pool)
+        logger.info("Database connection pool started (min=2, max=10)")
+    except Exception as exc:
+        logger.warning("Could not start connection pool, falling back to per-request connections: %s", exc)
+        pool = None
+
     yield
-    # Shutdown: nothing to clean up yet
+
+    # Shutdown: close pool if it was started
+    if pool is not None:
+        pool.close()
+        logger.info("Database connection pool closed")
 
 
 def build_cors_origins() -> list[str]:

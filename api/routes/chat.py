@@ -1,18 +1,21 @@
 """Feynman chat routes — SSE streaming endpoint."""
 
 import json
+import logging
 import os
 import time
 import uuid
 from pathlib import Path
 
-import psycopg
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from db.analytics import track
+from db.repositories import CallRepository, LearningRepository
 from dependencies import CurrentUserDep
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/calls", tags=["chat"])
 
@@ -40,10 +43,7 @@ def _load_prompt(stage: int) -> str:
 
 def _ticker_exists(ticker: str) -> bool:
     """Return True if a call record exists for the given ticker."""
-    with psycopg.connect(_db_url()) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM calls WHERE ticker = %s LIMIT 1", (ticker,))
-            return cur.fetchone() is not None
+    return CallRepository(_db_url()).get_company_info(ticker) is not None
 
 
 def _load_session(session_id: str, user_id: str) -> dict | None:
@@ -51,24 +51,13 @@ def _load_session(session_id: str, user_id: str) -> dict | None:
 
     Raises HTTPException 403 if the session belongs to a different user.
     """
-    with psycopg.connect(_db_url()) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT notes, user_id FROM learning_sessions WHERE id = %s LIMIT 1",
-                (session_id,),
-            )
-            row = cur.fetchone()
-
-    if not row:
-        return None
-
-    notes_json, owner_id = row
-    if str(owner_id) != user_id:
+    try:
+        return LearningRepository(_db_url()).get_session_by_id(session_id, user_id)
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Session belongs to a different user",
         )
-    return json.loads(notes_json) if notes_json else {}
 
 
 def _upsert_session(
@@ -81,30 +70,15 @@ def _upsert_session(
     completed: bool,
 ) -> None:
     """Insert or update a learning session row with the given message history."""
-    with psycopg.connect(_db_url()) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM calls WHERE ticker = %s LIMIT 1", (ticker,))
-            row = cur.fetchone()
-            if not row:
-                return
-            call_id = str(row[0])
-
-            notes = json.dumps({"topic": topic, "stage": stage, "messages": messages})
-            completed_sql = "now()" if completed else "NULL"
-            cur.execute(
-                f"""
-                INSERT INTO learning_sessions (id, user_id, call_id, notes, completed_at)
-                VALUES (%s, %s::uuid, %s::uuid, %s, {completed_sql})
-                ON CONFLICT (id) DO UPDATE SET
-                    notes = EXCLUDED.notes,
-                    completed_at = COALESCE(
-                        learning_sessions.completed_at,
-                        EXCLUDED.completed_at
-                    )
-                """,
-                (session_id, user_id, call_id, notes),
-            )
-        conn.commit()
+    LearningRepository(_db_url()).save_session(
+        ticker=ticker,
+        session_id=session_id,
+        topic=topic,
+        stage=stage,
+        messages=messages,
+        completed=completed,
+        user_id=user_id,
+    )
 
 
 def _sse_stream(
