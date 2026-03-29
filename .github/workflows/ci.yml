@@ -31,7 +31,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_DB: earnings_teacher_test
           POSTGRES_USER: postgres
@@ -57,6 +57,16 @@ jobs:
 
       - name: Install dependencies
         run: uv pip install --system -r requirements.txt
+
+      - name: Create stub Supabase auth objects
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d earnings_teacher_test <<'SQL'
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY);
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID LANGUAGE sql AS $$ SELECT NULL::UUID $$;
+          SQL
 
       - name: Run migrations (first pass)
         env:
