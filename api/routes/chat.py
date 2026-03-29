@@ -153,10 +153,19 @@ def _sse_stream(
                     "output_tokens": usage["usage"].get("completion_tokens", 0),
                 },
             )
+        # Fire stage_completed after the first response in a new session (len == 1 means
+        # only the opening user message was in the list — no prior assistant turns).
+        if len(messages) == 1:
+            track(
+                "feynman_stage_completed",
+                session_id=session_id,
+                properties={"stage": stage, "ticker": ticker},
+            )
         yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
 
-    except Exception as exc:
-        yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+    except Exception:
+        logger.exception("SSE stream error for session %s", session_id)
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Stream error'})}\n\n"
 
 
 # --- Request model ---
@@ -213,7 +222,6 @@ def chat(
         stage = max(1, min(body.stage, 5))
         history = []
         track("session_start", session_id=session_id, properties={"ticker": ticker, "stage": stage})
-        track("feynman_stage_completed", session_id=session_id, properties={"stage": stage, "ticker": ticker})
 
     system_prompt = _load_prompt(stage)
     messages = history + [{"role": "user", "content": body.message}]

@@ -1,11 +1,15 @@
 """FastAPI application entry point — CORS, lifespan, router registration."""
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 from routes import admin, calls, chat
 
@@ -53,6 +57,13 @@ app.add_middleware(
 app.include_router(calls.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch unhandled exceptions and return a generic 500 without leaking internals."""
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 @app.get("/health")
