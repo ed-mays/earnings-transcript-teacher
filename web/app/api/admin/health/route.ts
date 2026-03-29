@@ -1,5 +1,5 @@
-/** Server-side proxy for GET /admin/health — reads Supabase session and forwards JWT. */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+/** Server-side proxy for GET /admin/health — verifies admin role, forwards JWT to FastAPI. */
+import { requireAdminUser } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 
 export async function GET(): Promise<NextResponse> {
@@ -12,18 +12,12 @@ export async function GET(): Promise<NextResponse> {
     );
   }
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const authResult = await requireAdminUser();
+  if (authResult instanceof NextResponse) return authResult;
 
   try {
     const resp = await fetch(`${apiUrl}/admin/health`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${authResult.accessToken}` },
       cache: "no-store",
     });
     const data: unknown = await resp.json();

@@ -40,7 +40,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  if (user && pathname.startsWith("/admin")) {
+  const isAdminPath = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
+  if (user && isAdminPath) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -48,6 +49,10 @@ export async function proxy(request: NextRequest) {
       .single();
 
     if (profile?.role !== "admin") {
+      // Return JSON for API routes; redirect page routes to home.
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Admin role required" }, { status: 403 });
+      }
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";
       return NextResponse.redirect(homeUrl);
