@@ -187,7 +187,8 @@ CREATE TABLE IF NOT EXISTS misconceptions (
     correction        TEXT NOT NULL
 );
 
--- strategic_shifts migrated TEXT → TEXT[] (003) → JSONB[] (006); call_summary added in 005
+-- strategic_shifts: TEXT initially, converted to TEXT[] (migration 003) then JSONB[] (migration 006)
+-- call_summary column added in migration 005
 CREATE TABLE IF NOT EXISTS call_synthesis (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     call_id            UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE UNIQUE,
