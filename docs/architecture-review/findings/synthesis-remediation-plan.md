@@ -1,11 +1,12 @@
 # Milestone 7: Architecture Review Synthesis
 
 *Date: 2026-03-28*
-*Reviews completed: #195, #196, #197, #198, #199, #200*
+*Reviews completed: #195, #196, #197, #198, #199, #200, #220*
+*Additional gaps documented: [cross-cutting-concerns-gaps.md](cross-cutting-concerns-gaps.md)*
 
 ## Executive Summary
 
-The codebase is architecturally coherent at the macro level — FastAPI + Next.js layers are well-separated, the repository pattern is established, and the SSE streaming contract is sound. Two problems demand immediate attention before any new feature work: the admin API route handlers do not enforce the admin role (authenticated non-admins can call every `/api/admin/*` route directly), and every repository method swallows all exceptions and returns empty defaults, meaning a database outage is indistinguishable from "no data" at the HTTP boundary. Beneath these critical issues, the codebase has three compounding structural debts: `db/repositories.py` is a 1,229-line monolith that is already a merge-conflict magnet; raw SQL is scattered across route handlers bypassing the repository layer; and connection pooling is entirely absent, creating a hard scalability ceiling. The recommended approach is to address the two security/integrity issues in one PR, then execute the structural refactors as a coordinated sequence before resuming feature development.
+The codebase is architecturally coherent at the macro level — FastAPI + Next.js layers are well-separated, the repository pattern is established, and the SSE streaming contract is sound. Two problems demand immediate attention before any new feature work: the admin API route handlers do not enforce the admin role (authenticated non-admins can call every `/api/admin/*` route directly), and every repository method swallows all exceptions and returns empty defaults, meaning a database outage is indistinguishable from "no data" at the HTTP boundary. Beneath these critical issues, the codebase has three compounding structural debts: `db/repositories.py` is a 1,229-line monolith that is already a merge-conflict magnet; raw SQL is scattered across route handlers bypassing the repository layer; and connection pooling is entirely absent, creating a hard scalability ceiling. A separate set of operational gaps — rate limiting, startup validation, migration strategy, graceful shutdown, CI/CD pipeline, data retention, and input bounds — are documented in `cross-cutting-concerns-gaps.md`; three of them (rate limiting, startup validation, migration strategy) are prerequisites before the service carries production traffic. The recommended approach is to address the security/integrity issues first, then execute the structural refactors, then close the operational gaps before launch.
 
 ---
 
