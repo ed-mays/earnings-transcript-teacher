@@ -16,16 +16,19 @@ logger = logging.getLogger(__name__)
 from dependencies import set_pool
 from limiter import limiter
 from routes import admin, calls, chat
+from settings import REQUIRED_ENV_VARS
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown hooks."""
-    # Startup: validate required environment variables are present
-    required = ["DATABASE_URL", "SUPABASE_URL"]
-    missing = [var for var in required if not os.environ.get(var)]
+    # Startup: validate all required environment variables are present
+    missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
     if missing:
         raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
+    # Cache validation snapshot for health endpoint reporting
+    app.state.env_var_status = {var: bool(os.environ.get(var)) for var in REQUIRED_ENV_VARS}
 
     # Start connection pool
     try:

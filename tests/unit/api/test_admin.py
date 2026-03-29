@@ -22,6 +22,10 @@ from main import app  # noqa: E402  (must come after sys.modules stub)
 ENV = {
     "DATABASE_URL": "postgresql://test",
     "SUPABASE_URL": "https://test.supabase.co",
+    "VOYAGE_API_KEY": "voyage-test-key",
+    "PERPLEXITY_API_KEY": "pplx-test-key",
+    "MODAL_TOKEN_ID": "modal-test-id",
+    "ANTHROPIC_API_KEY": "anth-test-key",
 }
 
 # RSA key pair used to sign and verify test JWTs.
@@ -257,9 +261,10 @@ def test_health_response_has_expected_keys(client):
     assert "external_apis" in body
     assert "connected" in body["db"]
     assert "schema_version" in body["db"]
-    assert {"VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID"} == set(
-        body["env_vars"].keys()
-    )
+    assert {
+        "DATABASE_URL", "SUPABASE_URL",
+        "VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID", "ANTHROPIC_API_KEY",
+    } == set(body["env_vars"].keys())
     assert "voyage" in body["external_apis"]
     assert "perplexity" in body["external_apis"]
 
@@ -282,14 +287,9 @@ def test_health_db_disconnected_when_version_zero(client):
     assert body["db"]["schema_version"] == 0
 
 
-def test_health_env_vars_present_when_set(client):
-    extra_env = {
-        "VOYAGE_API_KEY": "vk",
-        "PERPLEXITY_API_KEY": "pk",
-        "MODAL_TOKEN_ID": "mk",
-    }
-    with patch.dict(os.environ, extra_env), \
-         patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
+def test_health_env_vars_reflect_startup_validation(client):
+    """env_vars in health response reflects startup-validated snapshot, not request-time state."""
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
         resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
@@ -351,3 +351,44 @@ def test_different_ticker_not_rate_limited(client):
         headers=ADMIN_AUTH,
     )
     assert resp.status_code == 202
+
+
+# ---------------------------------------------------------------------------
+# Startup env var validation
+# ---------------------------------------------------------------------------
+
+def test_startup_fails_with_missing_required_var():
+    """App raises RuntimeError at startup when a required env var is absent."""
+    from fastapi.testclient import TestClient
+
+    env_without_voyage = {k: v for k, v in ENV.items() if k != "VOYAGE_API_KEY"}
+    with patch.dict(os.environ, env_without_voyage, clear=True):
+        with pytest.raises(RuntimeError, match="VOYAGE_API_KEY"):
+            with TestClient(app):
+                pass
+
+
+def test_startup_error_names_all_missing_vars():
+    """RuntimeError message lists every missing variable when multiple are absent."""
+    from fastapi.testclient import TestClient
+
+    db_only = {"DATABASE_URL": "postgresql://test", "SUPABASE_URL": "https://test.supabase.co"}
+    with patch.dict(os.environ, db_only, clear=True):
+        with pytest.raises(RuntimeError) as exc_info:
+            with TestClient(app):
+                pass
+    message = str(exc_info.value)
+    assert "VOYAGE_API_KEY" in message
+    assert "PERPLEXITY_API_KEY" in message
+    assert "MODAL_TOKEN_ID" in message
+    assert "ANTHROPIC_API_KEY" in message
+
+
+def test_startup_succeeds_with_all_required_vars():
+    """App starts without error when all required env vars are set."""
+    from fastapi.testclient import TestClient
+
+    with patch.dict(os.environ, ENV):
+        with patch("psycopg.connect"):
+            with TestClient(app):
+                pass  # No exception raised

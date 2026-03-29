@@ -14,6 +14,10 @@ if API_DIR not in sys.path:
 ENV = {
     "DATABASE_URL": "postgresql://test",
     "SUPABASE_URL": "https://test.supabase.co",
+    "VOYAGE_API_KEY": "voyage-test-key",
+    "PERPLEXITY_API_KEY": "pplx-test-key",
+    "MODAL_TOKEN_ID": "modal-test-id",
+    "ANTHROPIC_API_KEY": "anth-test-key",
 }
 
 
