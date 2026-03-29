@@ -5,6 +5,7 @@
 --
 -- Prerequisites: pg_cron extension must be enabled before running this migration.
 -- Enable via: Supabase Dashboard → Database → Extensions → pg_cron
+-- On plain Postgres (e.g., CI), the cron.schedule calls are skipped automatically.
 
 -- Helper function for account deletion: hard-delete sessions/exercises and
 -- anonymize analytics events so they are retained for aggregate stats but are
@@ -32,28 +33,40 @@ $$;
 
 -- Schedule daily cleanup of learning_sessions older than 90 days (03:00 UTC).
 -- concept_exercises rows cascade automatically via ON DELETE CASCADE.
+-- Skipped if pg_cron is not installed (e.g., plain Postgres in CI).
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'cleanup-learning-sessions') THEN
-        PERFORM cron.schedule(
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+        RETURN;
+    END IF;
+    EXECUTE $cmd$
+        SELECT cron.schedule(
             'cleanup-learning-sessions',
             '0 3 * * *',
             'DELETE FROM learning_sessions WHERE started_at < now() - INTERVAL ''90 days'''
-        );
-    END IF;
+        ) WHERE NOT EXISTS (
+            SELECT 1 FROM cron.job WHERE jobname = 'cleanup-learning-sessions'
+        )
+    $cmd$;
 END $$;
 
 -- Schedule daily cleanup of analytics_events older than 1 year (03:30 UTC).
 -- Staggered 30 minutes after the sessions job to avoid simultaneous heavy deletes.
+-- Skipped if pg_cron is not installed (e.g., plain Postgres in CI).
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'cleanup-analytics-events') THEN
-        PERFORM cron.schedule(
+    IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+        RETURN;
+    END IF;
+    EXECUTE $cmd$
+        SELECT cron.schedule(
             'cleanup-analytics-events',
             '30 3 * * *',
             'DELETE FROM analytics_events WHERE created_at < now() - INTERVAL ''1 year'''
-        );
-    END IF;
+        ) WHERE NOT EXISTS (
+            SELECT 1 FROM cron.job WHERE jobname = 'cleanup-analytics-events'
+        )
+    $cmd$;
 END $$;
 
 INSERT INTO schema_version (version) VALUES (12) ON CONFLICT DO NOTHING;
