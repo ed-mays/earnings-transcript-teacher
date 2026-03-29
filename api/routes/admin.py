@@ -36,7 +36,7 @@ class IngestRequest(BaseModel):
         return upper
 
 
-_HEALTH_ENV_VARS = ["VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID", "SUPABASE_JWT_SECRET"]
+_HEALTH_ENV_VARS = ["VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID"]
 _VOYAGE_URL = "https://api.voyageai.com"
 _PERPLEXITY_URL = "https://api.perplexity.ai"
 

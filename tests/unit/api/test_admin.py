@@ -250,7 +250,7 @@ def test_health_response_has_expected_keys(client):
     assert "external_apis" in body
     assert "connected" in body["db"]
     assert "schema_version" in body["db"]
-    assert {"VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID", "SUPABASE_JWT_SECRET"} == set(
+    assert {"VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID"} == set(
         body["env_vars"].keys()
     )
     assert "voyage" in body["external_apis"]
@@ -280,7 +280,6 @@ def test_health_env_vars_present_when_set(client):
         "VOYAGE_API_KEY": "vk",
         "PERPLEXITY_API_KEY": "pk",
         "MODAL_TOKEN_ID": "mk",
-        "SUPABASE_JWT_SECRET": "sk",
     }
     with patch.dict(os.environ, extra_env), \
          patch("routes.admin.SchemaRepository", _make_schema_repo_mock()), \
