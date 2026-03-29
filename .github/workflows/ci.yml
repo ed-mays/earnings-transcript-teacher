@@ -10,6 +10,64 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      migrations: ${{ steps.filter.outputs.migrations }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            migrations:
+              - 'db/migrations/**'
+
+  migration-check:
+    needs: changes
+    if: needs.changes.outputs.migrations == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: earnings_teacher_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install --system -r requirements.txt
+
+      - name: Run migrations (first pass)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
+        run: python migrate.py
+
+      - name: Run migrations (idempotency check — second pass)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
+        run: python migrate.py
+
   test:
     runs-on: ubuntu-latest
 

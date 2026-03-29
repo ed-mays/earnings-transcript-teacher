@@ -94,7 +94,7 @@ ok "pgvector extension enabled"
 # ── 7. Schema ─────────────────────────────────────────────────────────────────
 TABLE_EXISTS=$(psql -d "$DB_NAME" -tAc "SELECT EXISTS(SELECT FROM pg_tables WHERE schemaname='public' AND tablename='calls')" 2>/dev/null)
 if [ "$TABLE_EXISTS" = "f" ]; then
-    psql -d "$DB_NAME" -f db/schema.sql &>/dev/null
+    python migrate.py &>/dev/null
     ok "Database schema applied"
 else
     ok "Schema already applied — skipping"
