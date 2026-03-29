@@ -1,0 +1,11 @@
+scikit-learn>=1.4
+psycopg[binary]>=3.1.18
+voyageai
+pgvector
+requests>=2.0
+perplexityai>=0.30
+anthropic
+pytest
+pytest-cov
+pytest-mock
+streamlit>=1.33.0
