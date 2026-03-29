@@ -17,12 +17,15 @@ interface StreamChatCallbacks {
   onError: (message: string) => void;
 }
 
-/** Stream a Feynman chat response via SSE. Uses fetch + ReadableStream because EventSource cannot POST. */
+/** Stream a Feynman chat response via SSE. Uses fetch + ReadableStream because EventSource cannot POST.
+ *  Pass an AbortSignal to cancel the in-flight stream when the caller unmounts or navigates away.
+ */
 export async function streamChat(
   ticker: string,
   message: string,
   sessionId: string | null,
-  callbacks: StreamChatCallbacks
+  callbacks: StreamChatCallbacks,
+  signal?: AbortSignal
 ): Promise<void> {
   const supabase = createSupabaseBrowserClient();
   const {
@@ -41,6 +44,7 @@ export async function streamChat(
     method: "POST",
     headers,
     body: JSON.stringify({ message, session_id: sessionId }),
+    signal,
   });
 
   if (!response.ok) {
@@ -58,9 +62,13 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buffer = "";
 
+  // Release the reader lock if the caller aborts mid-stream
+  signal?.addEventListener("abort", () => { reader.cancel().catch(() => {}); });
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
+    if (signal?.aborted) break;
 
     buffer += decoder.decode(value, { stream: true });
 

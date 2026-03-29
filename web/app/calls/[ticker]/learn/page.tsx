@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -26,6 +26,12 @@ export default function LearnPage({
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cancel any in-flight stream when the component unmounts (navigation away)
+  useEffect(() => {
+    return () => { abortControllerRef.current?.abort(); };
+  }, []);
 
   useEffect(() => {
     api
@@ -38,6 +44,10 @@ export default function LearnPage({
   }, [ticker]);
 
   async function handleSend(message: string) {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setError(null);
     setIsStreaming(true);
     setStreamingContent("");
@@ -60,11 +70,12 @@ export default function LearnPage({
         setIsStreaming(false);
       },
       onError(msg) {
+        if (controller.signal.aborted) return;
         setError(msg);
         setStreamingContent("");
         setIsStreaming(false);
       },
-    });
+    }, controller.signal);
   }
 
   function handleNewSession() {
