@@ -13,6 +13,11 @@ class OutdatedSchemaError(Exception):
     """Exception raised when the database schema is out of date."""
     pass
 
+
+class RepositoryError(Exception):
+    """Raised when a repository operation fails due to a database error."""
+    pass
+
 REQUIRED_SCHEMA_VERSION = 9
 
 
