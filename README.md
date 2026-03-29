@@ -158,6 +158,8 @@ python3 migrate.py
 ```
 This is idempotent — safe to run multiple times. The web UI (`app.py`) now only checks that the schema is current; it no longer auto-migrates on startup. Migration files live in `db/migrations/` as `NNN_name.sql`; add a new file there to introduce future schema changes.
 
+> **After any migration:** Re-verify Supabase Row Level Security policies on user-data tables using the checklist in [`docs/runbooks/rls-verification.md`](docs/runbooks/rls-verification.md). The authoritative policy SQL lives in [`db/rls-policies.sql`](db/rls-policies.sql) and is applied via the Supabase SQL Editor (not `migrate.py`).
+
 ### Clearing data
 To delete all stored analysis while keeping the database schema intact:
 ```bash
