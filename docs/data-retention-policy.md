@@ -37,7 +37,11 @@ When a user closes their account:
 1. **Hard-delete** all rows in `learning_sessions` where `user_id = <closed_user_id>`. `concept_exercises` rows cascade automatically.
 2. **Anonymize** `analytics_events` linked to any of the deleted sessions: set `session_id = NULL` on those rows. The events are retained for aggregate stats but are no longer traceable to the user.
 
-The SQL helper function `delete_user_data(user_id UUID)` (to be added in #242) will encapsulate these two steps for use by the account-deletion auth webhook.
+The SQL helper function `delete_user_data(user_id UUID)` encapsulates these two steps for use by the account-deletion auth webhook:
+
+```sql
+SELECT delete_user_data('<user-uuid>');
+```
 
 ---
 
@@ -50,9 +54,26 @@ The SQL helper function `delete_user_data(user_id UUID)` (to be added in #242) w
 
 ## Implementation approach
 
-Scheduled cleanup will be handled by **Supabase `pg_cron`** — a Postgres-native scheduler that runs SQL jobs inside the database. No additional infrastructure is required.
+Scheduled cleanup is handled by **Supabase `pg_cron`** — a Postgres-native scheduler that runs SQL jobs inside the database. No additional infrastructure is required.
 
-Implementation tracked in **#242**. Once that issue is complete, cron job details will be added here.
+### Enabling pg_cron
+
+The extension must be enabled once per environment before running migration 012:
+
+> Supabase Dashboard → Database → Extensions → search "pg_cron" → Enable
+
+### Cron jobs (migration 012)
+
+| Job name | Schedule | Action |
+|---|---|---|
+| `cleanup-learning-sessions` | `0 3 * * *` (daily 03:00 UTC) | Delete `learning_sessions` rows where `started_at < now() - 90 days`; `concept_exercises` cascade automatically |
+| `cleanup-analytics-events` | `30 3 * * *` (daily 03:30 UTC) | Delete `analytics_events` rows where `created_at < now() - 1 year` |
+
+Jobs are staggered by 30 minutes to avoid simultaneous heavy deletes. Verify they are registered after migration runs:
+
+```sql
+SELECT jobname, schedule, command FROM cron.job;
+```
 
 ---
 
