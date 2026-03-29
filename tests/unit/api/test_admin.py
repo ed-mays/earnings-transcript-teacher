@@ -2,6 +2,7 @@
 
 import os
 import sys
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
@@ -72,13 +73,22 @@ def _make_mock_conn(role: str = "admin") -> MagicMock:
 @pytest.fixture()
 def client():
     """Return a TestClient with required env vars set and the DB mocked for an admin user."""
-    with patch.dict(os.environ, ENV):
-        with patch("dependencies._get_jwks_client", return_value=_mock_jwks_client()):
-            with patch("psycopg.connect", return_value=_make_mock_conn("admin")):
-                from fastapi.testclient import TestClient
+    with ExitStack() as stack:
+        stack.enter_context(patch.dict(os.environ, ENV))
+        stack.enter_context(patch("dependencies._get_jwks_client", return_value=_mock_jwks_client()))
+        stack.enter_context(patch("psycopg.connect", return_value=_make_mock_conn("admin")))
+        try:
+            # Prevent ConnectionPool from attempting a real TCP connection (blocks ~30 s in CI).
+            # ModuleNotFoundError is raised when psycopg_pool is not installed (local dev).
+            stack.enter_context(
+                patch("psycopg_pool.ConnectionPool", side_effect=Exception("no pool in unit tests"))
+            )
+        except ModuleNotFoundError:
+            pass
+        from fastapi.testclient import TestClient
 
-                with TestClient(app) as c:
-                    yield c
+        with TestClient(app) as c:
+            yield c
 
 
 @pytest.fixture(autouse=True)
@@ -388,7 +398,14 @@ def test_startup_succeeds_with_all_required_vars():
     """App starts without error when all required env vars are set."""
     from fastapi.testclient import TestClient
 
-    with patch.dict(os.environ, ENV):
-        with patch("psycopg.connect"):
-            with TestClient(app):
-                pass  # No exception raised
+    with ExitStack() as stack:
+        stack.enter_context(patch.dict(os.environ, ENV))
+        stack.enter_context(patch("psycopg.connect"))
+        try:
+            stack.enter_context(
+                patch("psycopg_pool.ConnectionPool", side_effect=Exception("no pool in unit tests"))
+            )
+        except ModuleNotFoundError:
+            pass
+        with TestClient(app):
+            pass  # No exception raised

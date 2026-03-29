@@ -3,6 +3,7 @@
 import sys
 import os
 import json
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
@@ -57,14 +58,21 @@ def _mock_jwks_client() -> MagicMock:
 @pytest.fixture()
 def client():
     """Return a TestClient with env vars set and DB connections mocked."""
-    with patch.dict(os.environ, ENV):
-        with patch("dependencies._get_jwks_client", return_value=_mock_jwks_client()):
-            with patch("psycopg.connect"):
-                from fastapi.testclient import TestClient
-                from main import app
+    with ExitStack() as stack:
+        stack.enter_context(patch.dict(os.environ, ENV))
+        stack.enter_context(patch("dependencies._get_jwks_client", return_value=_mock_jwks_client()))
+        stack.enter_context(patch("psycopg.connect"))
+        try:
+            stack.enter_context(
+                patch("psycopg_pool.ConnectionPool", side_effect=Exception("no pool in unit tests"))
+            )
+        except ModuleNotFoundError:
+            pass
+        from fastapi.testclient import TestClient
+        from main import app
 
-                with TestClient(app) as c:
-                    yield c
+        with TestClient(app) as c:
+            yield c
 
 
 class TestChatAuth:
