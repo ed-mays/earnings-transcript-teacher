@@ -16,6 +16,7 @@ from db.repositories import CallRepository, LearningRepository
 from dependencies import CurrentUserDep
 from limiter import limiter
 from settings import CHAT_MESSAGE_MAX_LENGTH, CHAT_RATE_LIMIT, SESSION_HISTORY_MAX_TURNS
+from shutdown import shutdown_event
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,9 @@ def _sse_stream(
     start = time.monotonic()
     try:
         for chunk in stream_chat(messages, system_prompt):
+            if shutdown_event.is_set():
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Server restarting, please retry'})}\n\n"
+                return
             if isinstance(chunk, str):
                 accumulated.append(chunk)
                 yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"

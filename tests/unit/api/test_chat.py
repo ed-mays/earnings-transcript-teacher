@@ -228,6 +228,38 @@ class TestChatStreaming:
 
         mock_prompt.assert_called_once_with(3)
 
+    def test_shutdown_flag_emits_error_event(self, client):
+        """When shutdown_event is set, SSE generator emits error event and stops streaming."""
+        mock_chunks = ["Hello", " world"]
+
+        mock_event = MagicMock()
+        # First chunk passes, second chunk triggers shutdown
+        mock_event.is_set.side_effect = [False, True]
+
+        with (
+            patch("routes.chat._ticker_exists", return_value=True),
+            patch("routes.chat._load_prompt", return_value="You are a Feynman tutor."),
+            patch("routes.chat._upsert_session"),
+            patch("services.llm.stream_chat", return_value=iter(mock_chunks)),
+            patch("routes.chat.shutdown_event", mock_event),
+        ):
+            response = client.post(
+                "/api/calls/AAPL/chat",
+                json={"message": "explain revenue"},
+                headers={"Authorization": AUTH_HEADER},
+            )
+
+        assert response.status_code == 200
+        lines = [ln for ln in response.text.strip().split("\n\n") if ln]
+        events = [json.loads(ln.removeprefix("data: ")) for ln in lines if ln.startswith("data: ")]
+
+        error_events = [e for e in events if e["type"] == "error"]
+        done_events = [e for e in events if e["type"] == "done"]
+
+        assert len(error_events) == 1
+        assert "restarting" in error_events[0]["message"]
+        assert len(done_events) == 0
+
 
 # ---------------------------------------------------------------------------
 # Input bounds and rate limiting

@@ -2,6 +2,8 @@
 
 import logging
 import os
+import signal
+import threading
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -13,15 +15,25 @@ from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
+from db.analytics import drain as drain_analytics
 from dependencies import set_pool
 from limiter import limiter
 from routes import admin, calls, chat
 from settings import REQUIRED_ENV_VARS
+from shutdown import shutdown_event
+
+
+def _handle_sigterm(signum: int, frame: object) -> None:
+    """Set the shutdown flag so active SSE generators can emit a terminal event."""
+    shutdown_event.set()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown hooks."""
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _handle_sigterm)
+
     # Startup: validate all required environment variables are present
     missing = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
     if missing:
@@ -49,7 +61,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    # Shutdown: close pool if it was started
+    # Shutdown: drain in-flight analytics inserts, then close the connection pool
+    drain_analytics(timeout=5.0)
     if pool is not None:
         pool.close()
         logger.info("Database connection pool closed")
