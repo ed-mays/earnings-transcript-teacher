@@ -7,13 +7,15 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from db.analytics import track
 from db.repositories import CallRepository, LearningRepository
 from dependencies import CurrentUserDep
+from limiter import limiter
+from settings import CHAT_MESSAGE_MAX_LENGTH, CHAT_RATE_LIMIT, SESSION_HISTORY_MAX_TURNS
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +147,7 @@ def _sse_stream(
 # --- Request model ---
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(max_length=CHAT_MESSAGE_MAX_LENGTH)
     session_id: str | None = None
     stage: int = 1  # only applied when creating a new session; 1–5
 
@@ -153,7 +155,9 @@ class ChatRequest(BaseModel):
 # --- Endpoint ---
 
 @router.post("/{ticker}/chat")
+@limiter.limit(CHAT_RATE_LIMIT)
 def chat(
+    request: Request,
     ticker: str,
     body: ChatRequest,
     user_id: CurrentUserDep,
@@ -190,6 +194,12 @@ def chat(
         topic: str = notes.get("topic", body.message)
         stage: int = notes.get("stage", 1)
         history: list[dict] = notes.get("messages", [])
+        user_turns = sum(1 for m in history if m["role"] == "user")
+        if user_turns >= SESSION_HISTORY_MAX_TURNS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Session has reached the {SESSION_HISTORY_MAX_TURNS}-turn limit. Start a new session.",
+            )
     else:
         session_id = str(uuid.uuid4())
         topic = body.message

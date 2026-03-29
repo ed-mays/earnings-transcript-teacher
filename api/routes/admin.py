@@ -15,12 +15,16 @@ from pydantic import BaseModel, field_validator
 from db.analytics import track
 from db.repositories import AnalyticsRepository, SchemaRepository
 from dependencies import RequireAdminDep
+from settings import INGEST_RATE_LIMIT_WINDOW_SECONDS
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _TICKER_RE = re.compile(r"^[A-Z]{2,5}$")
+
+# Tracks the last ingest request per (user_id, ticker) for rate limiting.
+_ingest_last_request: dict[str, datetime] = {}
 
 
 class IngestRequest(BaseModel):
@@ -133,8 +137,20 @@ def analytics_ingestions(_: RequireAdminDep) -> dict:
 
 
 @router.post("/ingest", status_code=202)
-async def trigger_ingestion(body: IngestRequest, _: RequireAdminDep) -> dict:
+async def trigger_ingestion(body: IngestRequest, user_id: RequireAdminDep) -> dict:
     """Dispatch ticker to the Modal ingestion pipeline and return 202 immediately."""
+    key = f"{user_id}:{body.ticker}"
+    now = datetime.now(UTC)
+    last = _ingest_last_request.get(key)
+    if last is not None:
+        elapsed = (now - last).total_seconds()
+        if elapsed < INGEST_RATE_LIMIT_WINDOW_SECONDS:
+            remaining = int(INGEST_RATE_LIMIT_WINDOW_SECONDS - elapsed)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit: wait {remaining}s before ingesting {body.ticker} again.",
+            )
+    _ingest_last_request[key] = now
     fn = modal.Function.lookup("earnings-ingestion", "ingest_ticker")
     fn.spawn(body.ticker)
     logger.info("Ingestion dispatched: ticker=%s at=%s", body.ticker, datetime.now(UTC).isoformat())

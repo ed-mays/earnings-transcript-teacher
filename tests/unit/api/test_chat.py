@@ -216,3 +216,53 @@ class TestChatStreaming:
             )
 
         mock_prompt.assert_called_once_with(3)
+
+
+# ---------------------------------------------------------------------------
+# Input bounds and rate limiting
+# ---------------------------------------------------------------------------
+
+class TestChatInputBounds:
+    def test_422_when_message_exceeds_max_length(self, client):
+        """Message longer than 4000 chars is rejected by Pydantic before any API call."""
+        response = client.post(
+            "/api/calls/AAPL/chat",
+            json={"message": "x" * 4001},
+            headers={"Authorization": AUTH_HEADER},
+        )
+        assert response.status_code == 422
+
+    def test_422_when_session_history_exceeds_turn_limit(self, client):
+        """Session with 50 prior user turns returns 422 before streaming."""
+        # 50 user + 50 assistant messages = 100 entries
+        history = []
+        for _ in range(50):
+            history.append({"role": "user", "content": "explain"})
+            history.append({"role": "assistant", "content": "..."})
+        session_notes = {"topic": "margins", "stage": 1, "messages": history}
+
+        with (
+            patch("routes.chat._ticker_exists", return_value=True),
+            patch("routes.chat._load_session", return_value=session_notes),
+        ):
+            response = client.post(
+                "/api/calls/AAPL/chat",
+                json={"message": "continue", "session_id": "long-session-id"},
+                headers={"Authorization": AUTH_HEADER},
+            )
+        assert response.status_code == 422
+
+    def test_429_when_chat_rate_limit_exceeded(self, client):
+        """Endpoint returns 429 when the per-user rate limit is hit."""
+        from fastapi import HTTPException
+
+        def _raise_429(*args, **kwargs):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+        with patch("slowapi.Limiter._check_request_limit", side_effect=_raise_429):
+            response = client.post(
+                "/api/calls/AAPL/chat",
+                json={"message": "explain revenue"},
+                headers={"Authorization": AUTH_HEADER},
+            )
+        assert response.status_code == 429

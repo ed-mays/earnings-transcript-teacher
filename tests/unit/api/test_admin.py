@@ -83,6 +83,13 @@ def reset_modal():
     MODAL_STUB.reset_mock()
 
 
+@pytest.fixture(autouse=True)
+def reset_ingest_rate_limit():
+    """Clear the ingest TTL dict between tests to prevent rate-limit state bleed."""
+    import routes.admin as admin_mod
+    admin_mod._ingest_last_request.clear()
+
+
 def test_ingest_returns_202(client):
     mock_fn = MagicMock()
     MODAL_STUB.Function.lookup.return_value = mock_fn
@@ -305,3 +312,42 @@ def test_health_external_apis_unreachable_on_exception(client):
     body = resp.json()
     assert body["external_apis"]["voyage"]["reachable"] is False
     assert body["external_apis"]["perplexity"]["reachable"] is False
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting — POST /admin/ingest
+# ---------------------------------------------------------------------------
+
+def test_429_when_ingest_attempted_too_soon(client):
+    """Second ingest for the same user+ticker within 10 minutes returns 429."""
+    from datetime import UTC, datetime
+    import routes.admin as admin_mod
+
+    admin_mod._ingest_last_request[f"{ADMIN_UUID}:AAPL"] = datetime.now(UTC)
+
+    resp = client.post(
+        "/admin/ingest",
+        json={"ticker": "AAPL"},
+        headers=ADMIN_AUTH,
+    )
+    assert resp.status_code == 429
+    assert "Rate limit" in resp.json()["detail"]
+
+
+def test_different_ticker_not_rate_limited(client):
+    """Rate limit is per-ticker: a different ticker is not affected."""
+    from datetime import UTC, datetime
+    import routes.admin as admin_mod
+
+    mock_fn = MagicMock()
+    MODAL_STUB.Function.lookup.return_value = mock_fn
+
+    # AAPL is rate-limited, MSFT should proceed normally.
+    admin_mod._ingest_last_request[f"{ADMIN_UUID}:AAPL"] = datetime.now(UTC)
+
+    resp = client.post(
+        "/admin/ingest",
+        json={"ticker": "MSFT"},
+        headers=ADMIN_AUTH,
+    )
+    assert resp.status_code == 202

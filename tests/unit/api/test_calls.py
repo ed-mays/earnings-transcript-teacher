@@ -190,3 +190,19 @@ class TestSearchTranscript:
     def test_missing_query_param(self, client):
         response = client.get("/api/calls/AAPL/search")
         assert response.status_code == 422
+
+    def test_422_when_query_exceeds_max_length(self, client):
+        """Query longer than 500 chars is rejected by FastAPI before any API call."""
+        response = client.get(f"/api/calls/AAPL/search?q={'x' * 501}")
+        assert response.status_code == 422
+
+    def test_429_when_search_rate_limit_exceeded(self, client):
+        """Endpoint returns 429 when the per-user/IP rate limit is hit."""
+        from fastapi import HTTPException
+
+        def _raise_429(*args, **kwargs):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+        with patch("slowapi.Limiter._check_request_limit", side_effect=_raise_429):
+            response = client.get("/api/calls/AAPL/search?q=revenue")
+        assert response.status_code == 429
