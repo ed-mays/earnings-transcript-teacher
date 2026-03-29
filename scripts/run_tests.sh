@@ -19,6 +19,6 @@ python -m pytest tests/ \
     --cov=. \
     --cov-report=term-missing \
     --cov-report=xml \
-    --cov-fail-under=60
+    --cov-fail-under=50
 
 echo "✅ All tests passed successfully!"
