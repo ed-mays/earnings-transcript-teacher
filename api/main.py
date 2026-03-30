@@ -1,5 +1,6 @@
 """FastAPI application entry point — CORS, lifespan, router registration."""
 
+import json
 import logging
 import os
 import signal
@@ -7,6 +8,7 @@ import sys
 import threading
 import time
 import uuid
+from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -22,13 +24,25 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from context import request_id_var
-from settings import LOG_LEVEL_DEFAULT, SENTRY_DSN_ENV_VAR
+from settings import LOG_FORMAT_DEFAULT, LOG_LEVEL_DEFAULT, SENTRY_DSN_ENV_VAR
 
-logging.basicConfig(
-    stream=sys.stdout,
-    level=os.environ.get("LOG_LEVEL", LOG_LEVEL_DEFAULT).upper(),
-    format="%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s",
-)
+
+class JsonFormatter(logging.Formatter):
+    """Emit each log record as a single JSON object for log aggregation tools."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Serialize the log record to a JSON string."""
+        record.message = record.getMessage()
+        entry: dict = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.message,
+            "request_id": getattr(record, "request_id", "-"),
+        }
+        if record.exc_info:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry)
 
 
 class _RequestIdFilter(logging.Filter):
@@ -40,8 +54,17 @@ class _RequestIdFilter(logging.Filter):
         return True
 
 
-for _h in logging.getLogger().handlers:
-    _h.addFilter(_RequestIdFilter())
+_log_format = os.environ.get("LOG_FORMAT", LOG_FORMAT_DEFAULT).lower()
+_handler = logging.StreamHandler(sys.stdout)
+if _log_format == "json":
+    _handler.setFormatter(JsonFormatter())
+else:
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s")
+    )
+_handler.addFilter(_RequestIdFilter())
+logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", LOG_LEVEL_DEFAULT).upper())
+logging.getLogger().addHandler(_handler)
 
 def _configure_sentry() -> None:
     """Initialise Sentry SDK if SENTRY_DSN is configured; warn if absent."""

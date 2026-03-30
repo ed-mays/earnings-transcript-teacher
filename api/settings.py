@@ -1,6 +1,7 @@
 """Application-wide constants for rate limits and input bounds."""
 
 LOG_LEVEL_DEFAULT = "INFO"
+LOG_FORMAT_DEFAULT = "text"  # "json" in production, "text" for local development
 SENTRY_DSN_ENV_VAR = "SENTRY_DSN"
 LOG_SLOW_QUERY_THRESHOLD_MS = 500  # warn if any DB operation exceeds this
 
