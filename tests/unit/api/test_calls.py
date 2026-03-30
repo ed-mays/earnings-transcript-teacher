@@ -150,7 +150,7 @@ class TestGetCall:
             analysis_repo.get_themes_for_ticker.return_value = ["Growth", "Margins"]
             analysis_repo.get_topics_for_ticker.return_value = [["ai", "cloud"], ["revenue"]]
             analysis_repo.get_evasion_for_ticker.return_value = [
-                ("margin compression", 3, "Deflected with guidance")
+                ("margin compression", 3, "Deflected with guidance", "margin guidance", "John Smith")
             ]
             analysis_repo.get_strategic_shifts_for_ticker.return_value = [
                 {"prior_position": "on-prem", "current_position": "cloud", "investor_significance": "high"}
@@ -158,6 +158,9 @@ class TestGetCall:
             analysis_repo.get_speakers_for_ticker.return_value = [
                 ("Tim Cook", "executive", "CEO", "Apple Inc.")
             ]
+            analysis_repo.get_call_brief_for_ticker.return_value = None
+            analysis_repo.get_takeaways_for_ticker.return_value = []
+            analysis_repo.get_misconceptions_for_ticker.return_value = []
 
             response = client.get("/api/calls/AAPL")
 

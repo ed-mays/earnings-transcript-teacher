@@ -9,13 +9,14 @@ logger = logging.getLogger(__name__)
 
 import psycopg
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from dependencies import DbDep
+from dependencies import CurrentUserDep, DbDep
 from db.analytics import track
 from db.repositories import AnalysisRepository, CallRepository
 from limiter import limiter
-from settings import SEARCH_QUERY_MAX_LENGTH, SEARCH_RATE_LIMIT
+from settings import CHAT_RATE_LIMIT, SEARCH_QUERY_MAX_LENGTH, SEARCH_RATE_LIMIT
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
 
@@ -57,6 +58,8 @@ class EvasionItem(BaseModel):
     analyst_concern: str
     defensiveness_score: int
     evasion_explanation: str
+    question_topic: str | None = None
+    analyst_name: str | None = None
 
 
 class StrategicShift(BaseModel):
@@ -235,6 +238,8 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
             analyst_concern=r[0],
             defensiveness_score=r[1],
             evasion_explanation=r[2],
+            question_topic=r[3],
+            analyst_name=r[4],
         )
         for r in raw_evasion
     ]
@@ -404,4 +409,83 @@ def search_transcript(
             SearchResult(speaker=r[0], section=r[1], text=r[2], similarity=float(r[3]))
             for r in rows
         ],
+    )
+
+
+# --- Evasion signals ---
+
+_SIGNALS_SYSTEM_PROMPT = (
+    "You are a financial analyst educator. In 2–3 sentences, explain the investor "
+    "implications of the evasion pattern described. Focus on what a careful investor "
+    "or analyst should infer from this behaviour — not just what happened, but why it matters."
+)
+
+
+def _defensiveness_label(score: int) -> str:
+    """Map a 1–10 defensiveness score to a human-readable label."""
+    if score >= 8:
+        return "high"
+    if score >= 5:
+        return "medium"
+    return "low"
+
+
+class EvasionSignalsRequest(BaseModel):
+    analyst_concern: str
+    defensiveness_score: int
+    evasion_explanation: str
+
+
+def _signals_sse_stream(body: EvasionSignalsRequest):
+    """Generator that calls stream_chat and emits SSE-formatted lines for evasion signals."""
+    import json as _json
+    from services.llm import stream_chat
+
+    level = _defensiveness_label(body.defensiveness_score)
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Evasion concern: {body.analyst_concern}\n"
+                f"Defensiveness level: {level}\n"
+                f"What the executive avoided: {body.evasion_explanation}"
+            ),
+        }
+    ]
+    try:
+        for chunk in stream_chat(messages, _SIGNALS_SYSTEM_PROMPT):
+            if isinstance(chunk, str):
+                yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+    except Exception:
+        logger.exception("Error streaming evasion signals")
+        yield f"data: {_json.dumps({'type': 'error', 'message': 'Stream error'})}\n\n"
+
+
+@router.post("/{ticker}/evasion-signals")
+@limiter.limit(CHAT_RATE_LIMIT)
+def evasion_signals(
+    request: Request,
+    ticker: str,
+    body: EvasionSignalsRequest,
+    user_id: CurrentUserDep,
+) -> StreamingResponse:
+    """Stream a 2–3 sentence investor-implications framing for an evasion item as SSE."""
+    if not _ticker_exists(ticker):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Signals unavailable — PERPLEXITY_API_KEY is not configured",
+        )
+
+    return StreamingResponse(
+        _signals_sse_stream(body),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

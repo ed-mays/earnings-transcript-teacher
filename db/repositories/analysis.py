@@ -315,8 +315,12 @@ class AnalysisRepository:
 
     def get_evasion_for_ticker(
         self, ticker: str, conn: psycopg.Connection | None = None
-    ) -> list[tuple[str, int, str]]:
-        """Return evasion analysis entries for a ticker as (analyst_concern, defensiveness_score, evasion_explanation)."""
+    ) -> list[tuple[str, int, str, str | None, str | None]]:
+        """Return evasion analysis entries for a ticker.
+
+        Each row: (analyst_concern, defensiveness_score, evasion_explanation,
+                   question_topic, analyst_name)
+        """
         rows = []
         try:
             ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
@@ -324,7 +328,8 @@ class AnalysisRepository:
                 with c.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation
+                        SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation,
+                               ea.question_topic, ea.analyst_name
                         FROM evasion_analysis ea
                         JOIN calls c ON ea.call_id = c.id
                         WHERE c.ticker = %s

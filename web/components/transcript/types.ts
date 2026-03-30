@@ -10,6 +10,8 @@ export interface EvasionItem {
   analyst_concern: string;
   defensiveness_score: number;
   evasion_explanation: string;
+  question_topic: string | null;
+  analyst_name: string | null;
 }
 
 export interface StrategicShift {
