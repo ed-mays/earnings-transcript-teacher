@@ -103,7 +103,9 @@ Migrations are managed with the Supabase CLI. Ensure you have it installed (`bre
 
 4. Set `SUPABASE_URL` to your project URL (Dashboard → Project Settings → API → Project URL).
 
-5. Apply schema migrations:
+5. Enable the `vector` extension: Dashboard → **Database** → **Extensions** → search "vector" → enable it. This must be done before the first migration push because PostgreSQL does not make extension objects available within the same transaction that creates them.
+
+6. Apply schema migrations:
    ```bash
    supabase db push
    ```
