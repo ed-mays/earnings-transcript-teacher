@@ -46,8 +46,8 @@ def client():
 class TestListCalls:
     def test_returns_call_list(self, client):
         mock_rows = [
-            ("AAPL", "Apple Inc.", "2025-01-30", "Technology"),
-            ("MSFT", "Microsoft Corp.", None, None),
+            ("AAPL", "Apple Inc.", "2025-01-30", "Technology", "bullish", "low", "Expanding into AI hardware"),
+            ("MSFT", "Microsoft Corp.", None, None, None, None, None),
         ]
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = mock_rows
@@ -67,8 +67,13 @@ class TestListCalls:
         assert data[0]["company_name"] == "Apple Inc."
         assert data[0]["call_date"] == "2025-01-30"
         assert data[0]["industry"] == "Technology"
+        assert data[0]["overall_sentiment"] == "bullish"
+        assert data[0]["evasion_level"] == "low"
+        assert data[0]["top_strategic_shift"] == "Expanding into AI hardware"
         assert data[1]["ticker"] == "MSFT"
         assert data[1]["call_date"] is None
+        assert data[1]["evasion_level"] is None
+        assert data[1]["top_strategic_shift"] is None
 
     def test_logs_route_entry(self, client, caplog):
         """list_calls() emits an INFO log on entry."""
