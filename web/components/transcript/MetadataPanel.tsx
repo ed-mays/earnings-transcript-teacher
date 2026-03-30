@@ -225,16 +225,61 @@ function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
   );
 }
 
+/** Map evasion_level string to badge styling. */
+function evasionLevelBadge(level: string): { emoji: string; classes: string } {
+  if (level === "high") return { emoji: "🔴", classes: "text-red-700 bg-red-50" };
+  if (level === "medium") return { emoji: "🟡", classes: "text-amber-700 bg-amber-50" };
+  return { emoji: "🟢", classes: "text-green-700 bg-green-50" };
+}
+
 function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
   if (call.evasion_analyses.length === 0) {
     return <p className="text-sm text-zinc-400">No evasion patterns detected.</p>;
   }
 
+  const evasionLevel = call.signal_strip?.evasion_level ?? null;
+  const qaItems = call.evasion_analyses.filter((item) => item.analyst_name !== null);
+  const prepItems = call.evasion_analyses.filter((item) => item.analyst_name === null);
+
   return (
-    <div className="space-y-3">
-      {call.evasion_analyses.map((item, i) => (
-        <EvasionCard key={i} item={item} />
-      ))}
+    <div className="space-y-4">
+      {/* Overall evasion index */}
+      {evasionLevel && (() => {
+        const badge = evasionLevelBadge(evasionLevel);
+        return (
+          <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.classes}`}>
+            {badge.emoji} Evasion index: {evasionLevel}
+          </div>
+        );
+      })()}
+
+      {/* Q&A evasion */}
+      {qaItems.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Q&amp;A evasion
+          </p>
+          <div className="space-y-2">
+            {qaItems.map((item, i) => (
+              <EvasionCard key={i} item={item} ticker={call.ticker} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Prepared remarks evasion */}
+      {prepItems.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Prepared remarks
+          </p>
+          <div className="space-y-2">
+            {prepItems.map((item, i) => (
+              <EvasionCard key={i} item={item} ticker={call.ticker} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
