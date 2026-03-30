@@ -29,7 +29,7 @@ You will need accounts and keys for the following services. Gather them before s
 | [Perplexity AI](https://www.perplexity.ai) | Feynman chat endpoint | |
 | [Anthropic](https://console.anthropic.com) | LLM ingestion pipeline | |
 | [Modal](https://modal.com) | Cloud ingestion | Free tier available; required even for local dev (see note below) |
-| Sentry | Exception alerting | Optional; production only |
+| [Sentry](https://sentry.io) | Exception alerting | Optional; production only |
 
 > **`MODAL_TOKEN_ID` is required at startup.** The FastAPI app validates all required env vars at launch and returns HTTP 503 for every request if any are missing. Generate a token with `modal token new` before filling in your `.env`.
 
