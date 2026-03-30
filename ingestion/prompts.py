@@ -1,3 +1,31 @@
+"""
+Prompt constants for the three-tier LLM ingestion pipeline.
+
+The ingestion pipeline processes transcript chunks in three tiers of increasing depth:
+
+  Tier 1 (TIER_1_SYSTEM_PROMPT): Fast extraction pass run on every chunk by claude-haiku.
+  Identifies industry-specific jargon, extracts core concepts, and scores each chunk's
+  strategic importance (1–10). Sets requires_deep_analysis=True for chunks scoring >= 6.
+
+  Tier 2 (TIER_2_SYSTEM_PROMPT): Enrichment pass run by claude-sonnet on high-importance
+  chunks only (requires_deep_analysis=True). Generates beginner-friendly takeaways,
+  analyses executive evasion and defensiveness in Q&A exchanges, and flags common
+  investor misconceptions.
+
+  Tier 3 (TIER_3_SYNTHESIS_PROMPT): Global synthesis pass run by claude-haiku after all
+  chunks are processed. Produces a narrative call summary, overall sentiment, executive
+  tone, key thematic clusters, strategic shifts, and analyst sentiment.
+
+Supporting prompts:
+  HAIKU_NLP_SYNTHESIS_PROMPT — NLP synthesis pass that ranks keywords, clusters themes,
+  and selects top takeaways from the aggregated Tier 1/2 signals.
+
+  QA_DETECTION_SYSTEM_PROMPT — Fallback for detecting the Prepared Remarks → Q&A
+  section boundary when deterministic methods fail.
+
+Consumed by: ingestion/pipeline.py
+"""
+
 import json
 
 TIER_1_SYSTEM_PROMPT = """You are an expert financial analyst assistant.
