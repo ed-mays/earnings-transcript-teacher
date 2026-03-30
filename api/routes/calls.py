@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +270,9 @@ def search_transcript(
     from pgvector.psycopg import register_vector
 
     client = voyageai.Client(api_key=api_key)
+    _t0 = time.monotonic()
     embed_result = client.embed([q], model="voyage-finance-2")
+    logger.debug("voyage embed completed in %.0fms", (time.monotonic() - _t0) * 1000)
     query_vector = embed_result.embeddings[0]
     track(
         "api_call_completed",

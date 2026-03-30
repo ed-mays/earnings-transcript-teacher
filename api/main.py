@@ -5,6 +5,8 @@ import os
 import signal
 import sys
 import threading
+import time
+import uuid
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -13,14 +15,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
+from context import request_id_var
 from settings import LOG_LEVEL_DEFAULT
 
 logging.basicConfig(
     stream=sys.stdout,
     level=os.environ.get("LOG_LEVEL", LOG_LEVEL_DEFAULT).upper(),
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    format="%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s",
 )
+
+
+class _RequestIdFilter(logging.Filter):
+    """Inject request_id from ContextVar into every log record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Add request_id attribute so the log format can reference it."""
+        record.request_id = request_id_var.get("-")
+        return True
+
+
+for _h in logging.getLogger().handlers:
+    _h.addFilter(_RequestIdFilter())
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +112,38 @@ def build_cors_origin_regex() -> str | None:
     return os.environ.get("CORS_ORIGIN_REGEX") or None
 
 
+class CorrelationTimingMiddleware(BaseHTTPMiddleware):
+    """Read or generate X-Request-ID; log request duration; propagate ID to response."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        """Set request ID ContextVar, time the request, log on completion."""
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        token = request_id_var.set(request_id)
+        start = time.monotonic()
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_var.reset(token)
+            elapsed_ms = (time.monotonic() - start) * 1000
+            logger.info(
+                "completed %s %s in %.0fms [request_id=%s]",
+                request.method,
+                request.url.path,
+                elapsed_ms,
+                request_id,
+            )
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
 app = FastAPI(title="EarningsFluency API", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CorrelationTimingMiddleware is added first (becomes inner); CORSMiddleware added
+# last (becomes outermost) so CORS handles OPTIONS preflight before our middleware.
+app.add_middleware(CorrelationTimingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

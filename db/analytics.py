@@ -1,12 +1,20 @@
 """Analytics event tracking — fire-and-forget inserts into analytics_events."""
 
+import contextvars
 import logging
 import os
+import sys
 import threading
 import time
 from typing import Any
 
 import psycopg
+
+# Import slow-query threshold from settings (api/ is on sys.path at runtime).
+try:
+    from settings import LOG_SLOW_QUERY_THRESHOLD_MS
+except ImportError:
+    LOG_SLOW_QUERY_THRESHOLD_MS = 500
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +26,7 @@ def _insert_event(event_name: str, session_id: str | None, properties: dict[str,
     """Execute the DB insert; run in a background thread."""
     try:
         db_url = os.environ.get("DATABASE_URL", "dbname=earnings_teacher")
+        start = time.monotonic()
         with psycopg.connect(db_url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -28,6 +37,13 @@ def _insert_event(event_name: str, session_id: str | None, properties: dict[str,
                     (event_name, session_id, psycopg.types.json.Jsonb(properties or {})),
                 )
             conn.commit()
+        elapsed_ms = (time.monotonic() - start) * 1000
+        if elapsed_ms > LOG_SLOW_QUERY_THRESHOLD_MS:
+            logger.warning(
+                "slow query: analytics_events insert took %.0fms (threshold=%dms)",
+                elapsed_ms,
+                LOG_SLOW_QUERY_THRESHOLD_MS,
+            )
     except Exception as exc:
         logger.warning("analytics.track failed for event=%r: %s", event_name, exc)
 
@@ -51,10 +67,16 @@ def track(
 ) -> None:
     """Record an analytics event without blocking the caller.
 
-    Spawns a non-daemon thread to perform the DB insert. Logs a warning on failure
-    and never raises — safe to call on any code path.
+    Spawns a non-daemon thread to perform the DB insert. The current contextvars
+    context (including the request_id ContextVar) is copied into the thread so
+    background log entries remain linkable to the originating request. Logs a
+    warning on failure and never raises — safe to call on any code path.
     """
-    t = threading.Thread(target=_run_and_untrack, args=(event_name, session_id, properties), daemon=False)
+    ctx = contextvars.copy_context()
+    t = threading.Thread(
+        target=lambda: ctx.run(_run_and_untrack, event_name, session_id, properties),
+        daemon=False,
+    )
     with _threads_lock:
         _active_threads.append(t)
     t.start()

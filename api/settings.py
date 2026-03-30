@@ -1,6 +1,7 @@
 """Application-wide constants for rate limits and input bounds."""
 
 LOG_LEVEL_DEFAULT = "INFO"
+LOG_SLOW_QUERY_THRESHOLD_MS = 500  # warn if any DB operation exceeds this
 
 REQUIRED_ENV_VARS = [
     "DATABASE_URL",
