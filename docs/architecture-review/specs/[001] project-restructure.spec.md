@@ -6,6 +6,22 @@
 
 ---
 
+## Implementation status
+
+**Status:** Not implemented as specified
+
+**What happened instead:** The FastAPI backend (`api/`) was built directly against the existing top-level module structure. The `nlp/`, `parsing/`, `services/`, `ingestion/`, and `db/` directories were never moved under `core/`. The `core/` package exists but contains only `models.py`.
+
+**Remaining (deferred):**
+- Move `nlp/`, `parsing/`, `services/`, `ingestion/` under `core/`
+- Move `db/` under `core/db/`
+- Rewrite all consumer imports across `api/`, `app.py`, `ui/`, `cli/`, `tests/`
+- Delete original top-level module directories
+
+**Note:** The practical goal of this spec — keeping `api/` thin and delegating to business logic modules — was achieved without the physical restructure. The move may still be worth doing for long-term maintainability, but it is not blocking any current work.
+
+---
+
 ## Goal
 
 Move all framework-independent business logic into a `core/` package so that both the existing Streamlit app and the new FastAPI backend can import from the same place. At the end of this spec, the Streamlit app and CLI work exactly as before — the only change is where imports come from.

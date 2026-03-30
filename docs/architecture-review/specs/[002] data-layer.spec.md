@@ -6,6 +6,26 @@
 
 ---
 
+## Implementation status
+
+**Status:** Partially implemented
+
+**Implemented via:** #214
+
+**What was built:**
+- Repository pattern implemented as `db/repositories/` (split into `calls.py`, `analysis.py`, `learning.py`, `progress.py`, `embeddings.py`, `competitors.py`, `analytics.py`, `schema.py`)
+- Supabase JWT provides user identity — `user_id` is extracted from the auth token and passed through to repository calls
+- Schema has evolved to v12 (migrations 000–012 in `db/migrations/`)
+
+**Remaining / diverged:**
+- Abstract interfaces (`core/db/interfaces.py` with `abc.ABC` + `@abstractmethod`) were never created — concrete repository classes exist with no formal interface layer
+- Connection pooling: the spec called for `psycopg_pool.ConnectionPool`; current repositories accept a connection string and open connections per-call — pooling may still be needed for production load
+- Auth provider changed from Firebase UID to Supabase UID — the scoping model is the same but the token format and verification path differ
+- Some raw SQL remains in route files rather than going through repository classes (tracked in #195, #198)
+- Typed return dataclasses (replacing raw tuples) were partially adopted; some methods still return raw tuples or dicts
+
+---
+
 ## Goal
 
 Extract abstract repository interfaces from the current concrete PostgreSQL implementations. Add user_id scoping to support multi-tenancy. Introduce connection pooling for production readiness. At the end of this spec, the data layer has clean interfaces that a future non-Postgres backend could implement, and all user-scoped data is isolated by Firebase UID.
