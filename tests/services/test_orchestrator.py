@@ -54,7 +54,7 @@ def mock_external_calls(mocker):
     }
     mock_pipeline_class = mocker.patch("ingestion.pipeline.IngestionPipeline")
     mock_pipeline_instance = MagicMock()
-    mock_pipeline_instance.process.return_value = ([], mock_synthesis, TokenUsageSummary(), nlp_synthesis)
+    mock_pipeline_instance.process.return_value = ([], mock_synthesis, TokenUsageSummary(), nlp_synthesis, None)
     mock_pipeline_class.return_value = mock_pipeline_instance
 
 
