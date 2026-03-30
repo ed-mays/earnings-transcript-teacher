@@ -1,94 +1,216 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { CallDetail } from "./types";
 import { KeywordList } from "./KeywordList";
 import { ThemeCard } from "./ThemeCard";
 import { EvasionCard } from "./EvasionCard";
 import { StrategicShiftCard } from "./StrategicShiftCard";
 
-type Tab = "summary" | "keywords" | "themes" | "evasion" | "shifts";
+interface AnalystStepConfig {
+  id: string;
+  label: string;
+  question: string;
+  defaultExpanded: boolean;
+}
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "summary", label: "Summary" },
-  { id: "keywords", label: "Keywords" },
-  { id: "themes", label: "Themes" },
-  { id: "evasion", label: "Evasion" },
-  { id: "shifts", label: "Shifts" },
+const ANALYST_STEPS: AnalystStepConfig[] = [
+  {
+    id: "orient",
+    label: "Orient",
+    question: "What is this call about, and what was expected?",
+    defaultExpanded: true,
+  },
+  {
+    id: "read-the-room",
+    label: "Read the Room",
+    question: "How did management sound?",
+    defaultExpanded: false,
+  },
+  {
+    id: "understand-the-narrative",
+    label: "Understand the Narrative",
+    question: "What story did management tell?",
+    defaultExpanded: false,
+  },
+  {
+    id: "notice-what-was-avoided",
+    label: "Notice What Was Avoided",
+    question: "What wasn't said?",
+    defaultExpanded: false,
+  },
+  {
+    id: "track-what-changed",
+    label: "Track What Changed",
+    question: "What's different from last quarter?",
+    defaultExpanded: false,
+  },
+  {
+    id: "situate-in-context",
+    label: "Situate in Context",
+    question: "How does this fit the bigger picture?",
+    defaultExpanded: false,
+  },
 ];
 
 interface MetadataPanelProps {
   call: CallDetail;
 }
 
-/** Sidebar panel with tabbed metadata: summary, keywords, themes, evasion, strategic shifts. */
+/** Sidebar panel with analyst step framework: 6 collapsible sections teaching a mental model. */
 export function MetadataPanel({ call }: MetadataPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("summary");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(
+    Object.fromEntries(ANALYST_STEPS.map((s) => [s.id, s.defaultExpanded]))
+  );
+
+  function toggle(id: string) {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   return (
     <div className="flex flex-col rounded-xl border border-zinc-200 bg-zinc-50">
-      {/* Tab bar */}
-      <div className="flex border-b border-zinc-200 overflow-x-auto">
-        {TABS.map((tab) => (
+      {ANALYST_STEPS.map((step, i) => (
+        <div key={step.id} className={i > 0 ? "border-t border-zinc-200" : ""}>
+          {/* Step header */}
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`shrink-0 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? "border-b-2 border-zinc-900 text-zinc-900"
-                : "text-zinc-500 hover:text-zinc-700"
-            }`}
+            onClick={() => toggle(step.id)}
+            className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-zinc-100 transition-colors"
           >
-            {tab.label}
+            <span className="mt-0.5 shrink-0 text-xs font-semibold text-zinc-400 tabular-nums w-4">
+              {i + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-semibold text-zinc-900">{step.label}</span>
+              <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{step.question}</p>
+            </div>
+            <span className="mt-0.5 shrink-0 text-zinc-400 text-xs">
+              {expanded[step.id] ? "▲" : "▼"}
+            </span>
           </button>
-        ))}
-      </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === "summary" && <SummaryTab call={call} />}
-        {activeTab === "keywords" && <KeywordList keywords={call.keywords} />}
-        {activeTab === "themes" && <ThemesTab topics={call.topics} themes={call.themes} />}
-        {activeTab === "evasion" && <EvasionTab items={call.evasion_analyses} />}
-        {activeTab === "shifts" && <ShiftsTab shifts={call.strategic_shifts} />}
-      </div>
+          {/* Step body */}
+          {expanded[step.id] && (
+            <div className="px-4 pb-4 pt-1">
+              <StepContent step={step} call={call} />
+              <Link
+                href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
+                className="mt-4 block text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
+              >
+                Explore with Feynman →
+              </Link>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Language layer — always visible */}
+      {call.keywords.length > 0 && (
+        <div className="border-t border-zinc-200 px-4 py-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Language &amp; Keywords
+          </p>
+          <KeywordList keywords={call.keywords} />
+        </div>
+      )}
     </div>
   );
 }
 
-function SummaryTab({ call }: { call: CallDetail }) {
-  const { synthesis } = call;
+interface StepContentProps {
+  step: AnalystStepConfig;
+  call: CallDetail;
+}
 
-  if (!synthesis) {
-    return <p className="text-sm text-zinc-400">No summary available.</p>;
+function StepContent({ step, call }: StepContentProps) {
+  switch (step.id) {
+    case "orient":
+      return <OrientStep call={call} />;
+    case "read-the-room":
+      return <ReadTheRoomStep call={call} />;
+    case "understand-the-narrative":
+      return <UnderstandTheNarrativeStep call={call} />;
+    case "notice-what-was-avoided":
+      return <NoticeWhatWasAvoidedStep call={call} />;
+    case "track-what-changed":
+      return <TrackWhatChangedStep call={call} />;
+    case "situate-in-context":
+      return <SituateInContextStep />;
+    default:
+      return null;
+  }
+}
+
+function OrientStep({ call }: { call: CallDetail }) {
+  const sentiment = call.synthesis?.overall_sentiment;
+
+  if (!sentiment) {
+    return <p className="text-sm text-zinc-400">No orientation data available.</p>;
   }
 
-  const rows = [
-    { label: "Overall sentiment", value: synthesis.overall_sentiment },
-    { label: "Executive tone", value: synthesis.executive_tone },
-    { label: "Analyst sentiment", value: synthesis.analyst_sentiment },
-  ];
-
   return (
-    <dl className="space-y-4">
-      {rows.map(({ label, value }) =>
-        value ? (
-          <div key={label}>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              {label}
-            </dt>
-            <dd className="mt-1 text-sm text-zinc-700">{value}</dd>
-          </div>
-        ) : null
-      )}
-    </dl>
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        Overall sentiment
+      </dt>
+      <dd className="mt-1 text-sm text-zinc-700">{sentiment}</dd>
+    </div>
   );
 }
 
-function ThemesTab({ topics, themes }: { topics: string[][]; themes: string[] }) {
-  // topics is a list of term lists; themes is the same flat but labelled differently
-  // Use topics if available (richer), fall back to themes
-  const source = topics.length > 0 ? topics : themes.map((t) => [t]);
+function ReadTheRoomStep({ call }: { call: CallDetail }) {
+  const { synthesis, speakers } = call;
+  const hasSentiment = synthesis?.executive_tone || synthesis?.analyst_sentiment;
+
+  return (
+    <div className="space-y-4">
+      {hasSentiment && (
+        <dl className="grid grid-cols-2 gap-3">
+          {synthesis?.executive_tone && (
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Executive tone
+              </dt>
+              <dd className="mt-1 text-sm text-zinc-700">{synthesis.executive_tone}</dd>
+            </div>
+          )}
+          {synthesis?.analyst_sentiment && (
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Analyst sentiment
+              </dt>
+              <dd className="mt-1 text-sm text-zinc-700">{synthesis.analyst_sentiment}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
+      {speakers.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Speakers
+          </p>
+          <ul className="space-y-1.5">
+            {speakers.map((s, i) => (
+              <li key={i} className="text-sm">
+                <span className="font-medium text-zinc-800">{s.name}</span>
+                {s.title && <span className="text-zinc-500">, {s.title}</span>}
+                {s.firm && <span className="text-zinc-400"> · {s.firm}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!hasSentiment && speakers.length === 0 && (
+        <p className="text-sm text-zinc-400">No room dynamics data available.</p>
+      )}
+    </div>
+  );
+}
+
+function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
+  const source = call.topics.length > 0 ? call.topics : call.themes.map((t) => [t]);
 
   if (source.length === 0) {
     return <p className="text-sm text-zinc-400">No themes extracted.</p>;
@@ -103,30 +225,34 @@ function ThemesTab({ topics, themes }: { topics: string[][]; themes: string[] })
   );
 }
 
-function EvasionTab({ items }: { items: CallDetail["evasion_analyses"] }) {
-  if (items.length === 0) {
+function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
+  if (call.evasion_analyses.length === 0) {
     return <p className="text-sm text-zinc-400">No evasion patterns detected.</p>;
   }
 
   return (
     <div className="space-y-3">
-      {items.map((item, i) => (
+      {call.evasion_analyses.map((item, i) => (
         <EvasionCard key={i} item={item} />
       ))}
     </div>
   );
 }
 
-function ShiftsTab({ shifts }: { shifts: CallDetail["strategic_shifts"] }) {
-  if (shifts.length === 0) {
+function TrackWhatChangedStep({ call }: { call: CallDetail }) {
+  if (call.strategic_shifts.length === 0) {
     return <p className="text-sm text-zinc-400">No strategic shifts identified.</p>;
   }
 
   return (
     <div className="space-y-3">
-      {shifts.map((shift, i) => (
+      {call.strategic_shifts.map((shift, i) => (
         <StrategicShiftCard key={i} shift={shift} />
       ))}
     </div>
   );
+}
+
+function SituateInContextStep() {
+  return <p className="text-sm text-zinc-400">Context data coming soon.</p>;
 }

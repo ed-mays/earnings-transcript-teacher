@@ -5,11 +5,12 @@ import { useRef, useState } from "react";
 interface ChatInputProps {
   onSend: (message: string) => void;
   isStreaming: boolean;
+  initialValue?: string;
 }
 
 /** Textarea with send button. Submits on Enter; Shift+Enter inserts a newline. */
-export function ChatInput({ onSend, isStreaming }: ChatInputProps) {
-  const [value, setValue] = useState("");
+export function ChatInput({ onSend, isStreaming, initialValue = "" }: ChatInputProps) {
+  const [value, setValue] = useState(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSubmit() {
