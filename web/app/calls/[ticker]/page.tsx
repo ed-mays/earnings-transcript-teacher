@@ -10,7 +10,7 @@ async function fetchCallDetail(ticker: string): Promise<CallDetail | null> {
   if (!API_URL) throw new Error("NEXT_PUBLIC_API_URL is not configured");
 
   const res = await fetch(`${API_URL}/api/calls/${ticker}`, {
-    next: { revalidate: 60 },
+    next: { revalidate: 300 },
   });
 
   if (res.status === 404) return null;

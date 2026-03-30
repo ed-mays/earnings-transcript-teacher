@@ -29,9 +29,18 @@ def client():
         with patch("psycopg.connect"):
             from fastapi.testclient import TestClient
             from main import app
+            from dependencies import get_db
 
+            def override_get_db():
+                """Bypass the connection pool; forward to the (possibly re-patched) psycopg.connect."""
+                import psycopg as _psycopg
+                conn = _psycopg.connect(os.environ["DATABASE_URL"])
+                yield conn
+
+            app.dependency_overrides[get_db] = override_get_db
             with TestClient(app) as c:
                 yield c
+            app.dependency_overrides.pop(get_db, None)
 
 
 class TestListCalls:
