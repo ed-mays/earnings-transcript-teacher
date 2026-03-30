@@ -10,16 +10,19 @@ import uuid
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
+import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from context import request_id_var
-from settings import LOG_LEVEL_DEFAULT
+from settings import LOG_LEVEL_DEFAULT, SENTRY_DSN_ENV_VAR
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -39,6 +42,23 @@ class _RequestIdFilter(logging.Filter):
 
 for _h in logging.getLogger().handlers:
     _h.addFilter(_RequestIdFilter())
+
+def _configure_sentry() -> None:
+    """Initialise Sentry SDK if SENTRY_DSN is configured; warn if absent."""
+    dsn = os.environ.get(SENTRY_DSN_ENV_VAR)
+    if dsn:
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=os.environ.get("ENV", "production"),
+            integrations=[StarletteIntegration(), FastApiIntegration()],
+        )
+    else:
+        logging.getLogger(__name__).warning(
+            "SENTRY_DSN is not set — exception alerting disabled"
+        )
+
+
+_configure_sentry()
 
 logger = logging.getLogger(__name__)
 

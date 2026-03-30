@@ -387,3 +387,4 @@ Vercel automatically creates preview deployments for every PR. To allow all prev
 | `NEXT_PUBLIC_API_URL` | Next.js frontend | FastAPI base URL (Railway domain in production, `http://localhost:8000` locally) |
 | `NEXT_PUBLIC_VERCEL_URL` | FastAPI CORS | Vercel production domain (without `https://`) — set in Railway production |
 | `CORS_ORIGIN_REGEX` | FastAPI CORS | Regex matching allowed origin patterns — covers all Vercel preview URLs without enumerating them |
+| `SENTRY_DSN` | FastAPI (optional) | Sentry DSN — enables production exception alerting; service starts without it but logs a warning |
