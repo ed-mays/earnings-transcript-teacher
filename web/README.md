@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# web/
 
-## Getting Started
+Next.js 16 frontend for Earnings Transcript Teacher.
 
-First, run the development server:
+> **Note:** This project uses Next.js 16, which has breaking changes from older versions.
+> Read `web/AGENTS.md` before writing any frontend code.
+
+## Prerequisites
+
+- Node.js 20+
+- The FastAPI backend running locally (`./dev.sh api` from the repo root)
+
+## Environment variables
+
+Copy the template and fill in your values:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (Supabase → Project Settings → API) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (same page) |
+| `NEXT_PUBLIC_API_URL` | FastAPI base URL — use `http://localhost:8000` for local dev |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Running
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev        # http://localhost:3000
+```
 
-## Learn More
+Or start both API + frontend together from the repo root:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+./dev.sh           # starts api (8000) + web (3000)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## How web/ connects to the backend
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Auth:** Supabase client (`lib/supabase.ts`) handles login/session; JWT is forwarded to FastAPI on every request.
+- **API calls:** `NEXT_PUBLIC_API_URL` points to the FastAPI backend. All data fetching goes through FastAPI — Supabase is auth-only on the frontend.
+- **Proxy:** `proxy.ts` provides a local dev proxy to avoid CORS issues when testing against a non-local API.
 
-## Deploy on Vercel
+## Key files
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Path | Purpose |
+|---|---|
+| `app/` | Next.js App Router pages and layouts |
+| `components/` | Shared UI components |
+| `lib/` | Supabase client, API helpers |
+| `AGENTS.md` | Critical notes for AI coding agents — read before editing |

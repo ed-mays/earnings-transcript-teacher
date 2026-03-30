@@ -264,6 +264,9 @@ cp web/env.example web/.env.local
 | `SUPABASE_URL` | Supabase project URL, e.g. `https://[ref].supabase.co` (Supabase → Project Settings → API) |
 | `VOYAGE_API_KEY` | Required for the `/search` endpoint; other endpoints work without it |
 | `PERPLEXITY_API_KEY` | Required for the Feynman chat endpoint |
+| `MODAL_TOKEN_ID` | Required — Modal token ID for dispatching ingestion jobs (`modal token new` to generate) |
+
+> `api/.env.example` is the canonical reference for all API env vars with inline comments.
 
 **`web/.env.local` variables:**
 
@@ -387,4 +390,6 @@ Vercel automatically creates preview deployments for every PR. To allow all prev
 | `NEXT_PUBLIC_API_URL` | Next.js frontend | FastAPI base URL (Railway domain in production, `http://localhost:8000` locally) |
 | `NEXT_PUBLIC_VERCEL_URL` | FastAPI CORS | Vercel production domain (without `https://`) — set in Railway production |
 | `CORS_ORIGIN_REGEX` | FastAPI CORS | Regex matching allowed origin patterns — covers all Vercel preview URLs without enumerating them |
+| `CORS_EXTRA_ORIGINS` | FastAPI CORS | Optional comma-separated extra allowed origins (e.g., Vercel preview URLs in staging) |
+| `MODAL_TOKEN_ID` | FastAPI (admin ingest endpoint) | Modal token ID — required at startup; generate with `modal token new` |
 | `SENTRY_DSN` | FastAPI (optional) | Sentry DSN — enables production exception alerting; service starts without it but logs a warning |
