@@ -482,6 +482,8 @@ class AnalysisRepository:
                 self._save_agentic_chunks(cur, result.call.id, getattr(result, "chunks", []))
                 if getattr(result, "synthesis", None):
                     self._save_call_synthesis(cur, result.call.id, result.synthesis)
+                if getattr(result, "brief", None):
+                    self._save_call_brief(cur, result.call.id, result.brief)
             conn.commit()
 
     def _save_call_synthesis(self, cur, call_id, synthesis):
@@ -736,3 +738,61 @@ class AnalysisRepository:
                     gotcha.get("correction") or "",
                 ),
             )
+
+    def _save_call_brief(self, cur, call_id, brief) -> None:
+        """Upsert the call_brief row for a given call_id (used within an open transaction)."""
+        from psycopg.types.json import Jsonb
+        cur.execute(
+            """
+            INSERT INTO call_brief (call_id, context_line, bigger_picture, interpretation_questions)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (call_id) DO UPDATE SET
+                context_line = EXCLUDED.context_line,
+                bigger_picture = EXCLUDED.bigger_picture,
+                interpretation_questions = EXCLUDED.interpretation_questions
+            """,
+            (
+                str(call_id),
+                brief.context_line,
+                Jsonb(brief.bigger_picture),
+                Jsonb(brief.interpretation_questions),
+            ),
+        )
+
+    def save_call_brief(self, call_id, brief) -> None:
+        """Upsert the call_brief row for a given call_id (opens its own connection)."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    self._save_call_brief(cur, call_id, brief)
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Could not save call_brief for {call_id}: {e}")
+
+    def get_call_brief_for_ticker(self, ticker: str) -> dict | None:
+        """Return the call_brief record for a ticker, or None if absent."""
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT cb.context_line, cb.bigger_picture, cb.interpretation_questions
+                        FROM call_brief cb
+                        JOIN calls c ON cb.call_id = c.id
+                        WHERE c.ticker = %s
+                        ORDER BY c.created_at DESC
+                        LIMIT 1
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    return {
+                        "context_line": row[0],
+                        "bigger_picture": row[1] or [],
+                        "interpretation_questions": row[2] or [],
+                    }
+        except Exception as e:
+            logger.warning(f"Could not fetch call_brief for {ticker}: {e}")
+        return None
