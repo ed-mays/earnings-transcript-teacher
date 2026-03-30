@@ -20,6 +20,9 @@ Supporting prompts:
   HAIKU_NLP_SYNTHESIS_PROMPT — NLP synthesis pass that ranks keywords, clusters themes,
   and selects top takeaways from the aggregated Tier 1/2 signals.
 
+  BRIEF_SYNTHESIS_PROMPT — Brief generation pass (Phase 5) run after Tier 3 synthesis.
+  Produces the call brief: context_line, bigger_picture bullets, and interpretation_questions.
+
   QA_DETECTION_SYSTEM_PROMPT — Fallback for detecting the Prepared Remarks → Q&A
   section boundary when deterministic methods fail.
 
@@ -164,6 +167,42 @@ Respond ONLY with valid JSON matching this schema:
   "top_takeaways": [
     {"speaker": "string", "takeaway": "string", "why_it_matters": "string"}
   ]
+}
+"""
+
+BRIEF_SYNTHESIS_PROMPT = """You are an elite financial educator preparing a 60-second orientation brief \
+for a student about to read an earnings call transcript.
+
+You will receive a JSON payload containing:
+- call_summary: narrative summary of the call
+- overall_sentiment: one-sentence overall sentiment
+- executive_tone: description of executive tone
+- analyst_sentiment: prevailing analyst mood
+- key_themes: list of dominant themes
+- strategic_shifts: list of strategic shift objects
+- recent_news: list of recent headline/summary pairs about the company (may be empty)
+- competitors: list of competitor name/description pairs (may be empty)
+
+Produce exactly three fields:
+
+1. **context_line**: One precise sentence (≤25 words) that frames WHY this specific call matters right now. \
+Mention a concrete catalyst if one is present (e.g., a guidance cut, a major acquisition, a sector-wide shock). \
+Do NOT simply restate the call_summary.
+
+2. **bigger_picture**: An array of exactly 2-3 plain-text bullet strings synthesising the most important \
+external context: relevant recent news, key competitor dynamics, or macro forces a student needs to hold in mind \
+while reading. Each bullet ≤20 words. If no news or competitor data is available, derive bullets from the \
+strategic_shifts and key_themes.
+
+3. **interpretation_questions**: An array of exactly 3 open-ended questions a skilled analyst would hold in \
+mind while reading this transcript. Each question should probe something genuinely uncertain or contested — not \
+something the call_summary already answers directly.
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "context_line": "string",
+  "bigger_picture": ["string", "string"],
+  "interpretation_questions": ["string", "string", "string"]
 }
 """
 

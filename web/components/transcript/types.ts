@@ -25,6 +25,31 @@ export interface SpeakerInfo {
   firm: string | null;
 }
 
+export interface TakeawayItem {
+  takeaway: string;
+  why_it_matters: string;
+}
+
+export interface MisconceptionItem {
+  fact: string;
+  misinterpretation: string;
+  correction: string;
+}
+
+export interface CallBrief {
+  context_line: string;
+  bigger_picture: string[];
+  interpretation_questions: string[];
+}
+
+export interface SignalStrip {
+  overall_sentiment: string | null;
+  executive_sentiment: string | null;
+  analyst_sentiment: string | null;
+  evasion_level: string | null;
+  strategic_shift_flagged: boolean;
+}
+
 export interface CallDetail {
   ticker: string;
   company_name: string | null;
@@ -37,6 +62,10 @@ export interface CallDetail {
   evasion_analyses: EvasionItem[];
   strategic_shifts: StrategicShift[];
   speakers: SpeakerInfo[];
+  brief: CallBrief | null;
+  takeaways: TakeawayItem[];
+  misconceptions: MisconceptionItem[];
+  signal_strip: SignalStrip | null;
 }
 
 export interface SpanItem {

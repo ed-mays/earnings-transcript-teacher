@@ -200,10 +200,11 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
     try:
         from ingestion.pipeline import IngestionPipeline
         pipeline = IngestionPipeline()
-        chunks, synthesis, token_usage, nlp_synthesis = pipeline.process(analysis)
+        chunks, synthesis, token_usage, nlp_synthesis, brief = pipeline.process(analysis)
         analysis.chunks = chunks
         analysis.synthesis = synthesis
         analysis.token_usage = token_usage
+        analysis.brief = brief
 
         if nlp_synthesis:
             raw_keywords = nlp_synthesis.get("keywords", [])

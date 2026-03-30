@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TranscriptBrowser } from "@/components/transcript/TranscriptBrowser";
 import { MetadataPanel } from "@/components/transcript/MetadataPanel";
+import { CallBriefPanel } from "@/components/transcript/CallBriefPanel";
 import type { CallDetail } from "@/components/transcript/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -58,6 +59,16 @@ export default async function TranscriptPage({
           <span className="ml-auto text-sm text-zinc-400">{call.call_date}</span>
         )}
       </div>
+
+      {/* Call brief — shown only when available */}
+      {call.brief && (
+        <CallBriefPanel
+          brief={call.brief}
+          takeaways={call.takeaways}
+          misconceptions={call.misconceptions}
+          signal_strip={call.signal_strip ?? null}
+        />
+      )}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
