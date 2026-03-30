@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies: database connection, auth, admin check."""
 
+import logging
 import os
 from collections.abc import Generator
 from typing import Annotated
@@ -8,6 +9,8 @@ import jwt
 import psycopg
 from jwt import PyJWKClient
 from fastapi import Depends, Header, HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 try:
     from psycopg_pool import ConnectionPool as _ConnectionPool
@@ -81,6 +84,7 @@ def get_current_user(authorization: Annotated[str | None, Header()] = None) -> s
             detail="Token has expired",
         )
     except Exception:
+        logger.warning("JWKS fetch failed", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",

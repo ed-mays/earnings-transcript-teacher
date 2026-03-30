@@ -90,8 +90,8 @@ def analytics_sessions(_: RequireAdminDep) -> list[dict]:
     """Return daily session_start counts for the last 30 days."""
     try:
         return AnalyticsRepository(_db_url()).get_daily_session_starts()
-    except psycopg.Error as e:
-        logger.error("DB error in analytics_sessions: %s", e)
+    except psycopg.Error:
+        logger.error("DB error in analytics_sessions", exc_info=True)
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
@@ -100,8 +100,8 @@ def analytics_chat(_: RequireAdminDep) -> dict:
     """Return daily chat_turn counts and average turns per session for the last 30 days."""
     try:
         return AnalyticsRepository(_db_url()).get_daily_chat_turns()
-    except psycopg.Error as e:
-        logger.error("DB error in analytics_chat: %s", e)
+    except psycopg.Error:
+        logger.error("DB error in analytics_chat", exc_info=True)
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
@@ -110,8 +110,8 @@ def analytics_costs(_: RequireAdminDep) -> dict:
     """Return token totals grouped by service for the last 30 days."""
     try:
         return AnalyticsRepository(_db_url()).get_costs_by_service()
-    except psycopg.Error as e:
-        logger.error("DB error in analytics_costs: %s", e)
+    except psycopg.Error:
+        logger.error("DB error in analytics_costs", exc_info=True)
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
@@ -120,8 +120,8 @@ def analytics_feynman(_: RequireAdminDep) -> dict:
     """Return feynman_stage_completed counts grouped by stage for the last 30 days."""
     try:
         return AnalyticsRepository(_db_url()).get_feynman_by_stage()
-    except psycopg.Error as e:
-        logger.error("DB error in analytics_feynman: %s", e)
+    except psycopg.Error:
+        logger.error("DB error in analytics_feynman", exc_info=True)
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
@@ -130,8 +130,8 @@ def analytics_ingestions(_: RequireAdminDep) -> dict:
     """Return ingestion_requested events ordered by recency."""
     try:
         return AnalyticsRepository(_db_url()).get_recent_ingestions()
-    except psycopg.Error as e:
-        logger.error("DB error in analytics_ingestions: %s", e)
+    except psycopg.Error:
+        logger.error("DB error in analytics_ingestions", exc_info=True)
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
