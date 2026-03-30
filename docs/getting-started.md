@@ -109,12 +109,6 @@ Migrations are managed with the Supabase CLI. Ensure you have it installed (`bre
    ```
    This applies all pending migrations from `supabase/migrations/` and is idempotent.
 
-6. Apply Row Level Security policies — migrations do **not** apply RLS. Apply them separately:
-   - Supabase dashboard → **SQL Editor**
-   - Paste the contents of `db/rls-policies.sql`
-   - Click **Run**
-   - Verify using the checklist in [`docs/runbooks/rls-verification.md`](runbooks/rls-verification.md)
-
 > **Migrations are not auto-applied.** Any time you pull changes that add files to `supabase/migrations/`, run `supabase db push` manually.
 
 ---
