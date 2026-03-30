@@ -49,7 +49,7 @@ async def system_health(request: Request, _: RequireAdminDep) -> dict:
     """Return system health: DB connection, env var presence, and external API reachability."""
     db_url = os.environ.get("DATABASE_URL", "")
     repo = SchemaRepository(db_url)
-    version: int = await asyncio.to_thread(repo.get_current_version)
+    db_ok, _ = await asyncio.to_thread(repo.check_health)
 
     env_vars = request.app.state.env_var_status
 
@@ -69,8 +69,7 @@ async def system_health(request: Request, _: RequireAdminDep) -> dict:
 
     return {
         "db": {
-            "connected": version > 0,
-            "schema_version": version,
+            "connected": db_ok,
         },
         "env_vars": env_vars,
         "external_apis": {

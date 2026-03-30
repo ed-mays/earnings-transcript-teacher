@@ -24,7 +24,7 @@ ORDER BY tablename;
 
 Expected result: `rowsecurity = true` for all three rows.
 
-If any row shows `false`, re-apply the relevant block from `db/rls-policies.sql`.
+If any row shows `false`, re-apply the relevant block from `supabase/migrations/20260330000003_rls_policies.sql`.
 
 ---
 
@@ -48,7 +48,7 @@ Expected policies:
 | `profiles` | `users_read_own_profile` | SELECT |
 | `analytics_events` | _(none — denied by default)_ | — |
 
-If any policy is missing, re-run the relevant `DO $$ BEGIN … END $$` block from `db/rls-policies.sql`.
+If any policy is missing, re-run the relevant `DO $$ BEGIN … END $$` block from `supabase/migrations/20260330000003_rls_policies.sql`.
 
 ---
 
@@ -65,7 +65,7 @@ Using a Supabase client initialised with the **anon key** and a real user's JWT:
 
 ## Re-applying policies
 
-The authoritative SQL is in `db/rls-policies.sql`. All statements are idempotent — paste the relevant section into the Supabase SQL Editor and run it. No migration version bump is required.
+The authoritative SQL is in `supabase/migrations/20260330000003_rls_policies.sql`. All statements are idempotent — paste the relevant section into the Supabase SQL Editor and run it, or run `supabase db push` from the repo root if the migration has not yet been applied.
 
 ---
 

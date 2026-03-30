@@ -1,4 +1,4 @@
--- Migration 012: Scheduled retention cleanup and account-deletion helper.
+-- Scheduled retention cleanup and account-deletion helper.
 -- Implements pg_cron jobs for data retention policy (docs/data-retention-policy.md):
 --   - learning_sessions (+ cascading concept_exercises): 90 days
 --   - analytics_events: 1 year
@@ -68,5 +68,3 @@ BEGIN
         )
     $cmd$;
 END $$;
-
-INSERT INTO schema_version (version) VALUES (12) ON CONFLICT DO NOTHING;

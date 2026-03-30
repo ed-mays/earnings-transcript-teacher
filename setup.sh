@@ -92,13 +92,8 @@ fi
 ok "pgvector extension enabled"
 
 # ── 7. Schema ─────────────────────────────────────────────────────────────────
-TABLE_EXISTS=$(psql -d "$DB_NAME" -tAc "SELECT EXISTS(SELECT FROM pg_tables WHERE schemaname='public' AND tablename='calls')" 2>/dev/null)
-if [ "$TABLE_EXISTS" = "f" ]; then
-    python migrate.py &>/dev/null
-    ok "Database schema applied"
-else
-    ok "Schema already applied — skipping"
-fi
+supabase db push
+ok "Database schema applied"
 
 # ── 8. Environment variables ──────────────────────────────────────────────────
 step "Checking environment variables..."

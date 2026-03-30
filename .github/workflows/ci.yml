@@ -22,7 +22,7 @@ jobs:
         with:
           filters: |
             migrations:
-              - 'db/migrations/**'
+              - 'supabase/migrations/**'
 
   migration-check:
     needs: changes
@@ -47,16 +47,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - uses: supabase/setup-cli@v1
         with:
-          python-version: "3.12"
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install dependencies
-        run: uv pip install --system -r requirements.txt
+          version: latest
 
       - name: Create stub Supabase auth objects
         env:
@@ -69,14 +62,10 @@ jobs:
           SQL
 
       - name: Run migrations (first pass)
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
-        run: python migrate.py
+        run: supabase db push --db-url postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
 
       - name: Run migrations (idempotency check — second pass)
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
-        run: python migrate.py
+        run: supabase db push --db-url postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
 
   test:
     runs-on: ubuntu-latest
@@ -106,6 +95,23 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: false
+
+  deploy-migrations:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, migration-check]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push migrations to production
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase db push --project-ref qxdexukkmzidalnrzfqf
 
   docker-build:
     runs-on: ubuntu-latest
