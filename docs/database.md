@@ -1,35 +1,28 @@
 # Database
 
-## Authoritative bootstrap
+## Migration system
 
-`migrate.py` is the single source of truth for the database schema. To initialize a fresh database, run:
+Schema changes are managed with the [Supabase CLI](https://supabase.com/docs/reference/cli). Migration files live in `supabase/migrations/` as timestamped SQL files.
+
+To apply all pending migrations to the linked Supabase project:
 
 ```bash
-python migrate.py
+supabase db push
 ```
 
-This applies all migration files from `db/migrations/` in order and tracks applied versions in the `schema_version` table. Running it again on an already-migrated database is safe — already-applied migrations are skipped.
-
-## Migration files
-
-All schema changes live in `db/migrations/` as numbered SQL files (`NNN_description.sql`). Each file is self-contained and ends with an idempotent version insert:
-
-```sql
-INSERT INTO schema_version (version) VALUES (NNN) ON CONFLICT DO NOTHING;
-```
-
-The current schema version is tracked in `db/repositories/schema.py` (`REQUIRED_SCHEMA_VERSION`). The app will refuse to start if the database is below this version.
+This is idempotent — already-applied migrations are tracked by Supabase and skipped.
 
 ## Adding a migration
 
-1. Create `db/migrations/NNN_description.sql` (next sequential number)
-2. Write the DDL changes
-3. End with the version insert (see above)
-4. Run `python migrate.py` to apply
+1. Create a new file: `supabase/migrations/YYYYMMDDHHMMSS_description.sql`
+2. Write the DDL changes (no version tracking boilerplate required)
+3. Run `supabase db push` to apply
 
-## schema.sql
+To generate a migration from a local diff:
 
-`db/schema.sql` has been removed. It was a partial snapshot (v3) that diverged from the actual migration sequence (now at v11+) and caused confusion for new contributors. Use `migrate.py` to bootstrap any environment.
+```bash
+supabase db diff -f description_of_change
+```
 
 ## Rollback
 

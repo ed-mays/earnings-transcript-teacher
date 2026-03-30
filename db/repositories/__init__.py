@@ -15,7 +15,6 @@ from db.repositories.schema import (
     SchemaRepository,
     OutdatedSchemaError,
     RepositoryError,
-    REQUIRED_SCHEMA_VERSION,
     reset_all_data,
 )
 
@@ -31,6 +30,5 @@ __all__ = [
     "SchemaRepository",
     "OutdatedSchemaError",
     "RepositoryError",
-    "REQUIRED_SCHEMA_VERSION",
     "reset_all_data",
 ]

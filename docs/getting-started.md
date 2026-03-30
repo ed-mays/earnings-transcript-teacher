@@ -91,37 +91,7 @@ cp web/env.example web/.env.local
 
 ## Database setup
 
-Choose one option. Option B (Supabase) is recommended — it matches the production environment and avoids a local PostgreSQL installation.
-
-### Option A: Local PostgreSQL (macOS / Linux)
-
-```bash
-# Install PostgreSQL 16 and the pgvector extension
-brew install postgresql@16 pgvector
-brew services start postgresql@16
-
-# Create the database and enable the vector extension
-createdb earnings_teacher
-psql earnings_teacher -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-# Apply the schema (idempotent — safe to run multiple times)
-python migrate.py
-```
-
-Set `DATABASE_URL=postgresql://localhost/earnings_teacher` in `api/.env`.
-
-**Windows:** Use Docker instead of Homebrew:
-```bash
-docker run -d --name earnings_teacher_db \
-  -e POSTGRES_DB=earnings_teacher \
-  -p 5432:5432 \
-  pgvector/pgvector:pg16
-
-python migrate.py
-```
-Set `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/earnings_teacher`.
-
-### Option B: Supabase (cloud)
+Migrations are managed with the Supabase CLI. Ensure you have it installed (`brew install supabase/tap/supabase`) and are linked to the project (`supabase link`).
 
 1. Create a Supabase project at [supabase.com](https://supabase.com) (free tier is sufficient).
 
@@ -133,19 +103,19 @@ Set `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/earnings_teacher
 
 4. Set `SUPABASE_URL` to your project URL (Dashboard → Project Settings → API → Project URL).
 
-5. Apply schema migrations — run from the repo root with your venv active:
+5. Apply schema migrations:
    ```bash
-   python migrate.py
+   supabase db push
    ```
-   This connects to Supabase, applies all SQL files from `db/migrations/` in order, and is idempotent.
+   This applies all pending migrations from `supabase/migrations/` and is idempotent.
 
-6. Apply Row Level Security policies — `migrate.py` does **not** apply RLS. Apply them separately:
+6. Apply Row Level Security policies — migrations do **not** apply RLS. Apply them separately:
    - Supabase dashboard → **SQL Editor**
    - Paste the contents of `db/rls-policies.sql`
    - Click **Run**
    - Verify using the checklist in [`docs/runbooks/rls-verification.md`](runbooks/rls-verification.md)
 
-> **Supabase does not auto-run migrations.** Any time you pull changes that add files to `db/migrations/`, run `python migrate.py` manually.
+> **Migrations are not auto-applied.** Any time you pull changes that add files to `supabase/migrations/`, run `supabase db push` manually.
 
 ---
 

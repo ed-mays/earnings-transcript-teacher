@@ -4,7 +4,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 interface DbStatus {
   connected: boolean;
-  schema_version: number;
 }
 
 interface ServiceStatus {
@@ -92,10 +91,6 @@ export default async function AdminHealthPage() {
         <div className="grid gap-6 sm:grid-cols-3">
           <StatusCard title="Database">
             <StatusRow label="Connected" ok={health.db.connected} />
-            <StatusRow
-              label={`Schema v${health.db.schema_version}`}
-              ok={health.db.connected}
-            />
           </StatusCard>
 
           <StatusCard title="Environment Variables">

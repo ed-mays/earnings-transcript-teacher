@@ -227,10 +227,10 @@ def _make_healthy_httpx_mock():
     return mock_httpx
 
 
-def _make_schema_repo_mock(version: int = 9):
-    """Return a patched SchemaRepository class whose instance returns `version`."""
+def _make_schema_repo_mock(connected: bool = True):
+    """Return a patched SchemaRepository class whose instance returns the given connectivity state."""
     mock_repo = MagicMock()
-    mock_repo.get_current_version.return_value = version
+    mock_repo.check_health.return_value = (connected, "ok" if connected else "unreachable")
     mock_cls = MagicMock(return_value=mock_repo)
     return mock_cls
 
@@ -270,7 +270,7 @@ def test_health_response_has_expected_keys(client):
     assert "env_vars" in body
     assert "external_apis" in body
     assert "connected" in body["db"]
-    assert "schema_version" in body["db"]
+    assert "schema_version" not in body["db"]
     assert {
         "DATABASE_URL", "SUPABASE_URL",
         "VOYAGE_API_KEY", "PERPLEXITY_API_KEY", "MODAL_TOKEN_ID", "ANTHROPIC_API_KEY",
@@ -279,22 +279,20 @@ def test_health_response_has_expected_keys(client):
     assert "perplexity" in body["external_apis"]
 
 
-def test_health_db_connected_when_version_nonzero(client):
-    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(version=9)), \
+def test_health_db_connected(client):
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(connected=True)), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
         resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert body["db"]["connected"] is True
-    assert body["db"]["schema_version"] == 9
 
 
-def test_health_db_disconnected_when_version_zero(client):
-    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(version=0)), \
+def test_health_db_disconnected(client):
+    with patch("routes.admin.SchemaRepository", _make_schema_repo_mock(connected=False)), \
          patch("routes.admin.httpx", _make_healthy_httpx_mock()):
         resp = client.get("/admin/health", headers=ADMIN_AUTH)
     body = resp.json()
     assert body["db"]["connected"] is False
-    assert body["db"]["schema_version"] == 0
 
 
 def test_health_env_vars_reflect_startup_validation(client):

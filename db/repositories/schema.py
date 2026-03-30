@@ -1,17 +1,14 @@
-"""Schema management repository: version checks and data reset."""
+"""Schema management repository: connectivity checks and data reset."""
 
 import logging
 
 import psycopg
-import psycopg.errors
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_SCHEMA_VERSION = 9
-
 
 class OutdatedSchemaError(Exception):
-    """Raised when the database schema version is below the required minimum."""
+    """Raised when the database is not accessible."""
     pass
 
 
@@ -35,27 +32,13 @@ class SchemaRepository:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str
 
-    def get_current_version(self) -> int:
-        """Get the current schema version from the database. Returns 0 if table missing or empty."""
+    def check_health(self) -> tuple[bool, str]:
+        """Check that the database is reachable."""
         try:
             with psycopg.connect(self.conn_str) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
-                    row = cur.fetchone()
-                    return row[0] if row else 0
-        except psycopg.errors.UndefinedTable:
-            return 0
+                    cur.execute("SELECT 1")
+            return True, "Database is reachable."
         except Exception as e:
-            logger.warning(f"Error checking schema version: {e}")
-            return 0
-
-    def check_health(self) -> tuple[bool, str]:
-        """Check if the database schema is up to date."""
-        current_version = self.get_current_version()
-        if current_version < REQUIRED_SCHEMA_VERSION:
-            if current_version == 0:
-                msg = "Database schema version table is missing. Re-initialize the database."
-            else:
-                msg = f"Database schema is outdated (current: {current_version}, required: {REQUIRED_SCHEMA_VERSION})."
-            return False, f"{msg} Run 'python migrate.py' or './reset_db.sh' to update."
-        return True, "Database schema is up to date."
+            logger.warning(f"Database health check failed: {e}")
+            return False, f"Database is not reachable: {e}"
