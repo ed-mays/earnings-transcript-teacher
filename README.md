@@ -70,6 +70,7 @@ earnings-transcript-teacher/
 
 | Path | Contents |
 |---|---|
+| [`docs/getting-started.md`](docs/getting-started.md) | New developer onboarding: clone → running stack → first test |
 | [`docs/architecture-review/`](docs/architecture-review/00-index.md) | Architecture specs and production-readiness findings |
 | [`docs/runbooks/`](docs/runbooks/) | Operational runbooks (migration rollback, RLS verification) |
 | [`docs/disaster-recovery.md`](docs/disaster-recovery.md) | Infrastructure rebuild guide |
