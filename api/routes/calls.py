@@ -1,6 +1,9 @@
 """Earnings calls routes — library and transcript data."""
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 import psycopg
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -106,6 +109,7 @@ class SearchResponse(BaseModel):
 @router.get("", response_model=list[CallSummary])
 def list_calls() -> list[CallSummary]:
     """Return summary metadata for all analyzed calls."""
+    logger.info("GET /api/calls")
     with psycopg.connect(_db_url()) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -126,6 +130,7 @@ def list_calls() -> list[CallSummary]:
 @router.get("/{ticker}", response_model=CallDetail)
 def get_call(ticker: str) -> CallDetail:
     """Return full metadata for a single analyzed call."""
+    logger.info("GET /api/calls/%s", ticker)
     if not _ticker_exists(ticker):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -197,6 +202,7 @@ def get_spans(
     page_size: int = Query(default=50, ge=1, le=200),
 ) -> SpansResponse:
     """Return paginated speaker turns for a transcript, with optional filtering."""
+    logger.info("GET /api/calls/%s/spans section=%s", ticker, section)
     if not _ticker_exists(ticker):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -245,6 +251,7 @@ def search_transcript(
     top_k: int = Query(default=5, ge=1, le=20),
 ) -> SearchResponse:
     """Semantic search within a transcript using pgvector similarity."""
+    logger.info("GET /api/calls/%s/search q=%r", ticker, q)
     if not _ticker_exists(ticker):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

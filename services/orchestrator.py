@@ -69,7 +69,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
             candidate_turns = turns_metadata[start_num:end_num]
             
             if candidate_turns:
-                print(f"  ↳ Deterministic Q&A detection failed. Triggering LLM fallback...")
+                logger.info("Deterministic Q&A detection failed; triggering LLM fallback")
                 result = extractor.detect_qa_transition(candidate_turns)
                 
                 t_idx = result.get("transition_index", -1)
@@ -80,7 +80,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
                         split_point = all_turns[abs_idx].start()
                         prepared_remarks = raw_text[:split_point]
                         qa = raw_text[split_point:]
-                        print(f"    ↳ LLM identified Q&A start at turn {abs_idx} (Confidence: {result['confidence']}).")
+                        logger.info("LLM identified Q&A start at turn %d (confidence=%.2f)", abs_idx, result['confidence'])
         except Exception as e:
             logger.warning(f"LLM Q&A detection fallback failed: {e}")
 
@@ -223,7 +223,6 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
                 for i, t in enumerate(nlp_synthesis.get("themes", []))
             ]
     except Exception as e:
-        print(f"❌ Agentic pipeline failed: {e}")
-        logger.warning(f"Agentic pipeline failed or skipped: {e}")
+        logger.warning("Agentic pipeline failed or skipped: %s", e)
 
     return analysis

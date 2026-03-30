@@ -1,5 +1,7 @@
 """Application-wide constants for rate limits and input bounds."""
 
+LOG_LEVEL_DEFAULT = "INFO"
+
 REQUIRED_ENV_VARS = [
     "DATABASE_URL",
     "SUPABASE_URL",

@@ -181,8 +181,8 @@ class AgenticExtractor:
                     "output_tokens": message.usage.output_tokens,
                 },
             )
-        except Exception:
-            pass  # tracking must never block extraction
+        except Exception as exc:
+            logger.warning("analytics tracking failed for %s: %s", operation, exc)
 
     def _parse_response(self, message) -> Dict[str, Any]:
         """Parse an Anthropic message response into a result dict with usage stats."""
