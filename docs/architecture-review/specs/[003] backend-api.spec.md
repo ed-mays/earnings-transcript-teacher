@@ -6,6 +6,33 @@
 
 ---
 
+## Implementation status
+
+**Status:** Implemented (with significant divergence from spec)
+
+**Implemented via:** Multiple PRs. Auth bypass fixed in #212.
+
+**What was built:**
+- FastAPI application at `api/` (not `backend/` as spec'd)
+- Auth middleware uses Supabase JWT verification (not Firebase Admin SDK) — `api/dependencies.py` provides `CurrentUserDep` and `RequireAdminDep`
+- Routes at `api/routes/`: `calls.py` (call library + all analysis endpoints), `chat.py` (Feynman SSE streaming), `admin.py` (health check + ingestion trigger)
+- Dependency injection via `api/dependencies.py` (`DbDep`, `CurrentUserDep`, `RequireAdminDep`)
+- Pydantic response models on all endpoints
+- Rate limiting via `slowapi` (was out of scope in spec; delivered anyway)
+- JSON structured logging, Sentry integration, graceful shutdown
+- Ingestion dispatched to Modal (not an inline long-running FastAPI endpoint)
+- `api/Dockerfile` present
+
+**Remaining / diverged:**
+- `backend/` directory structure from spec was not used — everything lives in `api/`
+- Firebase Admin SDK replaced by Supabase JWT — local dev bypass pattern differs from spec
+- Separate `analysis.py` route file from spec was not created; analysis endpoints live in `calls.py`
+- `learning.py` and `progress.py` route files were not created as separate files; learning/progress endpoints may be absent or consolidated
+- `GET /api/calls/{ticker}/news` and `/competitors` endpoints: verify current state
+- OpenAPI docs available at `/docs` (FastAPI default)
+
+---
+
 ## Goal
 
 Stand up a FastAPI application that exposes the full API surface defined in the target architecture, with Firebase Auth middleware protecting all endpoints. At the end of this spec, a developer can run the backend locally and exercise every endpoint via curl or an API client — no frontend required.

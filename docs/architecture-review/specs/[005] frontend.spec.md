@@ -6,6 +6,32 @@
 
 ---
 
+## Implementation status
+
+**Status:** Partially implemented
+
+**What was built:**
+- Next.js application at `web/` (not Vite + React as spec'd) — see `web/AGENTS.md` for Next.js-specific conventions
+- Auth via Supabase (not Firebase JS SDK)
+- App Router with server and client components; no React Router
+- Pages: home (`/`), call library, ticker detail (`/calls/[ticker]`), Feynman learning (`/calls/[ticker]/learn`), admin dashboard + health + ingest
+- API client layer at `web/lib/api.ts` with Supabase auth token injection
+- SSE streaming client at `web/lib/chat.ts`
+- Supabase server/client helpers at `web/lib/supabase/`
+
+**Remaining / diverged:**
+- Build tool changed: Vite + React SPA → Next.js (App Router, server components)
+- Auth provider changed: Firebase JS SDK → Supabase Auth
+- Data fetching: TanStack Query was not adopted; server components fetch directly via `createSupabaseServerClient()` or the backend API
+- Component library and styling choices from spec (Shadcn/ui or Headless UI, Tailwind) may differ from what was implemented — verify `web/package.json`
+- Learning Path steps 3–6 (Language, Strategic Shifts, Evasion, Test Understanding): verify current implementation state
+- Step progress tracking UI: verify whether `web/lib/` hooks for progress exist
+- Transcript Browser page: verify current state
+- E2E tests (Playwright): verify whether any exist in `web/`
+- Deployment target: Firebase Hosting was replaced; verify actual hosting setup (likely Vercel given `web/vercel.json`)
+
+---
+
 ## Goal
 
 Build a React SPA that achieves feature parity with the current Streamlit UI. The frontend consumes the FastAPI backend (003), authenticates via Firebase Auth, and deploys to Firebase Hosting (004). At the end of this spec, the Streamlit app can be retired.

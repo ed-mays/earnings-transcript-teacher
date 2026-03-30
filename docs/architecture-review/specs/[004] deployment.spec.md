@@ -6,6 +6,27 @@
 
 ---
 
+## Implementation status
+
+**Status:** Partially implemented
+
+**Implemented via:** #229 (CI pipeline)
+
+**What was built:**
+- GitHub Actions CI at `.github/workflows/ci.yml`: runs pytest + migration checks on push to `main` and on pull requests
+- `api/Dockerfile` present (multi-stage build for the FastAPI backend)
+
+**Remaining / diverged:**
+- Infrastructure stack changed from the spec: GCP (Cloud Run + Cloud SQL + Firebase Hosting + Secret Manager) was replaced by Supabase (database + auth), Modal (ingestion pipeline), and a separate frontend host
+- Firebase projects (`ett-dev`, `ett-prod`) were never created; `firebase.json` and `.firebaserc` do not exist
+- Cloud Run deployment automation not implemented — no `gcloud` scripts or Terraform
+- `docker-compose.yml` for local containerised dev: verify whether this was added
+- GitHub Actions prod deploy with manual approval gate: not implemented
+- Secret management via GCP Secret Manager: replaced by Modal secrets (`earnings-secrets`) for the ingestion pipeline and environment variables for the API
+- CI currently runs tests and migration checks; it does not build a Docker image or deploy anywhere
+
+---
+
 ## Goal
 
 Define the infrastructure and CI/CD pipeline to deploy the FastAPI backend to Cloud Run and (later) the React frontend to Firebase Hosting. At the end of this spec, pushing to `main` triggers an automated deploy to the dev environment, and production deploys are gated by manual approval.
