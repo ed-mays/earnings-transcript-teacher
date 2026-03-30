@@ -13,10 +13,13 @@ import type { CallDetail } from "@/components/transcript/types";
 /** Feynman-style learning chat for a given ticker's transcript. */
 export default function LearnPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ ticker: string }>;
+  searchParams: Promise<{ topic?: string }>;
 }) {
   const { ticker } = use(params);
+  const { topic } = use(searchParams);
   const upperTicker = ticker.toUpperCase();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -130,7 +133,7 @@ export default function LearnPage({
 
       {/* Input */}
       <div className="mt-4">
-        <ChatInput onSend={handleSend} isStreaming={isStreaming} />
+        <ChatInput onSend={handleSend} isStreaming={isStreaming} initialValue={topic ?? ""} />
       </div>
     </div>
   );
