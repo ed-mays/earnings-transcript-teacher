@@ -64,6 +64,7 @@ def stream_chat(
     }
     
     try:
+        _t0 = time.time()
         with requests.post(
             "https://api.perplexity.ai/chat/completions",
             headers=headers,
@@ -115,6 +116,8 @@ def stream_chat(
             # Flush any remaining buffered text (a partial citation that never closed)
             if citation_buffer:
                 yield citation_buffer
+
+        logger.debug("perplexity stream_chat completed in %.0fms", (time.time() - _t0) * 1000)
 
     except Exception as e:
         logger.error("Error connecting to Perplexity API: %s", e)
