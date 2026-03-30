@@ -50,38 +50,52 @@ export async function streamSignals(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let terminated = false;
 
   signal?.addEventListener("abort", () => { reader.cancel().catch(() => {}); });
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (signal?.aborted) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (signal?.aborted) break;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    const events = buffer.split("\n\n");
-    buffer = events.pop() ?? "";
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
 
-    for (const event of events) {
-      const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
-      if (!dataLine) continue;
+      for (const event of events) {
+        const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+        if (!dataLine) continue;
 
-      const jsonStr = dataLine.slice("data: ".length);
-      let parsed: { type: string; content?: string; message?: string };
-      try {
-        parsed = JSON.parse(jsonStr);
-      } catch {
-        continue;
+        const jsonStr = dataLine.slice("data: ".length);
+        let parsed: { type: string; content?: string; message?: string };
+        try {
+          parsed = JSON.parse(jsonStr);
+        } catch {
+          continue;
+        }
+
+        if (parsed.type === "token" && parsed.content !== undefined) {
+          callbacks.onToken(parsed.content);
+        } else if (parsed.type === "done") {
+          terminated = true;
+          callbacks.onDone();
+        } else if (parsed.type === "error") {
+          terminated = true;
+          callbacks.onError(parsed.message ?? "Unknown error");
+        }
       }
-
-      if (parsed.type === "token" && parsed.content !== undefined) {
-        callbacks.onToken(parsed.content);
-      } else if (parsed.type === "done") {
-        callbacks.onDone();
-      } else if (parsed.type === "error") {
-        callbacks.onError(parsed.message ?? "Unknown error");
-      }
+    }
+  } catch (err: unknown) {
+    if (!signal?.aborted) {
+      terminated = true;
+      callbacks.onError(err instanceof Error ? err.message : "Stream read error");
+    }
+  } finally {
+    if (!terminated && !signal?.aborted) {
+      callbacks.onDone();
     }
   }
 }
