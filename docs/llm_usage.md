@@ -13,6 +13,7 @@ Anthropic's Claude models power the "Agentic Ingestion Pipeline," performing dee
     *   **`claude-sonnet-4-5`**: Used for "Tier 2" tasks that require deeper reasoning, such as identifying key takeaways, analyzing executive evasion, and flagging common investor misconceptions.
 *   **Purpose:** Structured data extraction, pedagogical analysis, and strategic synthesis.
 *   **Implementation:** See `services/llm.py` (`AgenticExtractor`) and `ingestion/pipeline.py`.
+*   **Prompt architecture:** The five prompt constants driving Claude-powered ingestion (`TIER_1_SYSTEM_PROMPT`, `TIER_2_SYSTEM_PROMPT`, `TIER_3_SYNTHESIS_PROMPT`, `HAIKU_NLP_SYNTHESIS_PROMPT`, `QA_DETECTION_SYSTEM_PROMPT`) are defined in `ingestion/prompts.py`. See the module docstring there for tier responsibilities and which model runs each pass.
 
 ---
 
@@ -25,7 +26,7 @@ Perplexity AI's online models are used for interactive elements and real-time gr
     *   **Interactive Chat**: Powers the Streamlit chat interface for "General Q&A" and the "Feynman Loop" tutor.
     *   **On-Demand Definitions**: Generates concise, company-grounded definitions for financial and industry-specific jargon found in the transcript.
     *   **On-Demand Explanations**: Provides contextual explanations of terms using RAG (Retrieval Augmented Generation) based on specific transcript snippets.
-*   **Implementation:** See `services/llm.py` (`stream_chat`) and `app.py`.
+*   **Implementation:** See `services/llm.py` (`stream_chat`) and `api/routes/chat.py`.
 
 ---
 
