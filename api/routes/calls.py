@@ -71,6 +71,31 @@ class SynthesisInfo(BaseModel):
     analyst_sentiment: str | None = None
 
 
+class TakeawayItem(BaseModel):
+    takeaway: str
+    why_it_matters: str
+
+
+class MisconceptionItem(BaseModel):
+    fact: str
+    misinterpretation: str
+    correction: str
+
+
+class CallBrief(BaseModel):
+    context_line: str
+    bigger_picture: list[str] = []
+    interpretation_questions: list[str] = []
+
+
+class SignalStrip(BaseModel):
+    overall_sentiment: str | None = None
+    executive_sentiment: str | None = None
+    analyst_sentiment: str | None = None
+    evasion_level: str | None = None
+    strategic_shift_flagged: bool = False
+
+
 class CallDetail(BaseModel):
     ticker: str
     company_name: str | None = None
@@ -83,6 +108,10 @@ class CallDetail(BaseModel):
     evasion_analyses: list[EvasionItem] = []
     strategic_shifts: list[StrategicShift] = []
     speakers: list[SpeakerInfo] = []
+    brief: CallBrief | None = None
+    takeaways: list[TakeawayItem] = []
+    misconceptions: list[MisconceptionItem] = []
+    signal_strip: SignalStrip | None = None
 
 
 class SpanItem(BaseModel):
@@ -213,6 +242,34 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
     raw_speakers = analysis_repo.get_speakers_for_ticker(ticker, conn=conn)
     speakers = [SpeakerInfo(name=r[0], role=r[1], title=r[2], firm=r[3]) for r in raw_speakers]
 
+    # Brief
+    raw_brief = analysis_repo.get_call_brief_for_ticker(ticker)
+    brief = CallBrief(**raw_brief) if raw_brief else None
+
+    # Takeaways (top 3 for the brief)
+    raw_takeaways = analysis_repo.get_takeaways_for_ticker(ticker, limit=3)
+    takeaways = [TakeawayItem(takeaway=r[0], why_it_matters=r[1]) for r in raw_takeaways]
+
+    # Misconceptions (top 3 for the brief)
+    raw_misconceptions = analysis_repo.get_misconceptions_for_ticker(ticker)
+    misconceptions = [
+        MisconceptionItem(fact=r[0], misinterpretation=r[1], correction=r[2])
+        for r in raw_misconceptions[:3]
+    ]
+
+    # Signal strip
+    evasion_level = None
+    if raw_evasion:
+        avg_score = sum(r[1] for r in raw_evasion) / len(raw_evasion)
+        evasion_level = "high" if avg_score > 6 else ("medium" if avg_score > 3 else "low")
+    signal_strip = SignalStrip(
+        overall_sentiment=raw_synthesis[0] if raw_synthesis else None,
+        executive_sentiment=raw_synthesis[1] if raw_synthesis else None,
+        analyst_sentiment=raw_synthesis[2] if raw_synthesis else None,
+        evasion_level=evasion_level,
+        strategic_shift_flagged=len(raw_shifts) > 0,
+    )
+
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return CallDetail(
         ticker=ticker,
@@ -226,6 +283,10 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         evasion_analyses=evasion_analyses,
         strategic_shifts=strategic_shifts,
         speakers=speakers,
+        brief=brief,
+        takeaways=takeaways,
+        misconceptions=misconceptions,
+        signal_strip=signal_strip,
     )
 
 

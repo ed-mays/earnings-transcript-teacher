@@ -241,6 +241,15 @@ class TranscriptChunk(BaseModel):
 # ---------------------------------------------------------------------------
 
 @dataclass
+class CallBriefRecord:
+    """LLM-generated pre-reading brief for a call (stored in call_brief table)."""
+
+    context_line: str
+    bigger_picture: list[str]
+    interpretation_questions: list[str]
+
+
+@dataclass
 class CallAnalysis:
     """Complete structured output of the analysis pipeline for one call."""
 
@@ -251,7 +260,8 @@ class CallAnalysis:
     topics: list[TopicRecord]
     takeaways: list[SpanRecord]     # subset of spans with textrank_score set
     qa_pairs: list[QAPairRecord]
-    
+
     chunks: list[TranscriptChunk] = field(default_factory=list)
     synthesis: CallSynthesisRecord | None = None
     token_usage: TokenUsageSummary | None = None
+    brief: CallBriefRecord | None = None

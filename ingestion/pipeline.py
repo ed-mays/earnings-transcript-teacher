@@ -3,7 +3,7 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple, Set
 import concurrent.futures
 
-from core.models import CallAnalysis, CallSynthesisRecord, TranscriptChunk, TokenUsageSummary
+from core.models import CallAnalysis, CallBriefRecord, CallSynthesisRecord, TranscriptChunk, TokenUsageSummary
 from parsing.financial_terms import scan_chunk
 from services.company_info import build_company_context
 
@@ -186,7 +186,7 @@ class IngestionPipeline:
         from services.llm import AgenticExtractor
         self.extractor = AgenticExtractor()
 
-    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord, TokenUsageSummary, dict]:
+    def process(self, analysis: CallAnalysis) -> tuple[List[TranscriptChunk], CallSynthesisRecord, TokenUsageSummary, dict, CallBriefRecord | None]:
         """Run the full ingestion pipeline on a parsed CallAnalysis."""
         logger.info(f"Starting agentic ingestion for {analysis.call.ticker}")
 
@@ -207,7 +207,7 @@ class IngestionPipeline:
             return [], CallSynthesisRecord(
                 overall_sentiment="", executive_tone="", key_themes=[],
                 strategic_shifts=[], analyst_sentiment="",
-            ), TokenUsageSummary(), {}
+            ), TokenUsageSummary(), {}, None
 
         # Phase 2: Map Phase (Concurrent Extraction)
         # Process chunks in parallel using a ThreadPoolExecutor
@@ -322,8 +322,31 @@ class IngestionPipeline:
             logger.warning(f"NLP synthesis phase failed: {e}")
             print(f"⚠️  NLP synthesis phase failed: {e}")
 
+        # Phase 5: Brief Synthesis (Haiku — context_line, bigger_picture, interpretation_questions)
+        print(f"\n[Brief Synthesis Phase] Generating call brief...")
+        brief_record: CallBriefRecord | None = None
+        try:
+            brief_payload = self._build_brief_payload(synthesis, nlp_synthesis)
+            brief_data = self.extractor.extract_brief_synthesis(brief_payload)
+            brief_usage = brief_data.pop("_usage_stats", None)
+            if brief_usage:
+                token_usage.add(
+                    brief_usage["model"],
+                    brief_usage["prompt_tokens"],
+                    brief_usage["completion_tokens"],
+                )
+                print(f"    ↳ Brief Synthesis [Model: {brief_usage['model']} | In: {brief_usage['prompt_tokens']} | Out: {brief_usage['completion_tokens']}]")
+            brief_record = CallBriefRecord(
+                context_line=brief_data.get("context_line", ""),
+                bigger_picture=brief_data.get("bigger_picture", []),
+                interpretation_questions=brief_data.get("interpretation_questions", []),
+            )
+        except Exception as e:
+            logger.warning(f"Brief synthesis phase failed: {e}")
+            print(f"⚠️  Brief synthesis phase failed: {e}")
+
         print("✅ Agentic ingestion complete.\n")
-        return chunks, synthesis, token_usage, nlp_synthesis
+        return chunks, synthesis, token_usage, nlp_synthesis, brief_record
 
     def _build_nlp_signals_payload(self, chunks: List[TranscriptChunk]) -> str:
         """Collect map-phase signals from all chunks into a JSON payload for NLP synthesis."""
@@ -352,6 +375,25 @@ class IngestionPipeline:
         }
         return json.dumps(payload, indent=2)
         
+    def _build_brief_payload(self, synthesis: CallSynthesisRecord, nlp_synthesis: dict) -> str:
+        """Build the JSON payload for brief synthesis from call synthesis data."""
+        payload = {
+            "call_summary": synthesis.call_summary or "",
+            "overall_sentiment": synthesis.overall_sentiment,
+            "executive_tone": synthesis.executive_tone,
+            "analyst_sentiment": synthesis.analyst_sentiment,
+            "key_themes": synthesis.key_themes,
+            "strategic_shifts": synthesis.strategic_shifts,
+            "recent_news": [],
+            "competitors": [],
+        }
+        # Include NLP-derived themes if richer than synthesis themes
+        if nlp_synthesis.get("themes"):
+            nlp_theme_names = [t.get("name", "") for t in nlp_synthesis["themes"] if t.get("name")]
+            if nlp_theme_names:
+                payload["key_themes"] = nlp_theme_names
+        return json.dumps(payload, indent=2)
+
     def _process_single_chunk(self, chunk: TranscriptChunk, index: int, total_chunks: int, company_context: str = "") -> list[dict]:
         """Helper method to process a single chunk, designed to run in a thread.
 

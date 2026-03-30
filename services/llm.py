@@ -12,7 +12,7 @@ from tenacity import retry, wait_exponential_jitter, stop_after_attempt, retry_i
 _CITATION_PATTERN = re.compile(r'\[(?:\d+|[a-z_]+)\]')
 
 import anthropic
-from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT, HAIKU_NLP_SYNTHESIS_PROMPT
+from ingestion.prompts import TIER_1_SYSTEM_PROMPT, TIER_2_SYSTEM_PROMPT, TIER_3_SYNTHESIS_PROMPT, QA_DETECTION_SYSTEM_PROMPT, HAIKU_NLP_SYNTHESIS_PROMPT, BRIEF_SYNTHESIS_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -288,6 +288,25 @@ class AgenticExtractor:
             messages=[{"role": "user", "content": user_prompt}]
         )
         self._track_usage(message, "nlp_synthesis")
+        return self._parse_response(message)
+
+    @retry(
+        wait=wait_exponential_jitter(initial=2, max=60),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception(_should_retry_error),
+        reraise=True
+    )
+    def extract_brief_synthesis(self, payload: str) -> Dict[str, Any]:
+        """Run Phase 5 brief synthesis: produce context_line, bigger_picture, and interpretation_questions."""
+        user_prompt = f"### Call Brief Payload:\n{payload}\n\nProduce the call brief JSON."
+        self.rate_limiter.wait()
+        message = self.client.messages.create(
+            model=self.tier3_model,
+            max_tokens=1024,
+            system=BRIEF_SYNTHESIS_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+        self._track_usage(message, "brief_synthesis")
         return self._parse_response(message)
 
     @retry(
