@@ -1,13 +1,24 @@
 # Analysis Pipeline
 
-| #   | Analysis                     | Module         | What it produces                                                                              |
-| --- | ---------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
-| 1   | **Basic Stats**              | `analysis.py`  | Token count from cleaned/tokenized text                                                       |
-| 2   | **Section Extraction**       | `sections.py`  | Splits transcript into **Prepared Remarks** and **Q&A** sections                              |
-| 3   | **Speaker Identification**   | `sections.py`  | Enriched speaker profiles with **role** (executive/analyst/operator), **title**, and **firm** |
-| 4   | **Q&A Exchanges**            | `sections.py`  | Structured question-answer threads grouped by analyst                                         |
-| 5   | **Keywords** (TF-IDF)        | `keywords.py`  | Top 20 salient **terms and bigrams** ranked by importance                                     |
-| 6   | **Themes** (NMF)             | `themes.py`    | 5 **topic clusters** of related terms representing major discussion areas                     |
-| 7   | **Key Takeaways** (TextRank) | `takeaways.py` | Top 10 most **central statements** with speaker attribution                                   |
+## Parsing layer
 
-Layers 1–4 are structural (parsing _who said what_), while 5–7 are conceptual (understanding _what matters_).
+These stages run for every transcript during ingestion, extracting structural information from the raw text.
+
+| # | Stage | Module | Output |
+|---|---|---|---|
+| 1 | **Basic stats** | `parsing/analysis.py` | Token count from cleaned/tokenized text |
+| 2 | **Section extraction** | `parsing/sections.py` | Splits transcript into **Prepared Remarks** and **Q&A** sections |
+| 3 | **Speaker identification** | `parsing/sections.py` | Speaker profiles with **role** (executive/analyst/operator), **title**, and **firm** |
+| 4 | **Q&A threading** | `parsing/sections.py` | Structured question-answer exchanges grouped by analyst |
+
+## LLM enrichment pipeline
+
+After parsing, the ingestion pipeline runs a three-tier LLM analysis defined in `ingestion/prompts.py`. Tiers use different models and run selectively to balance cost and depth.
+
+| Tier | Model | Runs on | Output |
+|---|---|---|---|
+| **Tier 1** | Claude Haiku | Every chunk | Industry jargon + definitions, core concepts (1–3 bullet points), importance score (1–10), `requires_deep_analysis` flag |
+| **Tier 2** | Claude Sonnet | High-score chunks only (`tier1_score >= 6`) | Beginner-friendly takeaways with "why it matters", analyst evasion/skepticism detection (Q&A only) |
+| **Tier 3** | Claude Sonnet | Full call (synthesis pass) | Cross-chunk themes and key takeaways summarising the entire call |
+
+See `ingestion/prompts.py` for the authoritative prompt text and JSON output schemas for each tier.
