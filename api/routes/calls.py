@@ -11,7 +11,7 @@ import psycopg
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel
 
-from api.dependencies import DbDep
+from dependencies import DbDep
 from db.analytics import track
 from db.repositories import AnalysisRepository, CallRepository
 from limiter import limiter
