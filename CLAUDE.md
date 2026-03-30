@@ -95,6 +95,7 @@ VOYAGE_API_KEY        # semantic embeddings
 PERPLEXITY_API_KEY    # Feynman chat
 DATABASE_URL          # optional (default: dbname=earnings_teacher)
 ANTHROPIC_API_KEY     # optional (Claude-based ingestion tiers)
+LOG_LEVEL             # optional (default: INFO); controls log verbosity
 ```
 
 ---

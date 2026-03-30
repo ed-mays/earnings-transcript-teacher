@@ -3,6 +3,7 @@
 import logging
 import os
 import signal
+import sys
 import threading
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
@@ -12,6 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+from settings import LOG_LEVEL_DEFAULT
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=os.environ.get("LOG_LEVEL", LOG_LEVEL_DEFAULT).upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 logger = logging.getLogger(__name__)
 

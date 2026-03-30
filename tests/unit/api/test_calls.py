@@ -1,5 +1,6 @@
 """Unit tests for /api/calls routes."""
 
+import logging
 import sys
 import os
 from unittest.mock import MagicMock, patch
@@ -60,6 +61,22 @@ class TestListCalls:
         assert data[1]["ticker"] == "MSFT"
         assert data[1]["call_date"] is None
 
+    def test_logs_route_entry(self, client, caplog):
+        """list_calls() emits an INFO log on entry."""
+        mock_cursor = MagicMock()
+        mock_cursor.fetchall.return_value = []
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = MagicMock(return_value=mock_conn)
+        mock_conn.__exit__ = MagicMock(return_value=False)
+        mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+
+        with caplog.at_level(logging.INFO, logger="routes.calls"):
+            with patch("psycopg.connect", return_value=mock_conn):
+                client.get("/api/calls")
+
+        assert any("GET /api/calls" in r.message for r in caplog.records)
+
     def test_empty_library(self, client):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
@@ -90,6 +107,14 @@ class TestGetCall:
             response = client.get("/api/calls/UNKNOWN")
 
         assert response.status_code == 404
+
+    def test_logs_route_entry(self, client, caplog):
+        """get_call() emits an INFO log with the ticker on entry."""
+        with caplog.at_level(logging.INFO, logger="routes.calls"):
+            with patch("routes.calls._ticker_exists", return_value=False):
+                client.get("/api/calls/AAPL")
+
+        assert any("AAPL" in r.message for r in caplog.records)
 
     def test_returns_call_detail(self, client):
         # _ticker_exists returns True
@@ -141,6 +166,14 @@ class TestGetSpans:
             response = client.get("/api/calls/UNKNOWN/spans")
         assert response.status_code == 404
 
+    def test_logs_route_entry(self, client, caplog):
+        """get_spans() emits an INFO log with ticker and section on entry."""
+        with caplog.at_level(logging.INFO, logger="routes.calls"):
+            with patch("routes.calls._ticker_exists", return_value=False):
+                client.get("/api/calls/AAPL/spans?section=prepared")
+
+        assert any("AAPL" in r.message and "prepared" in r.message for r in caplog.records)
+
     def test_returns_paginated_spans(self, client):
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = (2,)
@@ -178,6 +211,14 @@ class TestSearchTranscript:
         with patch("routes.calls._ticker_exists", return_value=False):
             response = client.get("/api/calls/UNKNOWN/search?q=revenue")
         assert response.status_code == 404
+
+    def test_logs_route_entry(self, client, caplog):
+        """search_transcript() emits an INFO log with ticker and query on entry."""
+        with caplog.at_level(logging.INFO, logger="routes.calls"):
+            with patch("routes.calls._ticker_exists", return_value=False):
+                client.get("/api/calls/AAPL/search?q=revenue")
+
+        assert any("AAPL" in r.message and "revenue" in r.message for r in caplog.records)
 
     def test_503_when_voyage_key_missing(self, client):
         with (
