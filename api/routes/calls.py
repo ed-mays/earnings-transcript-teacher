@@ -41,6 +41,9 @@ class CallSummary(BaseModel):
     company_name: str | None = None
     call_date: str | None = None
     industry: str | None = None
+    evasion_level: str | None = None
+    overall_sentiment: str | None = None
+    top_strategic_shift: str | None = None
 
 
 class SpeakerInfo(BaseModel):
@@ -117,15 +120,43 @@ def list_calls() -> list[CallSummary]:
     with psycopg.connect(_db_url()) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT ticker, company_name, call_date, industry FROM calls ORDER BY created_at DESC"
+                """
+                SELECT
+                    c.ticker,
+                    c.company_name,
+                    c.call_date::text,
+                    c.industry,
+                    cs.overall_sentiment,
+                    CASE
+                        WHEN COUNT(ea.id) = 0 THEN NULL
+                        WHEN AVG(ea.defensiveness_score) <= 3 THEN 'low'
+                        WHEN AVG(ea.defensiveness_score) <= 6 THEN 'medium'
+                        ELSE 'high'
+                    END AS evasion_level,
+                    CASE
+                        WHEN cs.strategic_shifts IS NOT NULL
+                             AND array_length(cs.strategic_shifts, 1) > 0
+                        THEN cs.strategic_shifts[1]->>'current_position'
+                        ELSE NULL
+                    END AS top_strategic_shift
+                FROM calls c
+                LEFT JOIN call_synthesis cs ON cs.call_id = c.id
+                LEFT JOIN evasion_analysis ea ON ea.call_id = c.id
+                GROUP BY c.ticker, c.company_name, c.call_date, c.industry, c.created_at,
+                         cs.overall_sentiment, cs.strategic_shifts
+                ORDER BY c.created_at DESC
+                """
             )
             rows = cur.fetchall()
     return [
         CallSummary(
             ticker=r[0],
             company_name=r[1],
-            call_date=str(r[2]) if r[2] else None,
+            call_date=r[2],
             industry=r[3],
+            overall_sentiment=r[4],
+            evasion_level=r[5],
+            top_strategic_shift=r[6],
         )
         for r in rows
     ]
