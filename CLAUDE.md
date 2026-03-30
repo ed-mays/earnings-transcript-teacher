@@ -57,13 +57,18 @@ See [`docs/getting-started.md`](docs/getting-started.md) for the full setup walk
 ### New stack conventions (FastAPI + Next.js + Modal)
 
 **FastAPI:**
-- New routes go in `api/routes/`. Keep route handlers thin — call into `services/` for business logic.
-- Return structured JSON errors with appropriate HTTP status codes. Follow the pattern used in existing route handlers.
-- All database access goes through `db/repositories.py`. Never make raw psycopg calls from route handlers or services.
+- New routes go in `api/routes/`. Keep route handlers thin — delegate business logic to service helpers; delegate data access to repository classes.
+- **Dependency injection:** use the type aliases defined in `api/dependencies.py` — `DbDep`, `CurrentUserDep`, `RequireAdminDep`. Do not call `psycopg.connect()` or validate JWTs inline in route handlers.
+- **Error responses:** raise `HTTPException(status_code=..., detail="...")` for client errors (4xx). The app-level handler in `api/main.py` already catches unhandled exceptions and returns `{"error": "Internal server error"}` — do not duplicate this.
+- **Response models:** define a Pydantic `BaseModel` for every response shape. Compose with nested models for complex structures. Use `list[Model]` for collections and add `total`/`page`/`page_size` fields for paginated responses.
+- All database access goes through repository classes. Never make raw psycopg calls from route handlers or services.
 - The `api/settings.py` `REQUIRED_ENV_VARS` list controls which env vars are validated at startup — the API returns 503 for all requests if any are missing.
 
 **Next.js (`web/`):**
 - **Read [`web/AGENTS.md`](web/AGENTS.md) before writing any code in `web/`.** This project uses a version of Next.js with breaking API changes — conventions from other projects may not apply.
+- **Server vs client components:** server components are the default (`page.tsx`, `layout.tsx`). Add `"use client"` only for components that need browser APIs, React hooks, or event handlers.
+- **Data fetching:** server components fetch directly via `createSupabaseServerClient()` or the backend API with `fetch(..., { next: { revalidate: N } })`. Client components call the typed `web/lib/api.ts` wrapper (`api.get<T>()`, `api.post<T>()`, etc.) which injects the Supabase auth token automatically — do not call `fetch()` directly from client components.
+- **Props typing:** every component must declare a named `interface ComponentNameProps`. Callbacks must be explicitly typed (e.g., `onSelect: (id: string) => void`).
 - Environment variables for the frontend live in `web/.env.local` (see `web/env.example`).
 
 **Modal pipeline (`pipeline/`):**
@@ -129,6 +134,8 @@ Name Claude Code sessions descriptively so you can find them later:
 - `refactor: module name` — for refactoring work
 - `test: module name` — for writing tests
 - `docs: readme/cleanup` — for documentation
+- `api: route or service name` — for FastAPI route and service work
+- `web: component or page name` — for Next.js component and page work
 
 Each session should have a **single, well-scoped goal**. If a conversation grows large (500+ lines), start a new session for the next feature.
 
