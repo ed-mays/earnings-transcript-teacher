@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from contextlib import nullcontext
 
 import psycopg
 from pgvector.psycopg import register_vector
@@ -15,11 +16,14 @@ class AnalysisRepository:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str
 
-    def get_topics_for_ticker(self, ticker: str, limit: int = 5) -> list[list[str]]:
+    def get_topics_for_ticker(
+        self, ticker: str, limit: int = 5, conn: psycopg.Connection | None = None
+    ) -> list[list[str]]:
         topics = []
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT ct.terms
@@ -36,11 +40,14 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch topics: {e}")
         return topics
 
-    def get_themes_for_ticker(self, ticker: str) -> list[str]:
+    def get_themes_for_ticker(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> list[str]:
         themes = []
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT cs.key_themes
@@ -58,11 +65,14 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch themes: {e}")
         return themes
 
-    def get_synthesis_for_ticker(self, ticker: str) -> tuple[str, str, str] | None:
+    def get_synthesis_for_ticker(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> tuple[str, str, str] | None:
         """Return (overall_sentiment, executive_tone, analyst_sentiment) for a ticker."""
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT cs.overall_sentiment, cs.executive_tone, cs.analyst_sentiment
@@ -77,11 +87,14 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch synthesis for {ticker}: {e}")
         return None
 
-    def get_strategic_shifts_for_ticker(self, ticker: str) -> list[dict] | None:
+    def get_strategic_shifts_for_ticker(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> list[dict] | None:
         """Return the strategic_shifts list for a ticker as structured dicts, or None if absent."""
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT cs.strategic_shifts
@@ -199,11 +212,14 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch takeaways: {e}")
         return takeaways
 
-    def get_keywords_for_ticker(self, ticker: str, limit: int = 15) -> list[str]:
+    def get_keywords_for_ticker(
+        self, ticker: str, limit: int = 15, conn: psycopg.Connection | None = None
+    ) -> list[str]:
         keywords = []
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT sk.term
@@ -220,12 +236,15 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch keywords: {e}")
         return keywords
 
-    def get_speakers_for_ticker(self, ticker: str) -> list[tuple[str, str, str | None, str | None]]:
+    def get_speakers_for_ticker(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> list[tuple[str, str, str | None, str | None]]:
         """Return speakers for a ticker as (name, role, title, firm) ordered by role then name."""
         rows = []
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT sp.name, sp.role, sp.title, sp.firm
@@ -294,12 +313,15 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch Q&A evasion for {ticker}: {e}")
         return rows
 
-    def get_evasion_for_ticker(self, ticker: str) -> list[tuple[str, int, str]]:
+    def get_evasion_for_ticker(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> list[tuple[str, int, str]]:
         """Return evasion analysis entries for a ticker as (analyst_concern, defensiveness_score, evasion_explanation)."""
         rows = []
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         """
                         SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation

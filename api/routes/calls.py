@@ -3,13 +3,15 @@
 import logging
 import os
 import time
+from contextlib import nullcontext
 
 logger = logging.getLogger(__name__)
 
 import psycopg
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel
 
+from api.dependencies import DbDep
 from db.analytics import track
 from db.repositories import AnalysisRepository, CallRepository
 from limiter import limiter
@@ -23,10 +25,11 @@ def _db_url() -> str:
     return os.environ["DATABASE_URL"]
 
 
-def _ticker_exists(ticker: str) -> bool:
+def _ticker_exists(ticker: str, conn: psycopg.Connection | None = None) -> bool:
     """Return True if a call record exists for the given ticker."""
-    with psycopg.connect(_db_url()) as conn:
-        with conn.cursor() as cur:
+    ctx = nullcontext(conn) if conn is not None else psycopg.connect(_db_url())
+    with ctx as c:
+        with c.cursor() as cur:
             cur.execute("SELECT 1 FROM calls WHERE ticker = %s LIMIT 1", (ticker,))
             return cur.fetchone() is not None
 
@@ -129,10 +132,10 @@ def list_calls() -> list[CallSummary]:
 
 
 @router.get("/{ticker}", response_model=CallDetail)
-def get_call(ticker: str) -> CallDetail:
+def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
     """Return full metadata for a single analyzed call."""
     logger.info("GET /api/calls/%s", ticker)
-    if not _ticker_exists(ticker):
+    if not _ticker_exists(ticker, conn):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No call found for ticker {ticker!r}",
@@ -142,10 +145,10 @@ def get_call(ticker: str) -> CallDetail:
     call_repo = CallRepository(db_url)
     analysis_repo = AnalysisRepository(db_url)
 
-    company_name, industry = call_repo.get_company_info(ticker)
-    call_date = call_repo.get_call_date(ticker)
+    company_name, industry = call_repo.get_company_info(ticker, conn=conn)
+    call_date = call_repo.get_call_date(ticker, conn=conn)
 
-    raw_synthesis = analysis_repo.get_synthesis_for_ticker(ticker)
+    raw_synthesis = analysis_repo.get_synthesis_for_ticker(ticker, conn=conn)
     synthesis = (
         SynthesisInfo(
             overall_sentiment=raw_synthesis[0],
@@ -156,7 +159,7 @@ def get_call(ticker: str) -> CallDetail:
         else None
     )
 
-    raw_shifts = analysis_repo.get_strategic_shifts_for_ticker(ticker) or []
+    raw_shifts = analysis_repo.get_strategic_shifts_for_ticker(ticker, conn=conn) or []
     strategic_shifts = [
         StrategicShift(
             prior_position=s.get("prior_position", ""),
@@ -166,7 +169,7 @@ def get_call(ticker: str) -> CallDetail:
         for s in raw_shifts
     ]
 
-    raw_evasion = analysis_repo.get_evasion_for_ticker(ticker)
+    raw_evasion = analysis_repo.get_evasion_for_ticker(ticker, conn=conn)
     evasion_analyses = [
         EvasionItem(
             analyst_concern=r[0],
@@ -176,18 +179,19 @@ def get_call(ticker: str) -> CallDetail:
         for r in raw_evasion
     ]
 
-    raw_speakers = analysis_repo.get_speakers_for_ticker(ticker)
+    raw_speakers = analysis_repo.get_speakers_for_ticker(ticker, conn=conn)
     speakers = [SpeakerInfo(name=r[0], role=r[1], title=r[2], firm=r[3]) for r in raw_speakers]
 
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return CallDetail(
         ticker=ticker,
         company_name=company_name or None,
         call_date=str(call_date) if call_date else None,
         industry=industry or None,
         synthesis=synthesis,
-        keywords=analysis_repo.get_keywords_for_ticker(ticker),
-        themes=analysis_repo.get_themes_for_ticker(ticker),
-        topics=analysis_repo.get_topics_for_ticker(ticker),
+        keywords=analysis_repo.get_keywords_for_ticker(ticker, conn=conn),
+        themes=analysis_repo.get_themes_for_ticker(ticker, conn=conn),
+        topics=analysis_repo.get_topics_for_ticker(ticker, conn=conn),
         evasion_analyses=evasion_analyses,
         strategic_shifts=strategic_shifts,
         speakers=speakers,

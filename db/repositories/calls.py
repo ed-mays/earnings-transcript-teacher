@@ -1,6 +1,7 @@
 """Call metadata repository."""
 
 import logging
+from contextlib import nullcontext
 
 import psycopg
 
@@ -11,11 +12,14 @@ class CallRepository:
     def __init__(self, conn_str: str):
         self.conn_str = conn_str
 
-    def get_company_info(self, ticker: str) -> tuple[str, str]:
+    def get_company_info(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> tuple[str, str]:
         """Return (company_name, industry) for a ticker, or empty strings if not found."""
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         "SELECT company_name, industry FROM calls WHERE ticker = %s LIMIT 1",
                         (ticker,),
@@ -27,11 +31,12 @@ class CallRepository:
             logger.warning(f"Could not fetch company info for {ticker}: {e}")
         return ("", "")
 
-    def get_call_date(self, ticker: str):
+    def get_call_date(self, ticker: str, conn: psycopg.Connection | None = None):
         """Return the call_date for a ticker, or None if not set."""
         try:
-            with psycopg.connect(self.conn_str) as conn:
-                with conn.cursor() as cur:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
                     cur.execute(
                         "SELECT call_date FROM calls WHERE ticker = %s LIMIT 1",
                         (ticker,),
