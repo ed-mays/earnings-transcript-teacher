@@ -453,10 +453,15 @@ def _signals_sse_stream(body: EvasionSignalsRequest):
         }
     ]
     try:
-        for chunk in stream_chat(messages, _SIGNALS_SYSTEM_PROMPT):
+        has_content = False
+        for chunk in stream_chat(messages, _SIGNALS_SYSTEM_PROMPT, model="sonar"):
             if isinstance(chunk, str):
+                has_content = True
                 yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
-        yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+        if has_content:
+            yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+        else:
+            yield f"data: {_json.dumps({'type': 'error', 'message': 'No content received from model'})}\n\n"
     except Exception:
         logger.exception("Error streaming evasion signals")
         yield f"data: {_json.dumps({'type': 'error', 'message': 'Stream error'})}\n\n"
