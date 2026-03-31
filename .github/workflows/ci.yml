@@ -62,10 +62,10 @@ jobs:
           SQL
 
       - name: Run migrations (first pass)
-        run: supabase db push --db-url postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
+        run: supabase db push --db-url "postgresql://postgres:postgres@localhost:5432/earnings_teacher_test?sslmode=disable"
 
       - name: Run migrations (idempotency check — second pass)
-        run: supabase db push --db-url postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
+        run: supabase db push --db-url "postgresql://postgres:postgres@localhost:5432/earnings_teacher_test?sslmode=disable"
 
   test:
     runs-on: ubuntu-latest
