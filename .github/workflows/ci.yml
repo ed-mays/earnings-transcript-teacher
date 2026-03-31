@@ -23,6 +23,7 @@ jobs:
           filters: |
             migrations:
               - 'supabase/migrations/**'
+              - '.github/workflows/ci.yml'
 
   migration-check:
     needs: changes
@@ -62,10 +63,14 @@ jobs:
           SQL
 
       - name: Run migrations (first pass)
-        run: supabase db push --db-url postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
+        env:
+          PGSSLMODE: disable
+        run: supabase db push --db-url "postgresql://postgres:postgres@localhost:5432/earnings_teacher_test"
 
       - name: Run migrations (idempotency check — second pass)
-        run: supabase db push --db-url postgresql://postgres:postgres@localhost:5432/earnings_teacher_test
+        env:
+          PGSSLMODE: disable
+        run: supabase db push --db-url "postgresql://postgres:postgres@localhost:5432/earnings_teacher_test"
 
   test:
     runs-on: ubuntu-latest
