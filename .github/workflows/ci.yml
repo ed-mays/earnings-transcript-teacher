@@ -136,6 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      deployments: write
 
     steps:
       - uses: actions/checkout@v4
@@ -147,6 +148,14 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Create GitHub deployment
+        uses: bobheadxi/deployments@v1
+        id: deployment
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: preview/${{ github.head_ref }}
+
       - name: Deploy preview
         id: deploy
         run: |
@@ -155,6 +164,17 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Update GitHub deployment status
+        uses: bobheadxi/deployments@v1
+        if: always()
+        with:
+          step: finish
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
+          env: ${{ steps.deployment.outputs.env }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          env_url: ${{ steps.deploy.outputs.url }}
 
       - name: Comment preview URL on PR
         uses: actions/github-script@v7
@@ -171,6 +191,8 @@ jobs:
     needs: [deploy-migrations]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      deployments: write
 
     steps:
       - uses: actions/checkout@v4
@@ -182,8 +204,30 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Create GitHub deployment
+        uses: bobheadxi/deployments@v1
+        id: deployment
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: production
+
       - name: Deploy to production
-        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        id: deploy
+        run: |
+          url=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes)
+          echo "url=$url" >> $GITHUB_OUTPUT
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Update GitHub deployment status
+        uses: bobheadxi/deployments@v1
+        if: always()
+        with:
+          step: finish
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
+          env: ${{ steps.deployment.outputs.env }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          env_url: ${{ steps.deploy.outputs.url }}
