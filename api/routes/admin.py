@@ -150,7 +150,7 @@ async def trigger_ingestion(body: IngestRequest, user_id: RequireAdminDep) -> di
             )
     try:
         fn = modal.Function.from_name("earnings-ingestion", "ingest_ticker")
-        fn.spawn(body.ticker)
+        await fn.spawn.aio(body.ticker)
     except modal.exception.NotFoundError:
         raise HTTPException(status_code=503, detail="Ingestion pipeline not deployed")
     except modal.exception.AuthError:
