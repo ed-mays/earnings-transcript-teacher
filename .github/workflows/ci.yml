@@ -116,7 +116,9 @@ jobs:
       - name: Push migrations to production
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase db push --project-ref qxdexukkmzidalnrzfqf
+        run: |
+          supabase link --project-ref qxdexukkmzidalnrzfqf
+          supabase db push
 
   docker-build:
     needs: [test]
