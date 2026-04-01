@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "_note": "Manually curated evaluation dataset. Populate chunk_id values from the transcript_chunks table in Supabase. See tools/eval/README.md for labeling instructions.",
+  "tier1": [
+    {
+      "_placeholder": true,
+      "chunk_id": "00000000-0000-0000-0000-000000000001",
+      "ticker": "MSFT",
+      "chunk_text_preview": "<replace with first 300 chars of a high-scoring MSFT chunk>",
+      "tier1_labels": {
+        "good_terms": ["Copilot stack", "Azure Arc", "intelligent cloud", "Microsoft Fabric"],
+        "bad_terms": ["pleased to report", "on a year-over-year basis", "I'd like to thank"],
+        "expected_score": 8
+      }
+    },
+    {
+      "_placeholder": true,
+      "chunk_id": "00000000-0000-0000-0000-000000000002",
+      "ticker": "MSFT",
+      "chunk_text_preview": "<replace with first 300 chars of a low-scoring MSFT chunk (boilerplate/safe harbor)>",
+      "tier1_labels": {
+        "good_terms": [],
+        "bad_terms": ["safe harbor", "forward-looking statements", "please refer to"],
+        "expected_score": 1
+      }
+    },
+    {
+      "_placeholder": true,
+      "chunk_id": "00000000-0000-0000-0000-000000000003",
+      "ticker": "AAPL",
+      "chunk_text_preview": "<replace with first 300 chars of a mid-scoring AAPL chunk>",
+      "tier1_labels": {
+        "good_terms": ["Apple Intelligence", "Vision Pro", "spatial computing"],
+        "bad_terms": ["excited about", "looking forward to"],
+        "expected_score": 5
+      }
+    }
+  ],
+  "tier2": [
+    {
+      "_placeholder": true,
+      "chunk_id": "00000000-0000-0000-0000-000000000004",
+      "ticker": "MSFT",
+      "chunk_text_preview": "<replace with first 300 chars of a MSFT Q&A chunk containing analyst questions>",
+      "tier2_labels": {
+        "evasion_verbatim_expected": true
+      }
+    },
+    {
+      "_placeholder": true,
+      "chunk_id": "00000000-0000-0000-0000-000000000005",
+      "ticker": "AAPL",
+      "chunk_text_preview": "<replace with first 300 chars of an AAPL chunk with no evasion>",
+      "tier2_labels": {
+        "evasion_verbatim_expected": false
+      }
+    }
+  ]
+}

@@ -284,6 +284,60 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch spans: {e}")
         return rows
 
+    def get_chunks_for_ticker(
+        self,
+        ticker: str,
+        limit: int = 10,
+        quarter: str | None = None,
+    ) -> list[dict]:
+        """Return transcript chunks for a ticker from the transcript_chunks table.
+
+        Optionally filter to a specific quarter using the format YYYY-QN (e.g. "2025-Q4").
+        Returns a list of dicts with keys: chunk_id, chunk_type, chunk_text,
+        tier1_score, needs_deep_analysis.
+        """
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    params: list = [ticker]
+                    quarter_clause = ""
+                    if quarter:
+                        # Parse YYYY-QN into a date range
+                        year_str, q_str = quarter.split("-Q")
+                        year = int(year_str)
+                        q = int(q_str)
+                        quarter_starts = {1: "01-01", 2: "04-01", 3: "07-01", 4: "10-01"}
+                        quarter_ends = {1: "03-31", 2: "06-30", 3: "09-30", 4: "12-31"}
+                        start_date = f"{year}-{quarter_starts[q]}"
+                        end_date = f"{year}-{quarter_ends[q]}"
+                        quarter_clause = "AND c.call_date BETWEEN %s AND %s"
+                        params.extend([start_date, end_date])
+                    params.append(limit)
+                    cur.execute(
+                        f"""
+                        SELECT tc.chunk_id, tc.chunk_type, tc.chunk_text,
+                               tc.tier1_score, tc.needs_deep_analysis
+                        FROM transcript_chunks tc
+                        JOIN calls c ON tc.call_id = c.id
+                        WHERE c.ticker = %s {quarter_clause}
+                        ORDER BY tc.sequence_order ASC
+                        LIMIT %s
+                        """,
+                        params,
+                    )
+                    for row in cur.fetchall():
+                        rows.append({
+                            "chunk_id": row[0],
+                            "chunk_type": row[1],
+                            "chunk_text": row[2],
+                            "tier1_score": row[3],
+                            "needs_deep_analysis": row[4],
+                        })
+        except Exception as e:
+            logger.warning(f"Could not fetch chunks for {ticker}: {e}")
+        return rows
+
     def get_qa_evasion_for_ticker(self, ticker: str) -> list[tuple]:
         """Return evasion entries ordered by call sequence.
 

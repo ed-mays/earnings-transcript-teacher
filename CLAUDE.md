@@ -141,6 +141,16 @@ Each session should have a **single, well-scoped goal**. If a conversation grows
 
 ---
 
+## Prompt versioning
+
+Prompt constants for the ingestion pipeline live in `ingestion/prompts.py`. Experimental variants go in `ingestion/prompts_candidates.py` (never imported by the pipeline). Git history is the version record — no database, no version numbers in filenames.
+
+See `docs/prompt-versioning.md` for the full conventions including naming, promotion workflow, and commit message format.
+
+Use `tools/prompt_tuner.py` to run a side-by-side comparison of production vs. candidate prompts and measure improvement on `tools/eval/dataset.json` before promoting anything.
+
+---
+
 ## Commit and PR message conventions
 
 - Do **not** add `Co-Authored-By` trailers or any other attribution to Claude in commit or PR messages.
