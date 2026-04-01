@@ -1,56 +1,16 @@
 """Unit tests for /api/calls routes."""
 
 import logging
-import sys
 import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Add the api/ directory so FastAPI can resolve `routes.*` imports.
-API_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../api"))
-if API_DIR not in sys.path:
-    sys.path.insert(0, API_DIR)
-
-ENV = {
-    "DATABASE_URL": "postgresql://test",
-    "SUPABASE_URL": "https://test.supabase.co",
-    "VOYAGE_API_KEY": "voyage-test-key",
-    "PERPLEXITY_API_KEY": "pplx-test-key",
-    "MODAL_TOKEN_ID": "modal-test-id",
-    "ANTHROPIC_API_KEY": "anth-test-key",
-}
-
-
-@pytest.fixture()
-def client():
-    """Return a TestClient with required env vars set and DB connections mocked."""
-    with patch.dict(os.environ, ENV):
-        with patch("psycopg.connect"):
-            from fastapi.testclient import TestClient
-            from main import app
-            from dependencies import get_db, get_current_user
-
-            def override_get_db():
-                """Bypass the connection pool; forward to the (possibly re-patched) psycopg.connect."""
-                import psycopg as _psycopg
-                conn = _psycopg.connect(os.environ["DATABASE_URL"])
-                yield conn
-
-            def override_get_current_user():
-                """Return a fixed user ID for all authenticated routes."""
-                return "test-user-id"
-
-            app.dependency_overrides[get_db] = override_get_db
-            app.dependency_overrides[get_current_user] = override_get_current_user
-            with TestClient(app) as c:
-                yield c
-            app.dependency_overrides.pop(get_db, None)
-            app.dependency_overrides.pop(get_current_user, None)
+# api_client fixture is provided by tests/conftest.py
 
 
 class TestListCalls:
-    def test_returns_call_list(self, client):
+    def test_returns_call_list(self, api_client):
         mock_rows = [
             ("AAPL", "Apple Inc.", "2025-01-30", "Technology", "bullish", "low", "Expanding into AI hardware"),
             ("MSFT", "Microsoft Corp.", None, None, None, None, None),
@@ -64,7 +24,7 @@ class TestListCalls:
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
         with patch("psycopg.connect", return_value=mock_conn):
-            response = client.get("/api/calls")
+            response = api_client.get("/api/calls")
 
         assert response.status_code == 200
         data = response.json()
@@ -81,7 +41,7 @@ class TestListCalls:
         assert data[1]["evasion_level"] is None
         assert data[1]["top_strategic_shift"] is None
 
-    def test_logs_route_entry(self, client, caplog):
+    def test_logs_route_entry(self, api_client, caplog):
         """list_calls() emits an INFO log on entry."""
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
@@ -93,11 +53,11 @@ class TestListCalls:
 
         with caplog.at_level(logging.INFO, logger="routes.calls"):
             with patch("psycopg.connect", return_value=mock_conn):
-                client.get("/api/calls")
+                api_client.get("/api/calls")
 
         assert any("GET /api/calls" in r.message for r in caplog.records)
 
-    def test_empty_library(self, client):
+    def test_empty_library(self, api_client):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
         mock_conn = MagicMock()
@@ -107,14 +67,14 @@ class TestListCalls:
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
         with patch("psycopg.connect", return_value=mock_conn):
-            response = client.get("/api/calls")
+            response = api_client.get("/api/calls")
 
         assert response.status_code == 200
         assert response.json() == []
 
 
 class TestGetCall:
-    def test_404_for_unknown_ticker(self, client):
+    def test_404_for_unknown_ticker(self, api_client):
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = None
         mock_conn = MagicMock()
@@ -124,23 +84,19 @@ class TestGetCall:
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
         with patch("psycopg.connect", return_value=mock_conn):
-            response = client.get("/api/calls/UNKNOWN")
+            response = api_client.get("/api/calls/UNKNOWN")
 
         assert response.status_code == 404
 
-    def test_logs_route_entry(self, client, caplog):
+    def test_logs_route_entry(self, api_client, caplog):
         """get_call() emits an INFO log with the ticker on entry."""
         with caplog.at_level(logging.INFO, logger="routes.calls"):
             with patch("routes.calls._ticker_exists", return_value=False):
-                client.get("/api/calls/AAPL")
+                api_client.get("/api/calls/AAPL")
 
         assert any("AAPL" in r.message for r in caplog.records)
 
-    def test_returns_call_detail(self, client):
-        # _ticker_exists returns True
-        exists_cursor = MagicMock()
-        exists_cursor.fetchone.return_value = (1,)
-
+    def test_returns_call_detail(self, api_client):
         with (
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.CallRepository") as MockCallRepo,
@@ -168,7 +124,7 @@ class TestGetCall:
             analysis_repo.get_takeaways_for_ticker.return_value = []
             analysis_repo.get_misconceptions_for_ticker.return_value = []
 
-            response = client.get("/api/calls/AAPL")
+            response = api_client.get("/api/calls/AAPL")
 
         assert response.status_code == 200
         data = response.json()
@@ -184,20 +140,20 @@ class TestGetCall:
 
 
 class TestGetSpans:
-    def test_404_for_unknown_ticker(self, client):
+    def test_404_for_unknown_ticker(self, api_client):
         with patch("routes.calls._ticker_exists", return_value=False):
-            response = client.get("/api/calls/UNKNOWN/spans")
+            response = api_client.get("/api/calls/UNKNOWN/spans")
         assert response.status_code == 404
 
-    def test_logs_route_entry(self, client, caplog):
+    def test_logs_route_entry(self, api_client, caplog):
         """get_spans() emits an INFO log with ticker and section on entry."""
         with caplog.at_level(logging.INFO, logger="routes.calls"):
             with patch("routes.calls._ticker_exists", return_value=False):
-                client.get("/api/calls/AAPL/spans?section=prepared")
+                api_client.get("/api/calls/AAPL/spans?section=prepared")
 
         assert any("AAPL" in r.message and "prepared" in r.message for r in caplog.records)
 
-    def test_returns_paginated_spans(self, client):
+    def test_returns_paginated_spans(self, api_client):
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = (2,)
         mock_cursor.fetchall.return_value = [
@@ -214,7 +170,7 @@ class TestGetSpans:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("psycopg.connect", return_value=mock_conn),
         ):
-            response = client.get("/api/calls/AAPL/spans?section=prepared&page=1&page_size=50")
+            response = api_client.get("/api/calls/AAPL/spans?section=prepared&page=1&page_size=50")
 
         assert response.status_code == 200
         data = response.json()
@@ -224,47 +180,43 @@ class TestGetSpans:
         assert data["spans"][0]["speaker"] == "Tim Cook"
         assert data["spans"][0]["sequence_order"] == 1
 
-    def test_invalid_section_param(self, client):
-        response = client.get("/api/calls/AAPL/spans?section=invalid")
+    def test_invalid_section_param(self, api_client):
+        response = api_client.get("/api/calls/AAPL/spans?section=invalid")
         assert response.status_code == 422
 
 
 class TestSearchTranscript:
-    def test_404_for_unknown_ticker(self, client):
+    def test_404_for_unknown_ticker(self, api_client):
         with patch("routes.calls._ticker_exists", return_value=False):
-            response = client.get("/api/calls/UNKNOWN/search?q=revenue")
+            response = api_client.get("/api/calls/UNKNOWN/search?q=revenue")
         assert response.status_code == 404
 
-    def test_logs_route_entry(self, client, caplog):
+    def test_logs_route_entry(self, api_client, caplog):
         """search_transcript() emits an INFO log with ticker and query on entry."""
         with caplog.at_level(logging.INFO, logger="routes.calls"):
             with patch("routes.calls._ticker_exists", return_value=False):
-                client.get("/api/calls/AAPL/search?q=revenue")
+                api_client.get("/api/calls/AAPL/search?q=revenue")
 
         assert any("AAPL" in r.message and "revenue" in r.message for r in caplog.records)
 
-    def test_503_when_voyage_key_missing(self, client):
-        with (
-            patch("routes.calls._ticker_exists", return_value=True),
-            patch.dict(os.environ, {"VOYAGE_API_KEY": ""}, clear=False),
-        ):
-            # Remove VOYAGE_API_KEY if present
+    def test_503_when_voyage_key_missing(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=True):
             env_without_voyage = {k: v for k, v in os.environ.items() if k != "VOYAGE_API_KEY"}
             with patch.dict(os.environ, env_without_voyage, clear=True):
-                response = client.get("/api/calls/AAPL/search?q=revenue")
+                response = api_client.get("/api/calls/AAPL/search?q=revenue")
 
         assert response.status_code == 503
 
-    def test_missing_query_param(self, client):
-        response = client.get("/api/calls/AAPL/search")
+    def test_missing_query_param(self, api_client):
+        response = api_client.get("/api/calls/AAPL/search")
         assert response.status_code == 422
 
-    def test_422_when_query_exceeds_max_length(self, client):
+    def test_422_when_query_exceeds_max_length(self, api_client):
         """Query longer than 500 chars is rejected by FastAPI before any API call."""
-        response = client.get(f"/api/calls/AAPL/search?q={'x' * 501}")
+        response = api_client.get(f"/api/calls/AAPL/search?q={'x' * 501}")
         assert response.status_code == 422
 
-    def test_429_when_search_rate_limit_exceeded(self, client):
+    def test_429_when_search_rate_limit_exceeded(self, api_client):
         """Endpoint returns 429 when the per-user/IP rate limit is hit."""
         from fastapi import HTTPException
 
@@ -272,7 +224,7 @@ class TestSearchTranscript:
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
         with patch("slowapi.Limiter._check_request_limit", side_effect=_raise_429):
-            response = client.get("/api/calls/AAPL/search?q=revenue")
+            response = api_client.get("/api/calls/AAPL/search?q=revenue")
         assert response.status_code == 429
 
 
@@ -293,12 +245,12 @@ class TestEvasionSignals:
                     events.append(json.loads(line[len("data: "):]))
         return events
 
-    def test_404_for_unknown_ticker(self, client):
+    def test_404_for_unknown_ticker(self, api_client):
         with patch("routes.calls._ticker_exists", return_value=False):
-            response = client.post("/api/calls/UNKNOWN/evasion-signals", json=self.PAYLOAD)
+            response = api_client.post("/api/calls/UNKNOWN/evasion-signals", json=self.PAYLOAD)
         assert response.status_code == 404
 
-    def test_happy_path_streams_tokens_and_done(self, client):
+    def test_happy_path_streams_tokens_and_done(self, api_client):
         """When stream_investor_signals yields tokens, endpoint emits token events then done."""
         def _fake_stream(messages, system_prompt):
             yield "Investors "
@@ -308,7 +260,7 @@ class TestEvasionSignals:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("services.llm.stream_investor_signals", side_effect=_fake_stream),
         ):
-            response = client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
+            response = api_client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
 
         assert response.status_code == 200
         events = self._parse_sse(response.text)
@@ -318,7 +270,7 @@ class TestEvasionSignals:
         assert token_events[1]["content"] == "should note."
         assert events[-1] == {"type": "done"}
 
-    def test_no_content_emits_error_event(self, client):
+    def test_no_content_emits_error_event(self, api_client):
         """When stream_investor_signals yields nothing, endpoint emits an error SSE event."""
         def _empty_stream(messages, system_prompt):
             return
@@ -328,7 +280,7 @@ class TestEvasionSignals:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("services.llm.stream_investor_signals", side_effect=_empty_stream),
         ):
-            response = client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
+            response = api_client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
 
         assert response.status_code == 200
         events = self._parse_sse(response.text)
@@ -336,7 +288,7 @@ class TestEvasionSignals:
         assert events[0]["type"] == "error"
         assert "No content" in events[0]["message"]
 
-    def test_api_exception_emits_error_event(self, client):
+    def test_api_exception_emits_error_event(self, api_client):
         """When stream_investor_signals raises, endpoint emits an error SSE event."""
         def _failing_stream(messages, system_prompt):
             raise RuntimeError("upstream API error")
@@ -346,7 +298,7 @@ class TestEvasionSignals:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("services.llm.stream_investor_signals", side_effect=_failing_stream),
         ):
-            response = client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
+            response = api_client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
 
         assert response.status_code == 200
         events = self._parse_sse(response.text)
