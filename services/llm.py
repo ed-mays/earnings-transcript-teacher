@@ -124,6 +124,26 @@ def stream_chat(
         raise
 
 
+def stream_investor_signals(
+    messages: list[dict],
+    system_prompt: str,
+):
+    """Stream a short investor-implications analysis using the Anthropic API.
+
+    Yields string chunks of the assistant's response as they arrive.
+    Raises on API errors.
+    """
+    client = anthropic.Anthropic()
+    with client.messages.stream(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=256,
+        system=system_prompt,
+        messages=messages,
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
+
+
 class RateLimiter:
     """A simple token-bucket-like rate limiter for the Anthropic API. Thread-safe."""
     def __init__(self, requests_per_minute: int = 50, requests_per_second: int = 1):

@@ -95,7 +95,7 @@ export async function streamSignals(
     }
   } finally {
     if (!terminated && !signal?.aborted) {
-      callbacks.onDone();
+      callbacks.onError("Stream closed without response");
     }
   }
 }

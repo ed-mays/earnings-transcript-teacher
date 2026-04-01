@@ -29,7 +29,7 @@ def client():
         with patch("psycopg.connect"):
             from fastapi.testclient import TestClient
             from main import app
-            from dependencies import get_db
+            from dependencies import get_db, get_current_user
 
             def override_get_db():
                 """Bypass the connection pool; forward to the (possibly re-patched) psycopg.connect."""
@@ -37,10 +37,16 @@ def client():
                 conn = _psycopg.connect(os.environ["DATABASE_URL"])
                 yield conn
 
+            def override_get_current_user():
+                """Return a fixed user ID for all authenticated routes."""
+                return "test-user-id"
+
             app.dependency_overrides[get_db] = override_get_db
+            app.dependency_overrides[get_current_user] = override_get_current_user
             with TestClient(app) as c:
                 yield c
             app.dependency_overrides.pop(get_db, None)
+            app.dependency_overrides.pop(get_current_user, None)
 
 
 class TestListCalls:
@@ -268,3 +274,81 @@ class TestSearchTranscript:
         with patch("slowapi.Limiter._check_request_limit", side_effect=_raise_429):
             response = client.get("/api/calls/AAPL/search?q=revenue")
         assert response.status_code == 429
+
+
+class TestEvasionSignals:
+    PAYLOAD = {
+        "analyst_concern": "Margin guidance",
+        "defensiveness_score": 7,
+        "evasion_explanation": "Executive redirected to top-line growth.",
+    }
+
+    def _parse_sse(self, text: str) -> list[dict]:
+        """Parse SSE response body into a list of event dicts."""
+        import json
+        events = []
+        for block in text.split("\n\n"):
+            for line in block.splitlines():
+                if line.startswith("data: "):
+                    events.append(json.loads(line[len("data: "):]))
+        return events
+
+    def test_404_for_unknown_ticker(self, client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = client.post("/api/calls/UNKNOWN/evasion-signals", json=self.PAYLOAD)
+        assert response.status_code == 404
+
+    def test_happy_path_streams_tokens_and_done(self, client):
+        """When stream_investor_signals yields tokens, endpoint emits token events then done."""
+        def _fake_stream(messages, system_prompt):
+            yield "Investors "
+            yield "should note."
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_fake_stream),
+        ):
+            response = client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        token_events = [e for e in events if e["type"] == "token"]
+        assert len(token_events) == 2
+        assert token_events[0]["content"] == "Investors "
+        assert token_events[1]["content"] == "should note."
+        assert events[-1] == {"type": "done"}
+
+    def test_no_content_emits_error_event(self, client):
+        """When stream_investor_signals yields nothing, endpoint emits an error SSE event."""
+        def _empty_stream(messages, system_prompt):
+            return
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_empty_stream),
+        ):
+            response = client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert "No content" in events[0]["message"]
+
+    def test_api_exception_emits_error_event(self, client):
+        """When stream_investor_signals raises, endpoint emits an error SSE event."""
+        def _failing_stream(messages, system_prompt):
+            raise RuntimeError("upstream API error")
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_failing_stream),
+        ):
+            response = client.post("/api/calls/AAPL/evasion-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
