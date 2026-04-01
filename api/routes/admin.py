@@ -148,9 +148,17 @@ async def trigger_ingestion(body: IngestRequest, user_id: RequireAdminDep) -> di
                 status_code=429,
                 detail=f"Rate limit: wait {remaining}s before ingesting {body.ticker} again.",
             )
+    try:
+        fn = modal.Function.from_name("earnings-ingestion", "ingest_ticker")
+        fn.spawn(body.ticker)
+    except modal.exception.NotFoundError:
+        raise HTTPException(status_code=503, detail="Ingestion pipeline not deployed")
+    except modal.exception.AuthError:
+        raise HTTPException(status_code=503, detail="Ingestion pipeline authentication failed")
+    except modal.exception.Error as exc:
+        logger.error("Modal dispatch failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail="Failed to dispatch ingestion job")
     _ingest_last_request[key] = now
-    fn = modal.Function.lookup("earnings-ingestion", "ingest_ticker")
-    fn.spawn(body.ticker)
     logger.info("Ingestion dispatched: ticker=%s at=%s", body.ticker, datetime.now(UTC).isoformat())
     track("ingestion_requested", properties={"ticker": body.ticker})
     return {

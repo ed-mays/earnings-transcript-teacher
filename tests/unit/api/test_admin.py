@@ -18,6 +18,19 @@ if API_DIR not in sys.path:
 MODAL_STUB = MagicMock()
 sys.modules.setdefault("modal", MODAL_STUB)
 
+
+# Real exception classes for the modal.exception namespace so that `except` clauses work.
+class _ModalError(Exception):
+    pass
+
+
+class _ModalNotFoundError(_ModalError):
+    pass
+
+
+class _ModalAuthError(_ModalError):
+    pass
+
 from main import app  # noqa: E402  (must come after sys.modules stub)
 
 ENV = {
@@ -93,8 +106,12 @@ def client():
 
 @pytest.fixture(autouse=True)
 def reset_modal():
-    """Reset the modal stub between tests so call counts don't bleed over."""
-    MODAL_STUB.reset_mock()
+    """Reset the modal stub between tests so call counts and side_effect don't bleed over."""
+    MODAL_STUB.reset_mock(side_effect=True)
+    # Re-wire exception classes after reset so except clauses can match them.
+    MODAL_STUB.exception.NotFoundError = _ModalNotFoundError
+    MODAL_STUB.exception.AuthError = _ModalAuthError
+    MODAL_STUB.exception.Error = _ModalError
 
 
 @pytest.fixture(autouse=True)
@@ -106,7 +123,7 @@ def reset_ingest_rate_limit():
 
 def test_ingest_returns_202(client):
     mock_fn = MagicMock()
-    MODAL_STUB.Function.lookup.return_value = mock_fn
+    MODAL_STUB.Function.from_name.return_value = mock_fn
 
     resp = client.post(
         "/admin/ingest",
@@ -123,7 +140,7 @@ def test_ingest_returns_202(client):
 
 def test_ingest_uppercases_ticker(client):
     mock_fn = MagicMock()
-    MODAL_STUB.Function.lookup.return_value = mock_fn
+    MODAL_STUB.Function.from_name.return_value = mock_fn
 
     resp = client.post(
         "/admin/ingest",
@@ -198,7 +215,7 @@ def test_ingest_invalid_ticker_non_alpha_returns_422(client):
 
 def test_ingest_looks_up_correct_modal_function(client):
     mock_fn = MagicMock()
-    MODAL_STUB.Function.lookup.return_value = mock_fn
+    MODAL_STUB.Function.from_name.return_value = mock_fn
 
     client.post(
         "/admin/ingest",
@@ -206,7 +223,7 @@ def test_ingest_looks_up_correct_modal_function(client):
         headers=ADMIN_AUTH,
     )
 
-    MODAL_STUB.Function.lookup.assert_called_with("earnings-ingestion", "ingest_ticker")
+    MODAL_STUB.Function.from_name.assert_called_with("earnings-ingestion", "ingest_ticker")
 
 
 # ---------------------------------------------------------------------------
@@ -342,13 +359,53 @@ def test_429_when_ingest_attempted_too_soon(client):
     assert "Rate limit" in resp.json()["detail"]
 
 
+def test_ingest_503_when_modal_function_not_found(client):
+    """NotFoundError from Modal surfaces as 503 with a clear message."""
+    MODAL_STUB.Function.from_name.side_effect = _ModalNotFoundError()
+
+    resp = client.post("/admin/ingest", json={"ticker": "AAPL"}, headers=ADMIN_AUTH)
+
+    assert resp.status_code == 503
+    assert "not deployed" in resp.json()["detail"]
+
+
+def test_ingest_503_when_modal_auth_fails(client):
+    """AuthError from Modal surfaces as 503 with a clear message."""
+    MODAL_STUB.Function.from_name.side_effect = _ModalAuthError()
+
+    resp = client.post("/admin/ingest", json={"ticker": "AAPL"}, headers=ADMIN_AUTH)
+
+    assert resp.status_code == 503
+    assert "authentication" in resp.json()["detail"]
+
+
+def test_ingest_502_when_modal_raises_generic_error(client):
+    """An unexpected Modal error surfaces as 502."""
+    MODAL_STUB.Function.from_name.side_effect = _ModalError("boom")
+
+    resp = client.post("/admin/ingest", json={"ticker": "AAPL"}, headers=ADMIN_AUTH)
+
+    assert resp.status_code == 502
+
+
+def test_ingest_failed_dispatch_does_not_poison_rate_limit(client):
+    """A failed Modal dispatch must not record the attempt — retry should not be blocked."""
+    import routes.admin as admin_mod
+
+    MODAL_STUB.Function.from_name.side_effect = _ModalNotFoundError()
+    client.post("/admin/ingest", json={"ticker": "AAPL"}, headers=ADMIN_AUTH)
+
+    # Rate limit must not have been recorded for this user+ticker.
+    assert f"{ADMIN_UUID}:AAPL" not in admin_mod._ingest_last_request
+
+
 def test_different_ticker_not_rate_limited(client):
     """Rate limit is per-ticker: a different ticker is not affected."""
     from datetime import UTC, datetime
     import routes.admin as admin_mod
 
     mock_fn = MagicMock()
-    MODAL_STUB.Function.lookup.return_value = mock_fn
+    MODAL_STUB.Function.from_name.return_value = mock_fn
 
     # AAPL is rate-limited, MSFT should proceed normally.
     admin_mod._ingest_last_request[f"{ADMIN_UUID}:AAPL"] = datetime.now(UTC)
