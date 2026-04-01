@@ -437,9 +437,9 @@ class EvasionSignalsRequest(BaseModel):
 
 
 def _signals_sse_stream(body: EvasionSignalsRequest):
-    """Generator that calls stream_chat and emits SSE-formatted lines for evasion signals."""
+    """Generator that streams investor-implications framing as SSE events."""
     import json as _json
-    from services.llm import stream_chat
+    from services.llm import stream_investor_signals
 
     level = _defensiveness_label(body.defensiveness_score)
     messages = [
@@ -452,12 +452,15 @@ def _signals_sse_stream(body: EvasionSignalsRequest):
             ),
         }
     ]
+    logger.debug("evasion_signals stream starting")
     try:
         has_content = False
-        for chunk in stream_chat(messages, _SIGNALS_SYSTEM_PROMPT, model="sonar"):
-            if isinstance(chunk, str):
-                has_content = True
-                yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        for chunk in stream_investor_signals(messages, _SIGNALS_SYSTEM_PROMPT):
+            if not has_content:
+                logger.debug("evasion_signals first token received")
+            has_content = True
+            yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        logger.debug("evasion_signals stream ended has_content=%s", has_content)
         if has_content:
             yield f"data: {_json.dumps({'type': 'done'})}\n\n"
         else:
@@ -480,13 +483,6 @@ def evasion_signals(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No call found for ticker {ticker!r}",
-        )
-
-    api_key = os.environ.get("PERPLEXITY_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Signals unavailable — PERPLEXITY_API_KEY is not configured",
         )
 
     return StreamingResponse(
