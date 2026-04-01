@@ -3,6 +3,8 @@
 /** Reveal-card for a single evasion item. Curiosity-first pattern. */
 
 import { useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { streamSignals } from "@/lib/signals";
 import type { EvasionItem } from "./types";
 
@@ -97,7 +99,18 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
                 📈 What this signals for investors
               </p>
-              <p className="text-sm text-amber-800">{signals}</p>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p className="text-sm text-amber-800 mb-1 last:mb-0">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc list-inside text-sm text-amber-800 space-y-0.5 mb-1">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-amber-800 space-y-0.5 mb-1">{children}</ol>,
+                  li: ({ children }) => <li className="text-sm text-amber-800">{children}</li>,
+                  strong: ({ children }) => <strong className="font-semibold text-amber-900">{children}</strong>,
+                }}
+              >
+                {signals}
+              </ReactMarkdown>
             </div>
           ) : signalsError ? (
             <p className="mt-3 text-xs text-red-500">{signalsError}</p>
