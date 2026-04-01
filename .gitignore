@@ -56,3 +56,6 @@ set_env.ps1
 
 # Feynman session exports (local only)
 feynman_sessions/
+
+# Prompt tuner raw results (stored locally, not committed)
+tools/eval/results/
