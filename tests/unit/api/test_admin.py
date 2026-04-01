@@ -3,7 +3,7 @@
 import os
 import sys
 from contextlib import ExitStack
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt as pyjwt
 import pytest
@@ -76,6 +76,13 @@ ADMIN_AUTH = {"Authorization": f"Bearer {_make_jwt(ADMIN_UUID)}"}
 LEARNER_AUTH = {"Authorization": f"Bearer {_make_jwt(LEARNER_UUID)}"}
 
 
+def _make_modal_fn() -> MagicMock:
+    """Return a MagicMock Modal Function with spawn.aio configured as an AsyncMock."""
+    mock_fn = MagicMock()
+    mock_fn.spawn.aio = AsyncMock()
+    return mock_fn
+
+
 def _make_mock_conn(role: str = "admin") -> MagicMock:
     """Return a mock psycopg connection whose execute().fetchone() returns the given role."""
     mock_conn = MagicMock()
@@ -122,7 +129,7 @@ def reset_ingest_rate_limit():
 
 
 def test_ingest_returns_202(client):
-    mock_fn = MagicMock()
+    mock_fn = _make_modal_fn()
     MODAL_STUB.Function.from_name.return_value = mock_fn
 
     resp = client.post(
@@ -135,11 +142,11 @@ def test_ingest_returns_202(client):
     body = resp.json()
     assert body["status"] == "accepted"
     assert body["ticker"] == "AAPL"
-    mock_fn.spawn.assert_called_once_with("AAPL")
+    mock_fn.spawn.aio.assert_called_once_with("AAPL")
 
 
 def test_ingest_uppercases_ticker(client):
-    mock_fn = MagicMock()
+    mock_fn = _make_modal_fn()
     MODAL_STUB.Function.from_name.return_value = mock_fn
 
     resp = client.post(
@@ -150,7 +157,7 @@ def test_ingest_uppercases_ticker(client):
 
     assert resp.status_code == 202
     assert resp.json()["ticker"] == "AAPL"
-    mock_fn.spawn.assert_called_once_with("AAPL")
+    mock_fn.spawn.aio.assert_called_once_with("AAPL")
 
 
 def test_ingest_missing_auth_returns_401(client):
@@ -214,7 +221,7 @@ def test_ingest_invalid_ticker_non_alpha_returns_422(client):
 
 
 def test_ingest_looks_up_correct_modal_function(client):
-    mock_fn = MagicMock()
+    mock_fn = _make_modal_fn()
     MODAL_STUB.Function.from_name.return_value = mock_fn
 
     client.post(
@@ -404,7 +411,7 @@ def test_different_ticker_not_rate_limited(client):
     from datetime import UTC, datetime
     import routes.admin as admin_mod
 
-    mock_fn = MagicMock()
+    mock_fn = _make_modal_fn()
     MODAL_STUB.Function.from_name.return_value = mock_fn
 
     # AAPL is rate-limited, MSFT should proceed normally.
