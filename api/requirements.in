@@ -11,3 +11,4 @@ modal>=0.73.0
 httpx>=0.27.0
 slowapi>=0.1.9
 sentry-sdk[fastapi]>=2.56.0
+anthropic>=0.40.0
