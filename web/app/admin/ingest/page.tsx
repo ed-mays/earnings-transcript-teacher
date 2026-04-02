@@ -2,7 +2,7 @@
 
 /** Admin page for triggering transcript ingestion. Client component (form state). */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Status = "idle" | "submitting" | "accepted" | "error";
 
@@ -10,6 +10,13 @@ export default function AdminIngestPage() {
   const [ticker, setTicker] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,6 +35,7 @@ export default function AdminIngestPage() {
       if (resp.status === 202) {
         setStatus("accepted");
         setTicker("");
+        dismissTimerRef.current = setTimeout(() => setStatus("idle"), 4000);
         return;
       }
 
@@ -76,10 +84,7 @@ export default function AdminIngestPage() {
               id="ticker"
               type="text"
               value={ticker}
-              onChange={(e) => {
-                setTicker(e.target.value);
-                if (status !== "submitting") setStatus("idle");
-              }}
+              onChange={(e) => setTicker(e.target.value)}
               placeholder="e.g. AAPL"
               disabled={status === "submitting"}
               className="w-full rounded-md border border-zinc-300 px-3 py-2 font-mono text-sm uppercase text-zinc-900 placeholder:normal-case placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400"
