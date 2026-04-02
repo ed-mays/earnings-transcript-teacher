@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getEvasionStyle, getSentimentStyle } from "@/lib/signal-colors";
 
 export interface CallSummary {
   ticker: string;
@@ -16,22 +17,6 @@ interface CallCardProps {
   call: CallSummary;
 }
 
-const EVASION_STYLES: Record<string, string> = {
-  low: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  medium: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  high: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-function sentimentStyle(sentiment: string): string {
-  const lower = sentiment.toLowerCase();
-  if (lower.includes("bullish") || lower.includes("positive")) {
-    return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-  }
-  if (lower.includes("bearish") || lower.includes("negative")) {
-    return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-  }
-  return "";
-}
 
 /** Card displaying summary metadata for a single earnings call. */
 export function CallCard({ call }: CallCardProps) {
@@ -63,20 +48,22 @@ export function CallCard({ call }: CallCardProps) {
         )}
         {(call.evasion_level || call.overall_sentiment) && (
           <div className="flex flex-wrap gap-1.5">
-            {call.overall_sentiment && (
-              <span
-                className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${sentimentStyle(call.overall_sentiment) || "bg-muted text-muted-foreground"}`}
-              >
-                {call.overall_sentiment}
-              </span>
-            )}
-            {call.evasion_level && (
-              <span
-                className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${EVASION_STYLES[call.evasion_level] ?? "bg-muted text-muted-foreground"}`}
-              >
-                {call.evasion_level} evasion
-              </span>
-            )}
+            {call.overall_sentiment && (() => {
+              const s = getSentimentStyle(call.overall_sentiment);
+              return (
+                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${s.bg} ${s.text}`}>
+                  {call.overall_sentiment}
+                </span>
+              );
+            })()}
+            {call.evasion_level && (() => {
+              const s = getEvasionStyle(call.evasion_level);
+              return (
+                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${s.bg} ${s.text}`}>
+                  {call.evasion_level} evasion
+                </span>
+              );
+            })()}
           </div>
         )}
         {call.top_strategic_shift && (

@@ -11,19 +11,15 @@ import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
+  CollapsibleChevron,
 } from "@/components/ui/collapsible";
+import { getEvasionStyle, evasionScoreToLevel } from "@/lib/signal-colors";
 
 interface EvasionCardProps {
   item: EvasionItem;
   ticker: string;
 }
 
-/** Maps defensiveness score (1–10) to severity badge content and colour classes. */
-function severityBadge(score: number): { emoji: string; label: string; classes: string } {
-  if (score >= 8) return { emoji: "🔴", label: "High", classes: "text-red-700 bg-red-50 dark:bg-red-900/30 dark:text-red-400" };
-  if (score >= 5) return { emoji: "🟡", label: "Medium", classes: "text-amber-700 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400" };
-  return { emoji: "🟢", label: "Low", classes: "text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-400" };
-}
 
 export function EvasionCard({ item, ticker }: EvasionCardProps) {
   const [revealed, setRevealed] = useState(false);
@@ -32,7 +28,7 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
   const [signalsError, setSignalsError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const badge = severityBadge(item.defensiveness_score);
+  const badge = getEvasionStyle(evasionScoreToLevel(item.defensiveness_score));
 
   async function handleSignalsClick() {
     if (signals) return;
@@ -79,7 +75,7 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
       {/* Always-visible header: analyst concern + severity + topic */}
       <CollapsibleTrigger className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted transition-colors">
         <span
-          className={`shrink-0 mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${badge.classes}`}
+          className={`shrink-0 mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${badge.bg} ${badge.text}`}
         >
           {badge.emoji} {badge.label}
         </span>
@@ -89,9 +85,7 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
             <p className="mt-0.5 text-xs text-muted-foreground">{item.question_topic}</p>
           )}
         </div>
-        <span className="shrink-0 text-xs text-muted-foreground mt-0.5">
-          {revealed ? "▲" : "▼"}
-        </span>
+        <CollapsibleChevron open={revealed} className="mt-0.5" />
       </CollapsibleTrigger>
 
       {/* Revealed: full analysis + signals button */}

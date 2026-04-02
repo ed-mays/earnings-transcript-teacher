@@ -8,6 +8,7 @@ import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
+  CollapsibleChevron,
 } from "@/components/ui/collapsible";
 
 interface MisconceptionCardProps {
@@ -29,9 +30,7 @@ export function MisconceptionCard({ item, forceExpanded = false }: Misconception
       {/* Always-visible: the misinterpretation (the "gotcha") */}
       <CollapsibleTrigger className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-amber-100 transition-colors dark:hover:bg-amber-900/30">
         <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{item.misinterpretation}</p>
-        <span className="shrink-0 text-xs text-amber-600 font-semibold mt-0.5 dark:text-amber-400">
-          {isOpen ? "Hide" : "Reveal"}
-        </span>
+        <CollapsibleChevron open={isOpen} className="mt-0.5 text-amber-600 dark:text-amber-400" />
       </CollapsibleTrigger>
 
       {/* Revealed: the correction */}
