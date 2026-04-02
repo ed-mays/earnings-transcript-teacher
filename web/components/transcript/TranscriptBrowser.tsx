@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type {
   CallDetail,
@@ -9,6 +9,9 @@ import type {
   SpanItem,
   SpansResponse,
 } from "./types";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type Section = "all" | "prepared" | "qa";
 
@@ -110,29 +113,25 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
     <div className="flex flex-col gap-4">
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Section filter */}
-        <div className="flex rounded-lg border border-zinc-200 bg-white text-sm overflow-hidden">
-          {(["all", "prepared", "qa"] as Section[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => { setSection(s); setSearchQuery(""); }}
-              className={`px-3 py-1.5 capitalize transition-colors ${
-                section === s && !inSearchMode
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              {s === "qa" ? "Q&A" : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
-        </div>
+        {/* Section filter — shadcn Tabs as segmented control */}
+        <Tabs
+          value={section}
+          onValueChange={(v) => { setSection(v as Section); setSearchQuery(""); }}
+          className="w-auto"
+        >
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="prepared">Prepared</TabsTrigger>
+            <TabsTrigger value="qa">Q&amp;A</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Speaker filter */}
         {speakerNames.length > 0 && (
           <select
             value={speaker}
             onChange={(e) => { setSpeaker(e.target.value); setSearchQuery(""); }}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="h-8 rounded-lg border border-input bg-transparent px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="">All speakers</option>
             {speakerNames.map((name) => (
@@ -145,15 +144,15 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
 
         {/* Semantic search */}
         <div className="relative flex-1 min-w-[200px]">
-          <input
+          <Input
             type="search"
             placeholder="Semantic search…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            className="h-8"
           />
           {searching && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
               Searching…
             </span>
           )}
@@ -196,7 +195,7 @@ function SpanListView({
 
   if (spans.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-zinc-200 px-6 py-10 text-center text-sm text-zinc-400">
+      <p className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
         No turns match the current filters.
       </p>
     );
@@ -218,16 +217,16 @@ function SpanBlock({ span }: { span: SpanItem }) {
       className={`rounded-lg border p-4 ${
         isAnalyst
           ? "border-blue-100 bg-blue-50"
-          : "border-zinc-200 bg-white"
+          : "bg-card"
       }`}
     >
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {span.speaker}
-        <span className="ml-2 font-normal normal-case text-zinc-400">
+        <span className="ml-2 font-normal normal-case text-muted-foreground/70">
           · {span.section === "qa" ? "Q&A" : "Prepared"}
         </span>
       </p>
-      <p className="text-sm leading-relaxed text-zinc-800">{span.text}</p>
+      <p className="text-sm leading-relaxed text-foreground">{span.text}</p>
     </div>
   );
 }
@@ -251,7 +250,7 @@ function SearchResultsView({
 
   if (results.length === 0) {
     return (
-      <p className="text-sm text-zinc-400">
+      <p className="text-sm text-muted-foreground">
         No results found for <em>{query}</em>.
       </p>
     );
@@ -259,23 +258,23 @@ function SearchResultsView({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-zinc-400">
+      <p className="text-xs text-muted-foreground">
         {results.length} result{results.length !== 1 ? "s" : ""} for <em>{query}</em>
       </p>
       {results.map((r, i) => (
         <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 p-4">
           <div className="mb-1 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {r.speaker}
-              <span className="ml-2 font-normal normal-case text-zinc-400">
+              <span className="ml-2 font-normal normal-case text-muted-foreground/70">
                 · {r.section === "qa" ? "Q&A" : "Prepared"}
               </span>
             </p>
-            <span className="text-xs text-zinc-400">
+            <span className="text-xs text-muted-foreground">
               {Math.round(r.similarity * 100)}% match
             </span>
           </div>
-          <p className="text-sm leading-relaxed text-zinc-800">{r.text}</p>
+          <p className="text-sm leading-relaxed text-foreground">{r.text}</p>
         </div>
       ))}
     </div>
@@ -293,23 +292,25 @@ function Pagination({
 }) {
   return (
     <div className="flex items-center justify-center gap-2">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
       >
         Prev
-      </button>
-      <span className="text-sm text-zinc-500">
+      </Button>
+      <span className="text-sm text-muted-foreground">
         {page} / {totalPages}
       </span>
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-600 disabled:opacity-40 hover:bg-zinc-50"
       >
         Next
-      </button>
+      </Button>
     </div>
   );
 }
@@ -318,12 +319,12 @@ function SpanSkeleton() {
   return (
     <div className="space-y-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-lg border border-zinc-200 bg-white p-4">
-          <div className="mb-2 h-3 w-32 rounded bg-zinc-100" />
+        <div key={i} className="animate-pulse rounded-lg border bg-card p-4">
+          <div className="mb-2 h-3 w-32 rounded bg-muted" />
           <div className="space-y-1.5">
-            <div className="h-4 rounded bg-zinc-100" />
-            <div className="h-4 w-4/5 rounded bg-zinc-100" />
-            <div className="h-4 w-3/5 rounded bg-zinc-100" />
+            <div className="h-4 rounded bg-muted" />
+            <div className="h-4 w-4/5 rounded bg-muted" />
+            <div className="h-4 w-3/5 rounded bg-muted" />
           </div>
         </div>
       ))}

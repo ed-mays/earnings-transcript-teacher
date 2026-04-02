@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/lib/chat";
+import { Button } from "@/components/ui/button";
 
 interface ChatThreadProps {
   messages: ChatMessage[];
@@ -22,25 +23,26 @@ export function ChatThread({ messages, streamingContent, suggestions, loadingSug
   if (messages.length === 0 && !streamingContent) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-6">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           Ask a question about this earnings call to get started.
         </p>
         {loadingSuggestions ? (
           <div className="flex flex-wrap justify-center gap-2">
-            <div className="animate-pulse rounded-full bg-zinc-100 px-4 py-2 text-sm text-zinc-400">
+            <div className="animate-pulse rounded-full bg-muted px-4 py-2 text-sm text-muted-foreground">
               Loading suggested starter questions…
             </div>
           </div>
         ) : suggestions && suggestions.length > 0 ? (
           <div className="flex flex-wrap justify-center gap-2">
             {suggestions.map((suggestion) => (
-              <button
+              <Button
                 key={suggestion}
+                variant="outline"
                 onClick={() => onSuggestionClick?.(suggestion)}
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900"
+                className="rounded-full"
               >
                 {suggestion}
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -75,8 +77,8 @@ function MessageBubble({ role, content, streaming = false }: MessageBubbleProps)
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
           isUser
-            ? "bg-zinc-900 text-white"
-            : "bg-zinc-100 text-zinc-900"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-foreground"
         }`}
       >
         {content}

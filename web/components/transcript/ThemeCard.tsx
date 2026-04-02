@@ -1,5 +1,7 @@
 /** Renders a topic cluster as a card with a label and term chips. */
 
+import { Card } from "@/components/ui/card";
+
 interface ThemeCardProps {
   /** The leading term used as the card label. */
   label: string;
@@ -9,8 +11,8 @@ interface ThemeCardProps {
 
 export function ThemeCard({ label, terms }: ThemeCardProps) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4">
-      <p className="mb-2 text-sm font-semibold text-zinc-800">{label}</p>
+    <Card className="p-4 gap-2">
+      <p className="text-sm font-semibold text-foreground">{label}</p>
       <div className="flex flex-wrap gap-1.5">
         {terms.map((term, i) => (
           <span
@@ -21,6 +23,6 @@ export function ThemeCard({ label, terms }: ThemeCardProps) {
           </span>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }

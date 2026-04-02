@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -29,8 +31,8 @@ export function ChatInput({ onSend, isStreaming, initialValue = "" }: ChatInputP
   }
 
   return (
-    <div className="flex items-end gap-2 border-t border-zinc-200 pt-4">
-      <textarea
+    <div className="flex items-end gap-2 border-t border pt-4">
+      <Textarea
         ref={textareaRef}
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -38,15 +40,15 @@ export function ChatInput({ onSend, isStreaming, initialValue = "" }: ChatInputP
         disabled={isStreaming}
         rows={3}
         placeholder="Ask a question… (Enter to send, Shift+Enter for newline)"
-        className="flex-1 resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none disabled:opacity-50"
+        className="flex-1 resize-none"
       />
-      <button
+      <Button
         onClick={handleSubmit}
         disabled={isStreaming || !value.trim()}
-        className="mb-0.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="mb-0.5"
       >
         {isStreaming ? "…" : "Send"}
-      </button>
+      </Button>
     </div>
   );
 }
