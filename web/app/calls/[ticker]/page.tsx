@@ -46,9 +46,9 @@ export default async function TranscriptPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8">
+    <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:flex lg:h-full lg:flex-col lg:overflow-hidden lg:py-0">
       {/* Header */}
-      <div className="mb-6 flex items-baseline gap-3">
+      <div className="mb-6 flex items-baseline gap-3 lg:mb-0 lg:shrink-0 lg:py-6">
         <h1 className="text-3xl font-bold tracking-tight text-zinc-900 uppercase">
           {call.ticker}
         </h1>
@@ -62,21 +62,25 @@ export default async function TranscriptPage({
 
       {/* Call brief — shown only when available */}
       {call.brief && (
-        <CallBriefPanel
-          brief={call.brief}
-          takeaways={call.takeaways}
-          misconceptions={call.misconceptions}
-          signal_strip={call.signal_strip ?? null}
-        />
+        <div className="lg:shrink-0">
+          <CallBriefPanel
+            brief={call.brief}
+            takeaways={call.takeaways}
+            misconceptions={call.misconceptions}
+            signal_strip={call.signal_strip ?? null}
+          />
+        </div>
       )}
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:flex-1 lg:min-h-0 lg:grid-cols-[1fr_360px] lg:overflow-hidden">
         {/* Left: transcript browser — client component */}
-        <TranscriptBrowser ticker={call.ticker} call={call} />
+        <div className="lg:overflow-y-auto lg:py-6">
+          <TranscriptBrowser ticker={call.ticker} call={call} />
+        </div>
 
         {/* Right: metadata panel — client component */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="lg:overflow-y-auto lg:border-l lg:py-6 lg:pl-6">
           <MetadataPanel call={call} />
           <Link
             href={`/calls/${call.ticker}/learn`}

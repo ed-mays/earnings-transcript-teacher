@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type {
   CallDetail,
@@ -109,8 +109,22 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
 
   const speakerNames = call.speakers.map((s) => s.name);
 
+  const topRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top when entering search mode
+  useEffect(() => {
+    if (inSearchMode) {
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [inSearchMode]);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [page]);
+
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={topRef} className="flex flex-col gap-4">
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Section filter — shadcn Tabs as segmented control */}

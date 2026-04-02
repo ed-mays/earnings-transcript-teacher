@@ -47,7 +47,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col bg-background">
+      <body className="h-dvh flex flex-col bg-background">
         <ThemeProvider>
           {user && (
             <nav className="border-b bg-card">
@@ -88,7 +88,7 @@ export default async function RootLayout({
               </div>
             </nav>
           )}
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main className="flex flex-1 flex-col overflow-auto">{children}</main>
         </ThemeProvider>
       </body>
     </html>
