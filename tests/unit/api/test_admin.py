@@ -115,6 +115,11 @@ def client():
 def reset_modal():
     """Reset the modal stub between tests so call counts and side_effect don't bleed over."""
     MODAL_STUB.reset_mock(side_effect=True)
+    # reset_mock resets children tracked in _mock_children, but patch() uses
+    # setattr which can leave a stale copy in Function.__dict__["from_name"].
+    # Explicitly clear side_effect on the actual attribute to avoid bleed.
+    MODAL_STUB.Function.from_name.side_effect = None
+    MODAL_STUB.Function.from_name.reset_mock()
     # Re-wire exception classes after reset so except clauses can match them.
     MODAL_STUB.exception.NotFoundError = _ModalNotFoundError
     MODAL_STUB.exception.AuthError = _ModalAuthError
