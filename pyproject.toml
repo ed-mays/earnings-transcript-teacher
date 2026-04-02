@@ -1,3 +1,6 @@
+[tool.coverage.run]
+omit = ["tools/prompt_tuner.py"]
+
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 
