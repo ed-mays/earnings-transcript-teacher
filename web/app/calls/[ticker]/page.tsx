@@ -60,9 +60,9 @@ export default async function TranscriptPage({
         )}
       </div>
 
-      {/* Call brief — shown only when available */}
+      {/* Call brief — shown above columns on mobile only */}
       {call.brief && (
-        <div className="lg:shrink-0">
+        <div className="lg:hidden">
           <CallBriefPanel
             brief={call.brief}
             takeaways={call.takeaways}
@@ -74,8 +74,19 @@ export default async function TranscriptPage({
 
       {/* Two-column layout */}
       <div className="flex flex-col gap-6 lg:flex-1 lg:min-h-0 lg:flex-row lg:gap-0 lg:overflow-hidden">
-        {/* Left: transcript browser — client component */}
+        {/* Left: call brief + transcript browser — client component */}
         <div className="lg:min-w-0 lg:flex-1 lg:overflow-y-auto lg:py-6">
+          {/* Call brief — inside scroll area on desktop */}
+          {call.brief && (
+            <div className="mb-6 hidden lg:block">
+              <CallBriefPanel
+                brief={call.brief}
+                takeaways={call.takeaways}
+                misconceptions={call.misconceptions}
+                signal_strip={call.signal_strip ?? null}
+              />
+            </div>
+          )}
           <TranscriptBrowser ticker={call.ticker} call={call} />
         </div>
 
