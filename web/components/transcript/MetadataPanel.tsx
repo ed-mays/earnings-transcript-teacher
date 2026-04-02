@@ -7,6 +7,12 @@ import { KeywordList } from "./KeywordList";
 import { ThemeCard } from "./ThemeCard";
 import { EvasionCard } from "./EvasionCard";
 import { StrategicShiftCard } from "./StrategicShiftCard";
+import { Card } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 
 interface AnalystStepConfig {
   id: string;
@@ -64,56 +70,52 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
     Object.fromEntries(ANALYST_STEPS.map((s) => [s.id, s.defaultExpanded]))
   );
 
-  function toggle(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
   return (
-    <div className="flex flex-col rounded-xl border border-zinc-200 bg-zinc-50">
+    <Card className="p-0 gap-0 overflow-hidden">
       {ANALYST_STEPS.map((step, i) => (
-        <div key={step.id} className={i > 0 ? "border-t border-zinc-200" : ""}>
+        <Collapsible
+          key={step.id}
+          open={expanded[step.id]}
+          onOpenChange={(open) => setExpanded((prev) => ({ ...prev, [step.id]: open }))}
+          className={i > 0 ? "border-t" : ""}
+        >
           {/* Step header */}
-          <button
-            onClick={() => toggle(step.id)}
-            className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-zinc-100 transition-colors"
-          >
-            <span className="mt-0.5 shrink-0 text-xs font-semibold text-zinc-400 tabular-nums w-4">
+          <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+            <span className="mt-0.5 shrink-0 text-xs font-semibold text-muted-foreground tabular-nums w-4">
               {i + 1}
             </span>
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-zinc-900">{step.label}</span>
-              <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{step.question}</p>
+              <span className="text-sm font-semibold text-foreground">{step.label}</span>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{step.question}</p>
             </div>
-            <span className="mt-0.5 shrink-0 text-zinc-400 text-xs">
+            <span className="mt-0.5 shrink-0 text-muted-foreground text-xs">
               {expanded[step.id] ? "▲" : "▼"}
             </span>
-          </button>
+          </CollapsibleTrigger>
 
           {/* Step body */}
-          {expanded[step.id] && (
-            <div className="px-4 pb-4 pt-1">
-              <StepContent step={step} call={call} />
-              <Link
-                href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
-                className="mt-4 block text-xs text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
-              >
-                Explore with Feynman →
-              </Link>
-            </div>
-          )}
-        </div>
+          <CollapsibleContent className="px-4 pb-4 pt-1">
+            <StepContent step={step} call={call} />
+            <Link
+              href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
+              className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Explore with Feynman →
+            </Link>
+          </CollapsibleContent>
+        </Collapsible>
       ))}
 
       {/* Language layer — always visible */}
       {call.keywords.length > 0 && (
-        <div className="border-t border-zinc-200 px-4 py-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        <div className="border-t px-4 py-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Language &amp; Keywords
           </p>
           <KeywordList keywords={call.keywords} />
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -145,15 +147,15 @@ function OrientStep({ call }: { call: CallDetail }) {
   const sentiment = call.synthesis?.overall_sentiment;
 
   if (!sentiment) {
-    return <p className="text-sm text-zinc-400">No orientation data available.</p>;
+    return <p className="text-sm text-muted-foreground">No orientation data available.</p>;
   }
 
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Overall sentiment
       </dt>
-      <dd className="mt-1 text-sm text-zinc-700">{sentiment}</dd>
+      <dd className="mt-1 text-sm text-foreground">{sentiment}</dd>
     </div>
   );
 }
@@ -168,18 +170,18 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
         <dl className="grid grid-cols-2 gap-3">
           {synthesis?.executive_tone && (
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Executive tone
               </dt>
-              <dd className="mt-1 text-sm text-zinc-700">{synthesis.executive_tone}</dd>
+              <dd className="mt-1 text-sm text-foreground">{synthesis.executive_tone}</dd>
             </div>
           )}
           {synthesis?.analyst_sentiment && (
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Analyst sentiment
               </dt>
-              <dd className="mt-1 text-sm text-zinc-700">{synthesis.analyst_sentiment}</dd>
+              <dd className="mt-1 text-sm text-foreground">{synthesis.analyst_sentiment}</dd>
             </div>
           )}
         </dl>
@@ -187,15 +189,15 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
 
       {speakers.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Speakers
           </p>
           <ul className="space-y-1.5">
             {speakers.map((s, i) => (
               <li key={i} className="text-sm">
-                <span className="font-medium text-zinc-800">{s.name}</span>
-                {s.title && <span className="text-zinc-500">, {s.title}</span>}
-                {s.firm && <span className="text-zinc-400"> · {s.firm}</span>}
+                <span className="font-medium text-foreground">{s.name}</span>
+                {s.title && <span className="text-muted-foreground">, {s.title}</span>}
+                {s.firm && <span className="text-muted-foreground/70"> · {s.firm}</span>}
               </li>
             ))}
           </ul>
@@ -203,7 +205,7 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
       )}
 
       {!hasSentiment && speakers.length === 0 && (
-        <p className="text-sm text-zinc-400">No room dynamics data available.</p>
+        <p className="text-sm text-muted-foreground">No room dynamics data available.</p>
       )}
     </div>
   );
@@ -213,7 +215,7 @@ function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
   const source = call.topics.length > 0 ? call.topics : call.themes.map((t) => [t]);
 
   if (source.length === 0) {
-    return <p className="text-sm text-zinc-400">No themes extracted.</p>;
+    return <p className="text-sm text-muted-foreground">No themes extracted.</p>;
   }
 
   return (
@@ -234,7 +236,7 @@ function evasionLevelBadge(level: string): { emoji: string; classes: string } {
 
 function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
   if (call.evasion_analyses.length === 0) {
-    return <p className="text-sm text-zinc-400">No evasion patterns detected.</p>;
+    return <p className="text-sm text-muted-foreground">No evasion patterns detected.</p>;
   }
 
   const evasionLevel = call.signal_strip?.evasion_level ?? null;
@@ -256,7 +258,7 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
       {/* Q&A evasion */}
       {qaItems.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Q&amp;A evasion
           </p>
           <div className="space-y-2">
@@ -270,7 +272,7 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
       {/* Prepared remarks evasion */}
       {prepItems.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Prepared remarks
           </p>
           <div className="space-y-2">
@@ -286,7 +288,7 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
 
 function TrackWhatChangedStep({ call }: { call: CallDetail }) {
   if (call.strategic_shifts.length === 0) {
-    return <p className="text-sm text-zinc-400">No strategic shifts identified.</p>;
+    return <p className="text-sm text-muted-foreground">No strategic shifts identified.</p>;
   }
 
   return (
@@ -299,5 +301,5 @@ function TrackWhatChangedStep({ call }: { call: CallDetail }) {
 }
 
 function SituateInContextStep() {
-  return <p className="text-sm text-zinc-400">Context data coming soon.</p>;
+  return <p className="text-sm text-muted-foreground">Context data coming soon.</p>;
 }

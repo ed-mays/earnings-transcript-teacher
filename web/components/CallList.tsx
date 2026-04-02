@@ -7,13 +7,13 @@ import { CallCard, type CallSummary } from "./CallCard";
 /** Skeleton placeholder shown while call list is loading. */
 function CallCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+    <div className="animate-pulse rounded-xl border p-6 shadow-sm bg-card">
       <div className="flex items-start justify-between gap-4">
-        <div className="h-7 w-16 rounded bg-zinc-200" />
-        <div className="h-4 w-24 rounded bg-zinc-100" />
+        <div className="h-7 w-16 rounded bg-muted" />
+        <div className="h-4 w-24 rounded bg-muted" />
       </div>
-      <div className="mt-2 h-4 w-40 rounded bg-zinc-100" />
-      <div className="mt-3 h-5 w-20 rounded-full bg-zinc-100" />
+      <div className="mt-2 h-4 w-40 rounded bg-muted" />
+      <div className="mt-3 h-5 w-20 rounded-full bg-muted" />
     </div>
   );
 }
@@ -54,9 +54,9 @@ export function CallList() {
 
   if (calls.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-8 py-16 text-center">
-        <p className="text-lg font-medium text-zinc-700">No transcripts yet</p>
-        <p className="mt-1 text-sm text-zinc-400">
+      <div className="rounded-xl border border-dashed px-8 py-16 text-center bg-card">
+        <p className="text-lg font-medium text-foreground">No transcripts yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">
           Ingest an earnings call to get started.
         </p>
       </div>

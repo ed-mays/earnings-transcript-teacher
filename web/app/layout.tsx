@@ -44,13 +44,13 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-zinc-50">
+      <body className="flex min-h-full flex-col bg-background">
         {user && (
-          <nav className="border-b border-zinc-200 bg-white">
+          <nav className="border-b bg-card">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
               <a
                 href="/"
-                className="text-lg font-semibold text-zinc-900 hover:text-zinc-700"
+                className="text-lg font-semibold text-foreground hover:text-foreground/80"
               >
                 EarningsFluency
               </a>
@@ -59,25 +59,25 @@ export default async function RootLayout({
                   <>
                     <a
                       href="/admin"
-                      className="text-sm text-zinc-500 hover:text-zinc-700"
+                      className="text-sm text-muted-foreground hover:text-foreground"
                     >
                       Admin Analytics
                     </a>
                     <a
                       href="/admin/health"
-                      className="text-sm text-zinc-500 hover:text-zinc-700"
+                      className="text-sm text-muted-foreground hover:text-foreground"
                     >
                       Admin Health
                     </a>
                     <a
                       href="/admin/ingest"
-                      className="text-sm text-zinc-500 hover:text-zinc-700"
+                      className="text-sm text-muted-foreground hover:text-foreground"
                     >
                       Admin Ingest
                     </a>
                   </>
                 )}
-                <span className="text-sm text-zinc-500">{user.email}</span>
+                <span className="text-sm text-muted-foreground">{user.email}</span>
                 <SignOutButton />
               </div>
             </div>

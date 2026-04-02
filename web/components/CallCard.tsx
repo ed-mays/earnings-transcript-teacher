@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export interface CallSummary {
   ticker: string;
@@ -28,7 +30,7 @@ function sentimentStyle(sentiment: string): string {
   if (lower.includes("bearish") || lower.includes("negative")) {
     return "bg-red-50 text-red-700";
   }
-  return "bg-zinc-100 text-zinc-600";
+  return "";
 }
 
 /** Card displaying summary metadata for a single earnings call. */
@@ -36,49 +38,53 @@ export function CallCard({ call }: CallCardProps) {
   return (
     <Link
       href={`/calls/${call.ticker}`}
-      className="block rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+      className="block transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-xl"
     >
-      <div className="flex items-start justify-between gap-4">
-        <span className="text-2xl font-bold tracking-tight text-zinc-900">
-          {call.ticker}
-        </span>
-        {call.call_date && (
-          <span className="shrink-0 text-sm text-zinc-400">{call.call_date}</span>
-        )}
-      </div>
-      {call.company_name && (
-        <p className="mt-1 text-sm font-medium text-zinc-700">
-          {call.company_name}
-        </p>
-      )}
-      {call.industry && (
-        <span className="mt-3 inline-block rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-600">
-          {call.industry}
-        </span>
-      )}
-      {(call.evasion_level || call.overall_sentiment) && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {call.overall_sentiment && (
-            <span
-              className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${sentimentStyle(call.overall_sentiment)}`}
-            >
-              {call.overall_sentiment}
-            </span>
-          )}
-          {call.evasion_level && (
-            <span
-              className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${EVASION_STYLES[call.evasion_level] ?? "bg-zinc-100 text-zinc-600"}`}
-            >
-              {call.evasion_level} evasion
-            </span>
+      <Card className="p-6 gap-2 shadow-sm cursor-pointer h-full">
+        <div className="flex items-start justify-between gap-4">
+          <span className="text-2xl font-bold tracking-tight text-foreground">
+            {call.ticker}
+          </span>
+          {call.call_date && (
+            <span className="shrink-0 text-sm text-muted-foreground">{call.call_date}</span>
           )}
         </div>
-      )}
-      {call.top_strategic_shift && (
-        <p className="mt-2 truncate text-xs text-zinc-400">
-          {call.top_strategic_shift}
-        </p>
-      )}
+        {call.company_name && (
+          <p className="text-sm font-medium text-foreground/80">
+            {call.company_name}
+          </p>
+        )}
+        {call.industry && (
+          <div>
+            <Badge variant="secondary" className="rounded-full">
+              {call.industry}
+            </Badge>
+          </div>
+        )}
+        {(call.evasion_level || call.overall_sentiment) && (
+          <div className="flex flex-wrap gap-1.5">
+            {call.overall_sentiment && (
+              <span
+                className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${sentimentStyle(call.overall_sentiment) || "bg-muted text-muted-foreground"}`}
+              >
+                {call.overall_sentiment}
+              </span>
+            )}
+            {call.evasion_level && (
+              <span
+                className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${EVASION_STYLES[call.evasion_level] ?? "bg-muted text-muted-foreground"}`}
+              >
+                {call.evasion_level} evasion
+              </span>
+            )}
+          </div>
+        )}
+        {call.top_strategic_shift && (
+          <p className="truncate text-xs text-muted-foreground">
+            {call.top_strategic_shift}
+          </p>
+        )}
+      </Card>
     </Link>
   );
 }
