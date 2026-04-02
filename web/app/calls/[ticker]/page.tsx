@@ -46,7 +46,7 @@ export default async function TranscriptPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:flex lg:h-full lg:flex-col lg:overflow-hidden lg:py-0">
+    <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:flex lg:h-[calc(100dvh-var(--nav-height))] lg:flex-col lg:overflow-hidden lg:py-0">
       {/* Header */}
       <div className="mb-6 flex items-baseline gap-3 lg:mb-0 lg:shrink-0 lg:py-6">
         <h1 className="text-3xl font-bold tracking-tight text-zinc-900 uppercase">
