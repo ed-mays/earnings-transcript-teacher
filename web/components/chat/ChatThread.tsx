@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/lib/chat";
 import { Button } from "@/components/ui/button";
 
@@ -15,10 +17,36 @@ interface ChatThreadProps {
 /** Renders the full conversation history plus any in-progress streamed assistant response. */
 export function ChatThread({ messages, streamingContent, suggestions, loadingSuggestions, onSuggestionClick }: ChatThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [fadingOut, setFadingOut] = useState<string | null>(null);
+
+  function handleScroll() {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const near = distanceFromBottom < 100;
+    isNearBottomRef.current = near;
+    setIsNearBottom(near);
+  }
+
+  function scrollToBottom() {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    isNearBottomRef.current = true;
+    setIsNearBottom(true);
+  }
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, streamingContent]);
+
+  function handleSuggestionClick(suggestion: string) {
+    setFadingOut(suggestion);
+    setTimeout(() => onSuggestionClick?.(suggestion), 200);
+  }
 
   if (messages.length === 0 && !streamingContent) {
     return (
@@ -38,8 +66,10 @@ export function ChatThread({ messages, streamingContent, suggestions, loadingSug
               <Button
                 key={suggestion}
                 variant="outline"
-                onClick={() => onSuggestionClick?.(suggestion)}
-                className="rounded-full"
+                onClick={() => handleSuggestionClick(suggestion)}
+                className={`rounded-full active:scale-95 transition-all duration-200 ${
+                  fadingOut === suggestion ? "opacity-0 scale-95" : ""
+                }`}
               >
                 {suggestion}
               </Button>
@@ -51,14 +81,28 @@ export function ChatThread({ messages, streamingContent, suggestions, loadingSug
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-1 py-2">
-      {messages.map((msg, i) => (
-        <MessageBubble key={i} role={msg.role} content={msg.content} />
-      ))}
-      {streamingContent && (
-        <MessageBubble role="assistant" content={streamingContent} streaming />
+    <div className="relative flex flex-1 flex-col min-h-0">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex flex-1 flex-col gap-4 overflow-y-auto px-1 py-2"
+      >
+        {messages.map((msg, i) => (
+          <MessageBubble key={i} role={msg.role} content={msg.content} />
+        ))}
+        {streamingContent && (
+          <MessageBubble role="assistant" content={streamingContent} streaming />
+        )}
+        <div ref={bottomRef} />
+      </div>
+      {streamingContent && !isNearBottom && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
+        >
+          ↓ New messages
+        </button>
       )}
-      <div ref={bottomRef} />
     </div>
   );
 }
@@ -75,13 +119,31 @@ function MessageBubble({ role, content, streaming = false }: MessageBubbleProps)
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+        className={`max-w-[90%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
           isUser
-            ? "bg-primary text-primary-foreground"
+            ? "bg-primary text-primary-foreground whitespace-pre-wrap"
             : "bg-muted text-foreground"
         }`}
       >
-        {content}
+        {isUser ? (
+          content
+        ) : (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="mb-2 list-disc list-inside space-y-0.5 last:mb-0">{children}</ul>,
+              ol: ({ children }) => <ol className="mb-2 list-decimal list-inside space-y-0.5 last:mb-0">{children}</ol>,
+              li: ({ children }) => <li>{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>,
+              code: ({ children }) => <code className="rounded bg-background/50 px-1 py-0.5 font-mono text-xs">{children}</code>,
+              pre: ({ children }) => <pre className="mb-2 overflow-x-auto rounded bg-background/50 p-2 font-mono text-xs last:mb-0">{children}</pre>,
+            }}
+          >
+            {content}
+          </ReactMarkdown>
+        )}
         {streaming && (
           <span className="ml-1 inline-block h-3 w-0.5 animate-pulse bg-current" />
         )}

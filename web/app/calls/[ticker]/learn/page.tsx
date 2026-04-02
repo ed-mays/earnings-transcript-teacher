@@ -46,6 +46,12 @@ export default function LearnPage({
       .finally(() => setLoadingSuggestions(false));
   }, [ticker]);
 
+  function handleAbort() {
+    abortControllerRef.current?.abort();
+    setStreamingContent("");
+    setIsStreaming(false);
+  }
+
   async function handleSend(message: string) {
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -89,7 +95,7 @@ export default function LearnPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col px-6 py-8" style={{ height: "calc(100vh - 64px)" }}>
+    <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col px-6 py-8">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-baseline gap-3">
@@ -145,7 +151,7 @@ export default function LearnPage({
 
       {/* Input */}
       <div className="mt-4">
-        <ChatInput onSend={handleSend} isStreaming={isStreaming} initialValue={topic ?? ""} />
+        <ChatInput onSend={handleSend} onAbort={handleAbort} isStreaming={isStreaming} initialValue={topic ?? ""} />
       </div>
     </div>
   );

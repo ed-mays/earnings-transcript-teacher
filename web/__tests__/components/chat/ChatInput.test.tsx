@@ -24,10 +24,19 @@ describe("ChatInput", () => {
     expect(textarea).toHaveValue("Line one\n");
   });
 
-  it("disables textarea and Send button when isStreaming is true", () => {
+  it("shows an enabled Stop button and disabled textarea when isStreaming is true", () => {
     render(<ChatInput onSend={vi.fn()} isStreaming={true} />);
     expect(screen.getByRole("textbox")).toBeDisabled();
-    expect(screen.getByRole("button", { name: /…/ })).toBeDisabled();
+    const stopButton = screen.getByRole("button", { name: /stop/i });
+    expect(stopButton).toBeInTheDocument();
+    expect(stopButton).not.toBeDisabled();
+  });
+
+  it("calls onAbort when the Stop button is clicked during streaming", async () => {
+    const onAbort = vi.fn();
+    render(<ChatInput onSend={vi.fn()} onAbort={onAbort} isStreaming={true} />);
+    await userEvent.click(screen.getByRole("button", { name: /stop/i }));
+    expect(onAbort).toHaveBeenCalledTimes(1);
   });
 
   it("does not call onSend when input is blank", async () => {

@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onAbort?: () => void;
   isStreaming: boolean;
   initialValue?: string;
 }
 
-/** Textarea with send button. Submits on Enter; Shift+Enter inserts a newline. */
-export function ChatInput({ onSend, isStreaming, initialValue = "" }: ChatInputProps) {
+/** Textarea with send/stop button. Submits on Enter; Shift+Enter inserts a newline. */
+export function ChatInput({ onSend, onAbort, isStreaming, initialValue = "" }: ChatInputProps) {
   const [value, setValue] = useState(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -42,13 +43,23 @@ export function ChatInput({ onSend, isStreaming, initialValue = "" }: ChatInputP
         placeholder="Ask a question… (Enter to send, Shift+Enter for newline)"
         className="flex-1 resize-none"
       />
-      <Button
-        onClick={handleSubmit}
-        disabled={isStreaming || !value.trim()}
-        className="mb-0.5"
-      >
-        {isStreaming ? "…" : "Send"}
-      </Button>
+      {isStreaming ? (
+        <Button
+          onClick={onAbort}
+          variant="secondary"
+          className="mb-0.5"
+        >
+          Stop
+        </Button>
+      ) : (
+        <Button
+          onClick={handleSubmit}
+          disabled={!value.trim()}
+          className="mb-0.5"
+        >
+          Send
+        </Button>
+      )}
     </div>
   );
 }
