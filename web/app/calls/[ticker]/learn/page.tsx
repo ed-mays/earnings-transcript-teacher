@@ -93,22 +93,27 @@ export default function LearnPage({
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-            Learn:{" "}
-            <span className="uppercase">{upperTicker}</span>
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Learn:{" "}
+              <span className="uppercase">{upperTicker}</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Explain what you&apos;ve learned in your own words — the AI will probe your understanding
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleNewSession}
             disabled={isStreaming}
-            className="text-sm text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline disabled:opacity-40"
+            className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-40"
           >
             New session
           </button>
           <Link
             href={`/calls/${upperTicker}`}
-            className="text-sm text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline"
+            className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             ← Back
           </Link>

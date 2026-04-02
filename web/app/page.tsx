@@ -15,11 +15,11 @@ export default async function LibraryPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12">
-      <h1 className="mb-2 text-3xl font-semibold text-zinc-900">
+      <h1 className="mb-2 text-3xl font-semibold text-foreground">
         Transcript Library
       </h1>
-      <p className="mb-8 text-zinc-500">
-        Select a transcript to study.
+      <p className="mb-8 text-muted-foreground">
+        Browse earnings call transcripts and study them interactively
       </p>
       <CallList />
     </div>

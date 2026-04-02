@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TranscriptBrowser } from "@/components/transcript/TranscriptBrowser";
 import { MetadataPanel } from "@/components/transcript/MetadataPanel";
 import { CallBriefPanel } from "@/components/transcript/CallBriefPanel";
+import { Card } from "@/components/ui/card";
 import type { CallDetail } from "@/components/transcript/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -35,9 +36,9 @@ export default async function TranscriptPage({
   if (!call) {
     return (
       <div className="mx-auto w-full max-w-7xl px-6 py-12">
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted-foreground">
           No transcript found for <span className="font-semibold uppercase">{ticker}</span>.{" "}
-          <Link href="/" className="underline hover:text-zinc-700">
+          <Link href="/" className="underline hover:text-foreground">
             Back to library
           </Link>
         </p>
@@ -49,14 +50,14 @@ export default async function TranscriptPage({
     <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:flex lg:h-[calc(100dvh-var(--nav-height))] lg:flex-col lg:overflow-hidden lg:py-0">
       {/* Header */}
       <div className="mb-6 flex items-baseline gap-3 lg:mb-0 lg:shrink-0 lg:py-6">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 uppercase">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground uppercase">
           {call.ticker}
         </h1>
         {call.company_name && (
-          <span className="text-lg text-zinc-500">{call.company_name}</span>
+          <span className="text-lg text-muted-foreground">{call.company_name}</span>
         )}
         {call.call_date && (
-          <span className="ml-auto text-sm text-zinc-400">{call.call_date}</span>
+          <span className="ml-auto text-sm text-muted-foreground">{call.call_date}</span>
         )}
       </div>
 
@@ -93,11 +94,13 @@ export default async function TranscriptPage({
         {/* Right: metadata panel — client component */}
         <div className="lg:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:border-l lg:py-6 lg:pl-6">
           <MetadataPanel call={call} />
-          <Link
-            href={`/calls/${call.ticker}/learn`}
-            className="mt-4 block w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-zinc-700"
-          >
-            Study with Feynman chat
+          <Link href={`/calls/${call.ticker}/learn`} className="mt-4 block group">
+            <Card className="p-4 transition-colors group-hover:bg-muted">
+              <p className="text-sm font-semibold text-foreground">Study with Feynman chat</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Explain what you&apos;ve learned — the AI will probe your understanding
+              </p>
+            </Card>
           </Link>
         </div>
       </div>
