@@ -125,6 +125,15 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
 
   return (
     <div ref={topRef} className="flex flex-col gap-4">
+      {/* Section heading */}
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold text-foreground">Transcript</h2>
+        {!inSearchMode && speakerNames.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {speakerNames.length} speaker{speakerNames.length !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Section filter — shadcn Tabs as segmented control */}
@@ -160,7 +169,7 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
         <div className="relative flex-1 min-w-[200px]">
           <Input
             type="search"
-            placeholder="Semantic search…"
+            placeholder="Search by meaning across all sections…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-8"

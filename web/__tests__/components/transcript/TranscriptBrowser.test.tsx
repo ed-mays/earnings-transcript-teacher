@@ -69,7 +69,7 @@ describe("TranscriptBrowser", () => {
     await waitFor(() => {
       expect(screen.getByText("We are pleased to report record services revenue.")).toBeInTheDocument();
     });
-    const searchInput = screen.getByPlaceholderText(/semantic search/i);
+    const searchInput = screen.getByPlaceholderText(/search by meaning/i);
     await userEvent.type(searchInput, "services");
     // Debounce is 400ms — waitFor polls until the search URL appears
     await waitFor(

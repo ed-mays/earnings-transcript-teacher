@@ -72,6 +72,10 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
 
   return (
     <Card className="p-0 gap-0 overflow-hidden">
+      <div className="px-4 py-3 border-b">
+        <p className="text-sm font-semibold text-foreground">Analyst Framework</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Use these questions to guide your reading</p>
+      </div>
       {ANALYST_STEPS.map((step, i) => (
         <Collapsible
           key={step.id}
