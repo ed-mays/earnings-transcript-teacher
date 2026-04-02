@@ -8,6 +8,7 @@ import { ThemeCard } from "./ThemeCard";
 import { EvasionCard } from "./EvasionCard";
 import { StrategicShiftCard } from "./StrategicShiftCard";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/EmptyState";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -151,7 +152,7 @@ function OrientStep({ call }: { call: CallDetail }) {
   const sentiment = call.synthesis?.overall_sentiment;
 
   if (!sentiment) {
-    return <p className="text-sm text-muted-foreground">No orientation data available.</p>;
+    return <EmptyState title="No orientation data available." />;
   }
 
   return (
@@ -209,7 +210,7 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
       )}
 
       {!hasSentiment && speakers.length === 0 && (
-        <p className="text-sm text-muted-foreground">No room dynamics data available.</p>
+        <EmptyState title="No room dynamics data available." />
       )}
     </div>
   );
@@ -219,7 +220,7 @@ function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
   const source = call.topics.length > 0 ? call.topics : call.themes.map((t) => [t]);
 
   if (source.length === 0) {
-    return <p className="text-sm text-muted-foreground">No themes extracted.</p>;
+    return <EmptyState title="No themes extracted." />;
   }
 
   return (
@@ -240,7 +241,7 @@ function evasionLevelBadge(level: string): { emoji: string; classes: string } {
 
 function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
   if (call.evasion_analyses.length === 0) {
-    return <p className="text-sm text-muted-foreground">No evasion patterns detected.</p>;
+    return <EmptyState title="No evasion patterns detected." />;
   }
 
   const evasionLevel = call.signal_strip?.evasion_level ?? null;
@@ -292,7 +293,7 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
 
 function TrackWhatChangedStep({ call }: { call: CallDetail }) {
   if (call.strategic_shifts.length === 0) {
-    return <p className="text-sm text-muted-foreground">No strategic shifts identified.</p>;
+    return <EmptyState title="No strategic shifts identified." />;
   }
 
   return (
@@ -305,5 +306,5 @@ function TrackWhatChangedStep({ call }: { call: CallDetail }) {
 }
 
 function SituateInContextStep() {
-  return <p className="text-sm text-muted-foreground">Context data coming soon.</p>;
+  return <EmptyState title="Context data coming soon." />;
 }

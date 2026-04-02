@@ -103,6 +103,30 @@ describe("LearnPage", () => {
     );
   });
 
+  it("shows a dismissible error banner when streamChat calls onError", async () => {
+    mockStreamChat.mockImplementation(
+      (_ticker: unknown, _message: unknown, _sessionId: unknown, callbacks: { onError: (msg: string) => void }) => {
+        callbacks.onError("Something went wrong.");
+        return Promise.resolve();
+      }
+    );
+
+    renderLearnPage("aapl");
+    const textarea = screen.getByRole("textbox");
+    await userEvent.type(textarea, "Tell me about revenue");
+    await userEvent.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /dismiss error/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Something went wrong.")).not.toBeInTheDocument();
+    });
+  });
+
   it("clears messages and resets state when New session is clicked", async () => {
     // Make streamChat call onDone to add an assistant message
     mockStreamChat.mockImplementation(
