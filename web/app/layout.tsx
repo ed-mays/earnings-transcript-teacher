@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import SignOutButton from "./SignOutButton";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemePicker } from "@/components/ThemePicker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,47 +45,51 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-background">
-        {user && (
-          <nav className="border-b bg-card">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-              <a
-                href="/"
-                className="text-lg font-semibold text-foreground hover:text-foreground/80"
-              >
-                EarningsFluency
-              </a>
-              <div className="flex items-center gap-4">
-                {isAdmin && (
-                  <>
-                    <a
-                      href="/admin"
-                      className="text-sm text-muted-foreground hover:text-foreground"
-                    >
-                      Admin Analytics
-                    </a>
-                    <a
-                      href="/admin/health"
-                      className="text-sm text-muted-foreground hover:text-foreground"
-                    >
-                      Admin Health
-                    </a>
-                    <a
-                      href="/admin/ingest"
-                      className="text-sm text-muted-foreground hover:text-foreground"
-                    >
-                      Admin Ingest
-                    </a>
-                  </>
-                )}
-                <span className="text-sm text-muted-foreground">{user.email}</span>
-                <SignOutButton />
+        <ThemeProvider>
+          {user && (
+            <nav className="border-b bg-card">
+              <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+                <a
+                  href="/"
+                  className="text-lg font-semibold text-foreground hover:text-foreground/80"
+                >
+                  EarningsFluency
+                </a>
+                <div className="flex items-center gap-4">
+                  {isAdmin && (
+                    <>
+                      <a
+                        href="/admin"
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        Admin Analytics
+                      </a>
+                      <a
+                        href="/admin/health"
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        Admin Health
+                      </a>
+                      <a
+                        href="/admin/ingest"
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        Admin Ingest
+                      </a>
+                    </>
+                  )}
+                  <span className="text-sm text-muted-foreground">{user.email}</span>
+                  <ThemePicker />
+                  <SignOutButton />
+                </div>
               </div>
-            </div>
-          </nav>
-        )}
-        <main className="flex flex-1 flex-col">{children}</main>
+            </nav>
+          )}
+          <main className="flex flex-1 flex-col">{children}</main>
+        </ThemeProvider>
       </body>
     </html>
   );

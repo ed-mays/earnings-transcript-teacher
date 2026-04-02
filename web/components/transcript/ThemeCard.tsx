@@ -17,7 +17,7 @@ export function ThemeCard({ label, terms }: ThemeCardProps) {
         {terms.map((term, i) => (
           <span
             key={i}
-            className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700"
+            className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
           >
             {term}
           </span>
