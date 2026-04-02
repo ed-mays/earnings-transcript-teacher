@@ -41,8 +41,6 @@ earnings-transcript-teacher/
 │   ├── ingest.py
 │   └── requirements.txt
 │
-├── main.py             # Console UI entry point (legacy)
-├── app.py              # Web UI entry point — Streamlit (legacy)
 ├── migrate.py          # Schema migration script — run after upgrades
 ├── setup.sh            # One-time setup script (macOS/Linux)
 ├── setup.ps1           # One-time setup script (Windows)
@@ -57,7 +55,6 @@ earnings-transcript-teacher/
 │   ├── competitors.py   # Competitor identification via Claude Haiku
 │   └── llm.py           # Anthropic API client with rate limiting (Haiku + Sonnet)
 ├── ingestion/          # Three-tier agentic LLM enrichment pipeline (Claude Haiku + Sonnet)
-├── cli/                # Console UI display and interactive menu
 ├── db/                 # PostgreSQL repository layer and semantic search
 ├── utils/              # Shared utilities
 ├── prompts/feynman/    # Pedagogical prompt files for the Feynman learning loop
@@ -76,8 +73,6 @@ earnings-transcript-teacher/
 | [`docs/disaster-recovery.md`](docs/disaster-recovery.md) | Infrastructure rebuild guide |
 | [`docs/database.md`](docs/database.md) | Migration system and schema reference |
 | [`docs/llm_usage.md`](docs/llm_usage.md) | LLM integration reference (models, tiers, endpoints) |
-| [`docs/legacy-stack.md`](docs/legacy-stack.md) | Legacy Python/Streamlit setup (deprecated) |
-
 ---
 
 ## Quick start
@@ -246,23 +241,6 @@ git commit -m "chore: update <package> to x.y.z"
 5. Back in Railway → Variables → set `NEXT_PUBLIC_VERCEL_URL` to the Vercel domain (without `https://`)
 
 Vercel automatically creates preview deployments for every PR. To allow all preview URLs through Railway's CORS, set `CORS_ORIGIN_REGEX` in Railway to a regex matching your app's preview URL pattern (e.g. `https://myapp(-[a-z0-9-]+)?\.vercel\.app`).
-
----
-
-## Legacy CLI (not recommended)
-
-> The original Python/Streamlit interface still works but is no longer the primary development target. See [docs/legacy-stack.md](docs/legacy-stack.md) for full setup instructions.
-
-Quick reference for the legacy entry point:
-
-```bash
-python3 main.py                    # interactive terminal menu
-python3 main.py --mode cli         # explicit; same as above
-python3 main.py --mode gui         # launch Streamlit web UI
-python3 main.py AAPL               # direct analysis
-python3 main.py AAPL --save        # analyze and save to PostgreSQL
-python3 main.py --reset-db         # clear all data
-```
 
 ---
 
