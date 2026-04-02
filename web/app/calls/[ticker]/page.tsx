@@ -7,6 +7,18 @@ import type { CallDetail } from "@/components/transcript/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+type AdjacentCallInfo = {
+  ticker: string
+  fiscal_quarter?: string | null
+  company_name?: string | null
+  call_date?: string | null
+}
+
+type AdjacentCalls = {
+  prev: AdjacentCallInfo | null
+  next: AdjacentCallInfo | null
+}
+
 /** Fetch call detail server-side; throws on error so Next.js renders the error boundary. */
 async function fetchCallDetail(ticker: string): Promise<CallDetail | null> {
   if (!API_URL) throw new Error("NEXT_PUBLIC_API_URL is not configured");
@@ -24,6 +36,19 @@ async function fetchCallDetail(ticker: string): Promise<CallDetail | null> {
   return res.json() as Promise<CallDetail>;
 }
 
+async function fetchAdjacentCalls(ticker: string): Promise<AdjacentCalls> {
+  if (!API_URL) return { prev: null, next: null }
+  try {
+    const res = await fetch(`${API_URL}/api/calls/${ticker}/adjacent`, {
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return { prev: null, next: null }
+    return res.json() as Promise<AdjacentCalls>
+  } catch {
+    return { prev: null, next: null }
+  }
+}
+
 /** Transcript browser and metadata panel for a given ticker. */
 export default async function TranscriptPage({
   params,
@@ -31,7 +56,11 @@ export default async function TranscriptPage({
   params: Promise<{ ticker: string }>;
 }) {
   const { ticker } = await params;
-  const call = await fetchCallDetail(ticker.toUpperCase());
+  const upperTicker = ticker.toUpperCase();
+  const [call, adjacent] = await Promise.all([
+    fetchCallDetail(upperTicker),
+    fetchAdjacentCalls(upperTicker),
+  ]);
 
   if (!call) {
     return (
@@ -49,16 +78,26 @@ export default async function TranscriptPage({
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8 lg:flex lg:h-[calc(100dvh-var(--nav-height))] lg:flex-col lg:overflow-hidden lg:py-0">
       {/* Header */}
-      <div className="mb-6 flex items-baseline gap-3 lg:mb-0 lg:shrink-0 lg:py-6">
+      <div className="mb-6 flex items-center gap-3 lg:mb-0 lg:shrink-0 lg:py-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground uppercase">
           {call.ticker}
         </h1>
         {call.company_name && (
           <span className="text-lg text-muted-foreground">{call.company_name}</span>
         )}
-        {call.call_date && (
-          <span className="ml-auto text-sm text-muted-foreground">{call.call_date}</span>
-        )}
+        <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
+          {adjacent.prev && (
+            <Link href={`/calls/${adjacent.prev.ticker}`} className="hover:text-foreground">
+              ← {adjacent.prev.ticker}
+            </Link>
+          )}
+          {call.call_date && <span>{call.call_date}</span>}
+          {adjacent.next && (
+            <Link href={`/calls/${adjacent.next.ticker}`} className="hover:text-foreground">
+              {adjacent.next.ticker} →
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Call brief — shown above columns on mobile only */}

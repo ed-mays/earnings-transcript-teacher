@@ -115,7 +115,7 @@ export default function LearnPage({
             href={`/calls/${upperTicker}`}
             className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
-            ← Back
+            View transcript
           </Link>
         </div>
       </div>

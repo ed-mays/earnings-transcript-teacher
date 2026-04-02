@@ -304,3 +304,54 @@ class TestEvasionSignals:
         events = self._parse_sse(response.text)
         assert len(events) == 1
         assert events[0]["type"] == "error"
+
+
+class TestGetAdjacentCalls:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/adjacent")
+        assert response.status_code == 404
+
+    def test_returns_prev_and_next(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+        ):
+            MockCallRepo.return_value.get_adjacent_calls.return_value = {
+                "prev": {
+                    "ticker": "MSFT",
+                    "fiscal_quarter": "Q3 2024",
+                    "company_name": "Microsoft Corp.",
+                    "call_date": "2024-07-30",
+                },
+                "next": {
+                    "ticker": "GOOGL",
+                    "fiscal_quarter": "Q3 2024",
+                    "company_name": "Alphabet Inc.",
+                    "call_date": "2024-07-31",
+                },
+            }
+            response = api_client.get("/api/calls/AAPL/adjacent")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["prev"]["ticker"] == "MSFT"
+        assert data["prev"]["call_date"] == "2024-07-30"
+        assert data["next"]["ticker"] == "GOOGL"
+
+    def test_returns_null_when_no_adjacent(self, api_client):
+        """When at the boundary, prev or next is None."""
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+        ):
+            MockCallRepo.return_value.get_adjacent_calls.return_value = {
+                "prev": None,
+                "next": None,
+            }
+            response = api_client.get("/api/calls/AAPL/adjacent")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["prev"] is None
+        assert data["next"] is None
