@@ -136,6 +136,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if pool is not None:
         pool.close()
         logger.info("Database connection pool closed")
+    set_pool(None)
 
 
 def build_cors_origins() -> list[str]:
