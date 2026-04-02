@@ -73,14 +73,14 @@ export default async function TranscriptPage({
       )}
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 gap-6 lg:flex-1 lg:min-h-0 lg:grid-cols-[1fr_360px] lg:overflow-hidden">
+      <div className="flex flex-col gap-6 lg:flex-1 lg:min-h-0 lg:flex-row lg:gap-0 lg:overflow-hidden">
         {/* Left: transcript browser — client component */}
-        <div className="lg:overflow-y-auto lg:py-6">
+        <div className="lg:min-w-0 lg:flex-1 lg:overflow-y-auto lg:py-6">
           <TranscriptBrowser ticker={call.ticker} call={call} />
         </div>
 
         {/* Right: metadata panel — client component */}
-        <div className="lg:overflow-y-auto lg:border-l lg:py-6 lg:pl-6">
+        <div className="lg:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:border-l lg:py-6 lg:pl-6">
           <MetadataPanel call={call} />
           <Link
             href={`/calls/${call.ticker}/learn`}
