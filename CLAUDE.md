@@ -10,8 +10,6 @@ This file is read automatically by Claude Code at the start of every session. It
 
 Primary stack: **FastAPI** (`api/`) + **Next.js** (`web/`) + **Supabase** (database + auth) + **Modal** (`pipeline/`)
 
-> The original console CLI (`main.py`) and Streamlit web UI (`app.py`) are **deprecated**. They remain runnable for reference but receive no new features. Do not target them for new development work.
-
 Core pipeline: `parsing/` → `nlp/` → `services/orchestrator.py` → `db/`
 
 Tests: `pytest` (test suite in `tests/`).
@@ -29,10 +27,6 @@ Tests: `pytest` (test suite in `tests/`).
 # Tests
 pytest
 pytest --cov=.
-
-# Deprecated — do not use for new work
-python3 main.py       # legacy console UI
-streamlit run app.py  # legacy Streamlit UI
 ```
 
 See [`docs/getting-started.md`](docs/getting-started.md) for the full setup walkthrough.
@@ -50,7 +44,6 @@ See [`docs/getting-started.md`](docs/getting-started.md) for the full setup walk
 
 ### Architecture rules
 - Keep modules single-responsibility. NLP logic belongs in `nlp/`, DB logic in `db/`, etc.
-- Do not import from `cli/` or `app.py` in core pipeline modules — those are output layers only.
 - Database access goes through `db/repositories.py`, not via raw psycopg calls scattered elsewhere.
 - New dataclasses should go in `core/models.py`.
 
