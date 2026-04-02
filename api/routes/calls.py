@@ -117,6 +117,18 @@ class CallDetail(BaseModel):
     signal_strip: SignalStrip | None = None
 
 
+class AdjacentCallInfo(BaseModel):
+    ticker: str
+    fiscal_quarter: str | None = None
+    company_name: str | None = None
+    call_date: str | None = None
+
+
+class AdjacentCalls(BaseModel):
+    prev: AdjacentCallInfo | None = None
+    next: AdjacentCallInfo | None = None
+
+
 class SpanItem(BaseModel):
     speaker: str
     section: str
@@ -292,6 +304,23 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         takeaways=takeaways,
         misconceptions=misconceptions,
         signal_strip=signal_strip,
+    )
+
+
+@router.get("/{ticker}/adjacent", response_model=AdjacentCalls)
+def get_adjacent_calls(ticker: str, conn: DbDep) -> AdjacentCalls:
+    """Return the prev/next calls relative to the given ticker ordered by call date."""
+    logger.info("GET /api/calls/%s/adjacent", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    call_repo = CallRepository(_db_url())
+    raw = call_repo.get_adjacent_calls(ticker, conn=conn)
+    return AdjacentCalls(
+        prev=AdjacentCallInfo(**raw["prev"]) if raw["prev"] else None,
+        next=AdjacentCallInfo(**raw["next"]) if raw["next"] else None,
     )
 
 

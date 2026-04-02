@@ -47,6 +47,60 @@ class CallRepository:
             logger.warning(f"Could not fetch call_date for {ticker}: {e}")
             return None
 
+    def get_adjacent_calls(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> dict[str, dict | None]:
+        """Return the calls immediately before and after ticker ordered by call_date."""
+        result: dict[str, dict | None] = {"prev": None, "next": None}
+        try:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT ticker, fiscal_quarter, company_name, call_date::text
+                        FROM calls
+                        WHERE call_date < (
+                            SELECT call_date FROM calls WHERE ticker = %s LIMIT 1
+                        )
+                        ORDER BY call_date DESC
+                        LIMIT 1
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        result["prev"] = {
+                            "ticker": row[0],
+                            "fiscal_quarter": row[1],
+                            "company_name": row[2],
+                            "call_date": row[3],
+                        }
+
+                    cur.execute(
+                        """
+                        SELECT ticker, fiscal_quarter, company_name, call_date::text
+                        FROM calls
+                        WHERE call_date > (
+                            SELECT call_date FROM calls WHERE ticker = %s LIMIT 1
+                        )
+                        ORDER BY call_date ASC
+                        LIMIT 1
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        result["next"] = {
+                            "ticker": row[0],
+                            "fiscal_quarter": row[1],
+                            "company_name": row[2],
+                            "call_date": row[3],
+                        }
+        except Exception as e:
+            logger.warning(f"Could not fetch adjacent calls for {ticker}: {e}")
+        return result
+
     def get_all_calls(self) -> list[tuple[str, str, str | None, str | None]]:
         """Return (ticker, fiscal_quarter, company_name, call_date) for all stored calls."""
         calls = []
