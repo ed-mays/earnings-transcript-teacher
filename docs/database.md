@@ -27,3 +27,7 @@ supabase db diff -f description_of_change
 ## Rollback
 
 See `docs/runbooks/migration-rollback.md` for the compensating-migration rollback procedure.
+
+## Schema reference
+
+For the full data dictionary — table purposes, key columns, RLS policies, and data retention status — see [`docs/database-schema.md`](database-schema.md).
