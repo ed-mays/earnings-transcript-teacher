@@ -17,18 +17,18 @@ interface CallCardProps {
 }
 
 const EVASION_STYLES: Record<string, string> = {
-  low: "bg-green-50 text-green-700",
-  medium: "bg-amber-50 text-amber-700",
-  high: "bg-red-50 text-red-700",
+  low: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  medium: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  high: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
 function sentimentStyle(sentiment: string): string {
   const lower = sentiment.toLowerCase();
   if (lower.includes("bullish") || lower.includes("positive")) {
-    return "bg-green-50 text-green-700";
+    return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400";
   }
   if (lower.includes("bearish") || lower.includes("negative")) {
-    return "bg-red-50 text-red-700";
+    return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400";
   }
   return "";
 }

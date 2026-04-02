@@ -20,9 +20,9 @@ interface EvasionCardProps {
 
 /** Maps defensiveness score (1–10) to severity badge content and colour classes. */
 function severityBadge(score: number): { emoji: string; label: string; classes: string } {
-  if (score >= 8) return { emoji: "🔴", label: "High", classes: "text-red-700 bg-red-50" };
-  if (score >= 5) return { emoji: "🟡", label: "Medium", classes: "text-amber-700 bg-amber-50" };
-  return { emoji: "🟢", label: "Low", classes: "text-green-700 bg-green-50" };
+  if (score >= 8) return { emoji: "🔴", label: "High", classes: "text-red-700 bg-red-50 dark:bg-red-900/30 dark:text-red-400" };
+  if (score >= 5) return { emoji: "🟡", label: "Medium", classes: "text-amber-700 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400" };
+  return { emoji: "🟢", label: "Low", classes: "text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-400" };
 }
 
 export function EvasionCard({ item, ticker }: EvasionCardProps) {
@@ -100,18 +100,18 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
 
         {/* Signals section */}
         {signals ? (
-          <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
+          <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 dark:bg-amber-900/20 dark:border-amber-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1 dark:text-amber-400">
               📈 What this signals for investors
             </p>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                p: ({ children }) => <p className="text-sm text-amber-800 mb-1 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-amber-800 space-y-0.5 mb-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-amber-800 space-y-0.5 mb-1">{children}</ol>,
-                li: ({ children }) => <li className="text-sm text-amber-800">{children}</li>,
-                strong: ({ children }) => <strong className="font-semibold text-amber-900">{children}</strong>,
+                p: ({ children }) => <p className="text-sm text-amber-800 mb-1 last:mb-0 dark:text-amber-300">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-amber-800 space-y-0.5 mb-1 dark:text-amber-300">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-amber-800 space-y-0.5 mb-1 dark:text-amber-300">{children}</ol>,
+                li: ({ children }) => <li className="text-sm text-amber-800 dark:text-amber-300">{children}</li>,
+                strong: ({ children }) => <strong className="font-semibold text-amber-900 dark:text-amber-200">{children}</strong>,
               }}
             >
               {signals}
@@ -123,7 +123,7 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
           <button
             onClick={handleSignalsClick}
             disabled={loadingSignals}
-            className="mt-3 w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
+            className="mt-3 w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30"
           >
             {loadingSignals ? "Analysing…" : "📈 What this signals for investors"}
           </button>
