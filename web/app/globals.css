@@ -129,3 +129,12 @@
     @apply font-sans;
   }
 }
+
+/* Collapsible panel animation */
+[data-slot="collapsible-content"] {
+  overflow: hidden;
+  height: var(--collapsible-panel-height);
+  transition: height 200ms ease-out;
+}
+[data-slot="collapsible-content"][data-starting-style] { height: 0; }
+[data-slot="collapsible-content"][data-ending-style]   { height: 0; }

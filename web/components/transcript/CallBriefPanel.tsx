@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { CallBrief, TakeawayItem, MisconceptionItem, SignalStrip } from "./types";
 import { MisconceptionCard } from "./MisconceptionCard";
 import { Card, CardContent } from "@/components/ui/card";
+import { getEvasionStyle, getSentimentStyle } from "@/lib/signal-colors";
 
 interface CallBriefPanelProps {
   brief: CallBrief;
@@ -14,22 +15,6 @@ interface CallBriefPanelProps {
   signal_strip: SignalStrip | null;
 }
 
-const EVASION_STYLES: Record<string, string> = {
-  low: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  medium: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  high: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
-function sentimentStyle(sentiment: string): string {
-  const lower = sentiment.toLowerCase();
-  if (lower.includes("bullish") || lower.includes("positive") || lower.includes("optimistic")) {
-    return "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-  }
-  if (lower.includes("bearish") || lower.includes("negative") || lower.includes("cautious")) {
-    return "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-  }
-  return "bg-muted text-muted-foreground";
-}
 
 interface SignalBadgeProps {
   label: string;
@@ -38,8 +23,9 @@ interface SignalBadgeProps {
 
 function SignalBadge({ label, value }: SignalBadgeProps) {
   if (!value) return null;
+  const s = getSentimentStyle(value);
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${sentimentStyle(value)}`}>
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}>
       {label}: {value}
     </span>
   );
@@ -51,9 +37,9 @@ interface EvasionBadgeProps {
 
 function EvasionBadge({ level }: EvasionBadgeProps) {
   if (!level) return null;
-  const style = EVASION_STYLES[level] ?? "bg-muted text-muted-foreground";
+  const s = getEvasionStyle(level);
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}>
       Evasion: {level}
     </span>
   );
