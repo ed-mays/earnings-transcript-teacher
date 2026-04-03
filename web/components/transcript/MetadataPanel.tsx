@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import Link from "next/link";
 import type { CallDetail } from "./types";
 import { KeywordList } from "./KeywordList";
@@ -69,9 +69,10 @@ interface MetadataPanelProps {
 
 /** Sidebar panel with analyst step framework: 6 collapsible sections teaching a mental model. */
 export function MetadataPanel({ call }: MetadataPanelProps) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(
-    Object.fromEntries(ANALYST_STEPS.map((s) => [s.id, s.defaultExpanded]))
-  );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({
+    ...Object.fromEntries(ANALYST_STEPS.map((s) => [s.id, s.defaultExpanded])),
+    participants: false,
+  });
 
   return (
     <Card className="p-0 gap-0 overflow-hidden">
@@ -80,35 +81,63 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
         <p className="text-xs text-muted-foreground mt-0.5">Use these questions to guide your reading</p>
       </div>
       {ANALYST_STEPS.map((step, i) => (
-        <Collapsible
-          key={step.id}
-          open={expanded[step.id]}
-          onOpenChange={(open) => setExpanded((prev) => ({ ...prev, [step.id]: open }))}
-          className={i > 0 ? "border-t" : ""}
-        >
-          {/* Step header */}
-          <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
-            <span className="mt-0.5 shrink-0 text-xs font-semibold text-muted-foreground tabular-nums w-4">
-              {i + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-foreground">{step.label}</span>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{step.question}</p>
-            </div>
-            <CollapsibleChevron open={expanded[step.id]} className="mt-0.5" />
-          </CollapsibleTrigger>
+        <Fragment key={step.id}>
+          <Collapsible
+            open={expanded[step.id]}
+            onOpenChange={(open) => setExpanded((prev) => ({ ...prev, [step.id]: open }))}
+            className={i > 0 ? "border-t" : ""}
+          >
+            {/* Step header */}
+            <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+              <span className="mt-0.5 shrink-0 text-xs font-semibold text-muted-foreground tabular-nums w-4">
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-semibold text-foreground">{step.label}</span>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{step.question}</p>
+              </div>
+              <CollapsibleChevron open={expanded[step.id]} className="mt-0.5" />
+            </CollapsibleTrigger>
 
-          {/* Step body */}
-          <CollapsibleContent className="px-4 pb-4 pt-1">
-            <StepContent step={step} call={call} />
-            <Link
-              href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
-              className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            {/* Step body */}
+            <CollapsibleContent className="px-4 pb-4 pt-1">
+              <StepContent step={step} call={call} />
+              <Link
+                href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
+                className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                Explore with Feynman →
+              </Link>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {step.id === "orient" && call.speakers.length > 0 && (
+            <Collapsible
+              open={expanded.participants}
+              onOpenChange={(open) => setExpanded((prev) => ({ ...prev, participants: open }))}
+              className="border-t"
             >
-              Explore with Feynman →
-            </Link>
-          </CollapsibleContent>
-        </Collapsible>
+              <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold text-foreground">Participants</span>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-snug">Who was on the call?</p>
+                </div>
+                <CollapsibleChevron open={expanded.participants} className="mt-0.5" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-4 pb-4 pt-1">
+                <ul className="space-y-1.5">
+                  {call.speakers.map((s, idx) => (
+                    <li key={idx} className="text-sm">
+                      <span className="font-medium text-foreground">{s.name}</span>
+                      {s.title && <span className="text-muted-foreground">, {s.title}</span>}
+                      {s.firm && <span className="text-muted-foreground/70"> · {s.firm}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </Fragment>
       ))}
 
       {/* Language layer — always visible */}
@@ -166,13 +195,13 @@ function OrientStep({ call }: { call: CallDetail }) {
 }
 
 function ReadTheRoomStep({ call }: { call: CallDetail }) {
-  const { synthesis, speakers } = call;
+  const { synthesis } = call;
   const hasSentiment = synthesis?.executive_tone || synthesis?.analyst_sentiment;
 
   return (
     <div className="space-y-4">
       {hasSentiment && (
-        <dl className="grid grid-cols-2 gap-3">
+        <dl className="space-y-3">
           {synthesis?.executive_tone && (
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -192,24 +221,7 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
         </dl>
       )}
 
-      {speakers.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Speakers
-          </p>
-          <ul className="space-y-1.5">
-            {speakers.map((s, i) => (
-              <li key={i} className="text-sm">
-                <span className="font-medium text-foreground">{s.name}</span>
-                {s.title && <span className="text-muted-foreground">, {s.title}</span>}
-                {s.firm && <span className="text-muted-foreground/70"> · {s.firm}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {!hasSentiment && speakers.length === 0 && (
+      {!hasSentiment && (
         <EmptyState title="No room dynamics data available." />
       )}
     </div>
