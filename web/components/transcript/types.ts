@@ -52,6 +52,12 @@ export interface SignalStrip {
   strategic_shift_flagged: boolean;
 }
 
+export interface TopicInfo {
+  label: string;
+  terms: string[];
+  summary: string;
+}
+
 export interface CallDetail {
   ticker: string;
   company_name: string | null;
@@ -60,7 +66,7 @@ export interface CallDetail {
   synthesis: SynthesisInfo | null;
   keywords: string[];
   themes: string[];
-  topics: string[][];
+  topics: TopicInfo[];
   evasion_analyses: EvasionItem[];
   strategic_shifts: StrategicShift[];
   speakers: SpeakerInfo[];

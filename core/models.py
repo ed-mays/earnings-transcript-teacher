@@ -150,6 +150,7 @@ class TopicRecord:
     weight: float
     rank_order: int
     name: str = ""
+    summary: str = ""
 
 
 # ---------------------------------------------------------------------------

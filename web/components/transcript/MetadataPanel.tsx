@@ -239,16 +239,24 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
 }
 
 function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
-  const source = call.topics.length > 0 ? call.topics : call.themes.map((t) => [t]);
-
-  if (source.length === 0) {
+  if (call.topics.length === 0 && call.themes.length === 0) {
     return <EmptyState title="No themes extracted." />;
+  }
+
+  if (call.topics.length > 0) {
+    return (
+      <div className="space-y-3">
+        {call.topics.map((topic, i) => (
+          <ThemeCard key={i} label={topic.label || `Topic ${i + 1}`} summary={topic.summary} />
+        ))}
+      </div>
+    );
   }
 
   return (
     <div className="space-y-3">
-      {source.map((terms, i) => (
-        <ThemeCard key={i} label={terms[0] ?? `Topic ${i + 1}`} terms={terms} />
+      {call.themes.map((theme, i) => (
+        <ThemeCard key={i} label={theme} summary="" />
       ))}
     </div>
   );
