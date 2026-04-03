@@ -2,7 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { streamChat } from "@/lib/chat";
@@ -119,9 +119,12 @@ export default function LearnPage({
           >
             New session
           </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/calls/${upperTicker}`}>View transcript</Link>
-          </Button>
+          <Link
+            href={`/calls/${upperTicker}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            View transcript
+          </Link>
         </div>
       </div>
 
