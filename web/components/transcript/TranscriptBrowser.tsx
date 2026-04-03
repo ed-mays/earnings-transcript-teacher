@@ -134,6 +134,7 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
   const speakerNames = call.speakers.map((s) => s.name);
 
   const topRef = useRef<HTMLDivElement>(null);
+  const hasMounted = useRef(false);
 
   // Scroll to top when entering search mode
   useEffect(() => {
@@ -142,8 +143,12 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
     }
   }, [inSearchMode]);
 
-  // Scroll to top when page changes
+  // Scroll to top when page changes (skip initial mount to avoid hiding the call summary on load)
   useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [page]);
 
