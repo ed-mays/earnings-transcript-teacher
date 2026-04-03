@@ -303,7 +303,7 @@ class AgenticExtractor:
         self.rate_limiter.wait()
         message = self.client.messages.create(
             model=self.tier3_model,
-            max_tokens=4096,
+            max_tokens=6144,
             system=HAIKU_NLP_SYNTHESIS_PROMPT,
             messages=[{"role": "user", "content": user_prompt}]
         )
