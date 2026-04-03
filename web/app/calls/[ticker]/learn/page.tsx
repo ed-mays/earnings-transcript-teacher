@@ -128,12 +128,12 @@ export default function LearnPage({
 
       {/* Error banner */}
       {error && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span className="flex-1">{error}</span>
           <button
             onClick={() => setError(null)}
             aria-label="Dismiss error"
-            className="shrink-0 text-red-400 hover:text-red-600"
+            className="shrink-0 text-destructive/60 hover:text-destructive"
           >
             ✕
           </button>

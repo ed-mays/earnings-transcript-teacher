@@ -112,7 +112,7 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
             </ReactMarkdown>
           </div>
         ) : signalsError ? (
-          <p className="mt-3 text-xs text-red-500">{signalsError}</p>
+          <p className="mt-3 text-xs text-destructive">{signalsError}</p>
         ) : (
           <button
             onClick={handleSignalsClick}
