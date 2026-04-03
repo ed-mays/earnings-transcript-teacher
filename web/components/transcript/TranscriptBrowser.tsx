@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import type {
   CallDetail,
@@ -9,7 +10,7 @@ import type {
   SpanItem,
   SpansResponse,
 } from "./types";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -30,6 +31,29 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
 
   return debounced;
+}
+
+/**
+ * Returns an array of page numbers and "..." spacers for pagination.
+ * Always includes the first and last page, the current page, and its immediate neighbours.
+ */
+function getPageNumbers(page: number, totalPages: number): (number | "...")[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pageSet = new Set<number>();
+  [1, page - 1, page, page + 1, totalPages].forEach((n) => {
+    if (n >= 1 && n <= totalPages) pageSet.add(n);
+  });
+
+  const sorted = Array.from(pageSet).sort((a, b) => a - b);
+
+  return sorted.reduce<(number | "...")[]>((acc, cur, i) => {
+    if (i > 0 && cur - sorted[i - 1] > 1) acc.push("...");
+    acc.push(cur);
+    return acc;
+  }, []);
 }
 
 /** Left-pane transcript browser with section/speaker filtering, pagination, and semantic search. */
@@ -114,13 +138,13 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
   // Scroll to top when entering search mode
   useEffect(() => {
     if (inSearchMode) {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [inSearchMode]);
 
   // Scroll to top when page changes
   useEffect(() => {
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [page]);
 
   return (
@@ -134,27 +158,29 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
           </span>
         )}
       </div>
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-3">
+
+      {/* Filter bar — stacks vertically on mobile, inline on sm+ */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {/* Section filter — shadcn Tabs as segmented control */}
-        <Tabs
-          value={section}
-          onValueChange={(v) => { setSection(v as Section); setSearchQuery(""); }}
-          className="w-auto"
-        >
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="prepared">Prepared</TabsTrigger>
-            <TabsTrigger value="qa">Q&amp;A</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="w-full sm:w-auto">
+          <Tabs
+            value={section}
+            onValueChange={(v) => { setSection(v as Section); setSearchQuery(""); }}
+          >
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="prepared">Prepared</TabsTrigger>
+              <TabsTrigger value="qa">Q&amp;A</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         {/* Speaker filter */}
         {speakerNames.length > 0 && (
           <select
             value={speaker}
             onChange={(e) => { setSpeaker(e.target.value); setSearchQuery(""); }}
-            className="h-8 rounded-lg border border-input bg-transparent px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:w-auto"
           >
             <option value="">All speakers</option>
             {speakerNames.map((name) => (
@@ -172,13 +198,20 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
             placeholder="Search by meaning across all sections…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8"
+            className="h-8 pr-8"
           />
-          {searching && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-              Searching…
-            </span>
-          )}
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : searching ? (
+            <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : null}
         </div>
       </div>
 
@@ -189,7 +222,13 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
         <>
           <SpanListView spans={spans} loading={loading} error={error} />
           {totalPages > 1 && !loading && !error && (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
           )}
         </>
       )}
@@ -281,11 +320,11 @@ function SearchResultsView({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
+      <p className="sticky top-0 z-10 bg-background py-1 text-xs text-muted-foreground">
         {results.length} result{results.length !== 1 ? "s" : ""} for <em>{query}</em>
       </p>
       {results.map((r, i) => (
-        <div key={i} className="rounded-lg border border-warning/20 bg-warning/10 p-4">
+        <div key={i} className="rounded-lg border border-primary/20 bg-primary/10 p-4">
           <div className="mb-1 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {r.speaker}
@@ -307,33 +346,89 @@ function SearchResultsView({
 function Pagination({
   page,
   totalPages,
+  total,
+  pageSize,
   onPageChange,
 }: {
   page: number;
   totalPages: number;
+  total: number;
+  pageSize: number;
   onPageChange: (p: number) => void;
 }) {
+  const [goToInput, setGoToInput] = useState("");
+
+  const startItem = (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, total);
+  const pageNumbers = getPageNumbers(page, totalPages);
+
+  function commitGoTo() {
+    const n = parseInt(goToInput, 10);
+    if (!isNaN(n) && n >= 1 && n <= totalPages) {
+      onPageChange(n);
+    }
+    setGoToInput("");
+  }
+
   return (
-    <div className="flex items-center justify-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
-      >
-        Prev
-      </Button>
-      <span className="text-sm text-muted-foreground">
-        {page} / {totalPages}
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
-      >
-        Next
-      </Button>
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="disabled:text-muted-foreground"
+        >
+          Prev
+        </Button>
+
+        {pageNumbers.map((p, i) =>
+          p === "..." ? (
+            <span key={`ellipsis-${i}`} className="px-1 text-sm text-muted-foreground select-none">
+              …
+            </span>
+          ) : (
+            <Button
+              key={p}
+              variant={p === page ? "default" : "outline"}
+              size="sm"
+              onClick={() => onPageChange(p)}
+              className="min-w-[2rem]"
+            >
+              {p}
+            </Button>
+          )
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="disabled:text-muted-foreground"
+        >
+          Next
+        </Button>
+
+        <div className="ml-2 flex items-center gap-1.5">
+          <label className="text-xs text-muted-foreground whitespace-nowrap">Go to:</label>
+          <input
+            type="number"
+            min={1}
+            max={totalPages}
+            value={goToInput}
+            onChange={(e) => setGoToInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") commitGoTo(); }}
+            onBlur={commitGoTo}
+            className="h-7 w-14 rounded border border-input bg-transparent px-2 text-center text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Showing {startItem}–{endItem} of {total} turns
+      </p>
     </div>
   );
 }
