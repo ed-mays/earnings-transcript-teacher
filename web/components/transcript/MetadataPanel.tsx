@@ -7,6 +7,8 @@ import { KeywordList } from "./KeywordList";
 import { ThemeCard } from "./ThemeCard";
 import { EvasionCard } from "./EvasionCard";
 import { StrategicShiftCard } from "./StrategicShiftCard";
+import { NewsCard } from "./NewsCard";
+import { CompetitorList } from "./CompetitorList";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import {
@@ -181,7 +183,7 @@ function StepContent({ step, call }: StepContentProps) {
     case "track-what-changed":
       return <TrackWhatChangedStep call={call} />;
     case "situate-in-context":
-      return <SituateInContextStep />;
+      return <SituateInContextStep call={call} />;
     default:
       return null;
   }
@@ -329,6 +331,41 @@ function TrackWhatChangedStep({ call }: { call: CallDetail }) {
   );
 }
 
-function SituateInContextStep() {
-  return <EmptyState title="Context data coming soon." />;
+interface SituateInContextStepProps {
+  call: CallDetail;
+}
+
+function SituateInContextStep({ call }: SituateInContextStepProps) {
+  const hasNews = call.news_items.length > 0;
+  const hasCompetitors = call.competitors.length > 0;
+
+  return (
+    <div className="space-y-5">
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Recent News
+        </h3>
+        {hasNews ? (
+          <div className="space-y-2">
+            {call.news_items.map((item) => (
+              <NewsCard key={item.headline} item={item} ticker={call.ticker} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No recent news found." />
+        )}
+      </section>
+
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Competitors
+        </h3>
+        {hasCompetitors ? (
+          <CompetitorList competitors={call.competitors} />
+        ) : (
+          <EmptyState title="No competitor data found." />
+        )}
+      </section>
+    </div>
+  );
 }

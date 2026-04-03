@@ -58,6 +58,21 @@ export interface TopicInfo {
   summary: string;
 }
 
+export interface NewsItem {
+  headline: string;
+  url: string;
+  source: string;
+  date: string;
+  summary: string;
+}
+
+export interface Competitor {
+  name: string;
+  ticker: string;
+  description: string;
+  mentioned_in_transcript: boolean;
+}
+
 export interface CallDetail {
   ticker: string;
   company_name: string | null;
@@ -74,6 +89,8 @@ export interface CallDetail {
   takeaways: TakeawayItem[];
   misconceptions: MisconceptionItem[];
   signal_strip: SignalStrip | null;
+  news_items: NewsItem[];
+  competitors: Competitor[];
 }
 
 export interface SpanItem {

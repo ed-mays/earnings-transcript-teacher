@@ -97,14 +97,19 @@ class TestGetCall:
         assert any("AAPL" in r.message for r in caplog.records)
 
     def test_returns_call_detail(self, api_client):
+        from core.models import Competitor, NewsItem
+
         with (
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.CallRepository") as MockCallRepo,
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+            patch("routes.calls.CompetitorRepository") as MockCompRepo,
+            patch("routes.calls.NewsRepository") as MockNewsRepo,
         ):
             call_repo = MockCallRepo.return_value
             call_repo.get_company_info.return_value = ("Apple Inc.", "Technology")
             call_repo.get_call_date.return_value = None
+            call_repo.get_transcript_text.return_value = ""
 
             analysis_repo = MockAnalysisRepo.return_value
             analysis_repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
@@ -127,6 +132,13 @@ class TestGetCall:
             analysis_repo.get_takeaways_for_ticker.return_value = []
             analysis_repo.get_misconceptions_for_ticker.return_value = []
 
+            MockCompRepo.return_value.get.return_value = [
+                Competitor(name="Google", ticker="GOOGL", description="Search giant.", mentioned_in_transcript=True)
+            ]
+            MockNewsRepo.return_value.get.return_value = [
+                NewsItem(headline="Apple beats estimates", url="https://example.com", source="Reuters", date="2025-01-31", summary="Strong Q1.")
+            ]
+
             response = api_client.get("/api/calls/AAPL")
 
         assert response.status_code == 200
@@ -140,6 +152,47 @@ class TestGetCall:
         assert len(data["strategic_shifts"]) == 1
         assert len(data["speakers"]) == 1
         assert data["speakers"][0]["name"] == "Tim Cook"
+        assert len(data["competitors"]) == 1
+        assert data["competitors"][0]["name"] == "Google"
+        assert data["competitors"][0]["mentioned_in_transcript"] is True
+        assert len(data["news_items"]) == 1
+        assert data["news_items"][0]["headline"] == "Apple beats estimates"
+
+    def test_call_detail_empty_news_and_competitors(self, api_client):
+        """When repos return empty and call_date is None, news/competitors default to []."""
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+            patch("routes.calls.CompetitorRepository") as MockCompRepo,
+            patch("routes.calls.NewsRepository") as MockNewsRepo,
+        ):
+            call_repo = MockCallRepo.return_value
+            call_repo.get_company_info.return_value = ("Apple Inc.", "Technology")
+            call_repo.get_call_date.return_value = None
+            call_repo.get_transcript_text.return_value = ""
+
+            analysis_repo = MockAnalysisRepo.return_value
+            analysis_repo.get_synthesis_for_ticker.return_value = None
+            analysis_repo.get_keywords_for_ticker.return_value = []
+            analysis_repo.get_themes_for_ticker.return_value = []
+            analysis_repo.get_topics_for_ticker.return_value = []
+            analysis_repo.get_evasion_for_ticker.return_value = []
+            analysis_repo.get_strategic_shifts_for_ticker.return_value = []
+            analysis_repo.get_speakers_for_ticker.return_value = []
+            analysis_repo.get_call_brief_for_ticker.return_value = None
+            analysis_repo.get_takeaways_for_ticker.return_value = []
+            analysis_repo.get_misconceptions_for_ticker.return_value = []
+
+            MockCompRepo.return_value.get.return_value = []
+            MockNewsRepo.return_value.get.return_value = []
+
+            response = api_client.get("/api/calls/AAPL")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["news_items"] == []
+        assert data["competitors"] == []
 
 
 class TestGetSpans:
@@ -358,3 +411,87 @@ class TestGetAdjacentCalls:
         data = response.json()
         assert data["prev"] is None
         assert data["next"] is None
+
+
+class TestNewsContext:
+    PAYLOAD = {
+        "headline": "Apple beats Q1 estimates",
+        "summary": "Revenue grew 10% YoY driven by services.",
+        "source": "Reuters",
+        "date": "2025-01-31",
+    }
+
+    def _parse_sse(self, text: str) -> list[dict]:
+        """Parse SSE response body into a list of event dicts."""
+        import json
+        events = []
+        for block in text.split("\n\n"):
+            for line in block.splitlines():
+                if line.startswith("data: "):
+                    events.append(json.loads(line[len("data: "):]))
+        return events
+
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.post("/api/calls/UNKNOWN/news-context", json=self.PAYLOAD)
+        assert response.status_code == 404
+
+    def test_happy_path_streams_tokens_and_done(self, api_client):
+        """When stream_investor_signals yields tokens, endpoint emits token events then done."""
+        def _fake_stream(messages, system_prompt):
+            yield "This news "
+            yield "is relevant."
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+            patch("services.llm.stream_investor_signals", side_effect=_fake_stream),
+        ):
+            MockCallRepo.return_value.get_company_info.return_value = ("Apple Inc.", "Technology")
+            MockCallRepo.return_value.get_call_date.return_value = None
+            response = api_client.post("/api/calls/AAPL/news-context", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        token_events = [e for e in events if e["type"] == "token"]
+        assert len(token_events) == 2
+        assert token_events[0]["content"] == "This news "
+        assert events[-1] == {"type": "done"}
+
+    def test_no_content_emits_error_event(self, api_client):
+        def _empty_stream(messages, system_prompt):
+            return
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+            patch("services.llm.stream_investor_signals", side_effect=_empty_stream),
+        ):
+            MockCallRepo.return_value.get_company_info.return_value = ("Apple Inc.", "Technology")
+            MockCallRepo.return_value.get_call_date.return_value = None
+            response = api_client.post("/api/calls/AAPL/news-context", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+
+    def test_api_exception_emits_error_event(self, api_client):
+        def _failing_stream(messages, system_prompt):
+            raise RuntimeError("upstream API error")
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+            patch("services.llm.stream_investor_signals", side_effect=_failing_stream),
+        ):
+            MockCallRepo.return_value.get_company_info.return_value = ("Apple Inc.", "Technology")
+            MockCallRepo.return_value.get_call_date.return_value = None
+            response = api_client.post("/api/calls/AAPL/news-context", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"

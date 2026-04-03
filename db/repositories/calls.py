@@ -101,6 +101,27 @@ class CallRepository:
             logger.warning(f"Could not fetch adjacent calls for {ticker}: {e}")
         return result
 
+    def get_transcript_text(self, ticker: str, conn: psycopg.Connection | None = None) -> str:
+        """Return the concatenated span text for a ticker, or empty string if not found."""
+        try:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT string_agg(s.text, ' ' ORDER BY s.sequence_order)
+                        FROM spans s
+                        JOIN calls c ON s.call_id = c.id
+                        WHERE c.ticker = %s AND s.span_type = 'turn'
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    return row[0] or "" if row else ""
+        except Exception as e:
+            logger.warning(f"Could not fetch transcript text for {ticker}: {e}")
+            return ""
+
     def get_all_calls(self) -> list[tuple[str, str, str | None, str | None]]:
         """Return (ticker, fiscal_quarter, company_name, call_date) for all stored calls."""
         calls = []
