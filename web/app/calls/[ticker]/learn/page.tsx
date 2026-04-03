@@ -2,6 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { streamChat } from "@/lib/chat";
@@ -110,19 +111,17 @@ export default function LearnPage({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleNewSession}
             disabled={isStreaming}
-            className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-40"
           >
             New session
-          </button>
-          <Link
-            href={`/calls/${upperTicker}`}
-            className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-          >
-            View transcript
-          </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/calls/${upperTicker}`}>View transcript</Link>
+          </Button>
         </div>
       </div>
 
