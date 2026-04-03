@@ -72,17 +72,17 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
       onOpenChange={setRevealed}
       className="rounded-lg border overflow-hidden bg-card"
     >
-      {/* Always-visible header: analyst concern + severity + topic */}
+      {/* Always-visible header: severity badge → analyst concern → topic */}
       <CollapsibleTrigger className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted transition-colors">
-        <span
-          className={`shrink-0 mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${badge.bg} ${badge.text}`}
-        >
-          {badge.emoji} {badge.label}
-        </span>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 space-y-1">
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge.bg} ${badge.text}`}
+          >
+            {badge.emoji} {badge.label}
+          </span>
           <p className="text-sm font-medium text-foreground">{item.analyst_concern}</p>
           {item.question_topic && (
-            <p className="mt-0.5 text-xs text-muted-foreground">{item.question_topic}</p>
+            <p className="text-xs text-muted-foreground">{item.question_topic}</p>
           )}
         </div>
         <CollapsibleChevron open={revealed} className="mt-0.5" />
@@ -102,9 +102,9 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
               remarkPlugins={[remarkGfm]}
               components={{
                 p: ({ children }) => <p className="text-sm text-warning-foreground mb-1 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-warning-foreground space-y-0.5 mb-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-warning-foreground space-y-0.5 mb-1">{children}</ol>,
-                li: ({ children }) => <li className="text-sm text-warning-foreground">{children}</li>,
+                ul: ({ children }) => <ul className="list-disc list-inside text-sm text-warning-foreground space-y-2 mb-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-warning-foreground space-y-2 mb-1">{children}</ol>,
+                li: ({ children }) => <li className="text-sm text-warning-foreground border-l-2 border-warning/40 pl-2">{children}</li>,
                 strong: ({ children }) => <strong className="font-semibold text-warning-foreground">{children}</strong>,
               }}
             >
