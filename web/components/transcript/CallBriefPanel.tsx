@@ -25,7 +25,7 @@ function SignalBadge({ label, value }: SignalBadgeProps) {
   if (!value) return null;
   const s = getSentimentStyle(value);
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}>
+    <span className={`rounded-md px-2.5 py-1 text-xs font-medium ${s.bg} ${s.text}`}>
       {label}: {value}
     </span>
   );
@@ -39,7 +39,7 @@ function EvasionBadge({ level }: EvasionBadgeProps) {
   if (!level) return null;
   const s = getEvasionStyle(level);
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}>
+    <span className={`rounded-md px-2.5 py-1 text-xs font-medium ${s.bg} ${s.text}`}>
       Evasion: {level}
     </span>
   );
@@ -113,7 +113,7 @@ export function CallBriefPanel({ brief, takeaways, misconceptions, signal_strip 
             <SignalBadge label="Analyst mood" value={signal_strip.analyst_sentiment} />
             <EvasionBadge level={signal_strip.evasion_level} />
             {signal_strip.strategic_shift_flagged && (
-              <span className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+              <span className="rounded-md px-2.5 py-1 text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                 Strategic shift flagged
               </span>
             )}
