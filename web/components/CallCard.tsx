@@ -51,7 +51,7 @@ export function CallCard({ call }: CallCardProps) {
             {call.overall_sentiment && (() => {
               const s = getSentimentStyle(call.overall_sentiment);
               return (
-                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${s.bg} ${s.text}`}>
+                <span className={`inline-block rounded-md px-2.5 py-1 text-xs ${s.bg} ${s.text}`}>
                   {call.overall_sentiment}
                 </span>
               );
@@ -59,7 +59,7 @@ export function CallCard({ call }: CallCardProps) {
             {call.evasion_level && (() => {
               const s = getEvasionStyle(call.evasion_level);
               return (
-                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs ${s.bg} ${s.text}`}>
+                <span className={`inline-block rounded-md px-2.5 py-1 text-xs ${s.bg} ${s.text}`}>
                   {call.evasion_level} evasion
                 </span>
               );
