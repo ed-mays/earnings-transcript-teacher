@@ -220,6 +220,7 @@ def analyze(ticker: str = "MSFT") -> CallAnalysis:
                     terms=t.get("terms", []),
                     weight=1.0,
                     rank_order=i + 1,
+                    summary=t.get("summary", ""),
                 )
                 for i, t in enumerate(nlp_synthesis.get("themes", []))
             ]

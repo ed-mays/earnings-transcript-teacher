@@ -110,7 +110,10 @@ class TestGetCall:
             analysis_repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
             analysis_repo.get_keywords_for_ticker.return_value = ["AI", "cloud"]
             analysis_repo.get_themes_for_ticker.return_value = ["Growth", "Margins"]
-            analysis_repo.get_topics_for_ticker.return_value = [["ai", "cloud"], ["revenue"]]
+            analysis_repo.get_topics_for_ticker.return_value = [
+                {"label": "AI & Cloud", "terms": ["ai", "cloud"], "summary": "AI and cloud adoption dominated the discussion."},
+                {"label": "Revenue Growth", "terms": ["revenue"], "summary": ""},
+            ]
             analysis_repo.get_evasion_for_ticker.return_value = [
                 ("margin compression", 3, "Deflected with guidance", "margin guidance", "John Smith")
             ]

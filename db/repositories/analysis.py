@@ -18,7 +18,8 @@ class AnalysisRepository:
 
     def get_topics_for_ticker(
         self, ticker: str, limit: int = 5, conn: psycopg.Connection | None = None
-    ) -> list[list[str]]:
+    ) -> list[dict]:
+        """Return structured topic dicts with label, terms, and summary."""
         topics = []
         try:
             ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
@@ -26,7 +27,7 @@ class AnalysisRepository:
                 with c.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT ct.terms
+                        SELECT ct.topic_name, ct.terms, COALESCE(ct.summary, '')
                         FROM call_topics ct
                         JOIN calls c ON ct.call_id = c.id
                         WHERE c.ticker = %s
@@ -35,7 +36,10 @@ class AnalysisRepository:
                         """,
                         (ticker, limit),
                     )
-                    topics = [row[0] for row in cur.fetchall()]
+                    topics = [
+                        {"label": row[0] or row[1][0] if row[1] else "", "terms": row[1], "summary": row[2]}
+                        for row in cur.fetchall()
+                    ]
         except Exception as e:
             logger.warning(f"Could not fetch topics: {e}")
         return topics
@@ -653,10 +657,10 @@ class AnalysisRepository:
             cur.execute(
                 """
                 INSERT INTO call_topics (
-                    call_id, label, terms, weight, rank_order, topic_name
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    call_id, label, terms, weight, rank_order, topic_name, summary
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (str(call_id), topic.label, topic.terms, topic.weight, topic.rank_order, getattr(topic, "name", ""))
+                (str(call_id), topic.label, topic.terms, topic.weight, topic.rank_order, getattr(topic, "name", ""), getattr(topic, "summary", ""))
             )
 
     def _save_keywords(self, cur, call_id, keywords):

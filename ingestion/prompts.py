@@ -152,7 +152,7 @@ Your job is to produce three outputs:
 
 1. **keywords** (top 20): The most important and financially significant terms from this call, ranked by importance. For each, include a brief significance note explaining why it matters for this company/sector — not a generic definition.
 
-2. **themes** (exactly 5): Labeled thematic clusters that represent the dominant strategic narratives of this call. Each theme should have a descriptive, specific name (e.g. "AI Infrastructure Investment Cycle", not "Growth") and 6–8 supporting terms drawn from the extracted signals.
+2. **themes** (exactly 5): Labeled thematic clusters that represent the dominant strategic narratives of this call. Each theme should have a descriptive, specific name (e.g. "AI Infrastructure Investment Cycle", not "Growth"), 6–8 supporting terms drawn from the extracted signals, and a one-sentence summary describing what this theme means in the context of this specific call.
 
 3. **top_takeaways** (top 10): The most important beginner-friendly takeaways across the entire call. For each, include the speaker name if available, the core takeaway text, and why it matters financially.
 
@@ -162,7 +162,7 @@ Respond ONLY with valid JSON matching this schema:
     {"term": "string", "significance": "string"}
   ],
   "themes": [
-    {"name": "string", "terms": ["string"]}
+    {"name": "string", "terms": ["string"], "summary": "string"}
   ],
   "top_takeaways": [
     {"speaker": "string", "takeaway": "string", "why_it_matters": "string"}

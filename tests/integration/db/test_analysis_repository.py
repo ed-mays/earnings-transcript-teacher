@@ -9,15 +9,17 @@ def test_get_topics_for_ticker(mock_psycopg_connect):
     m_connect, m_cursor = mock_psycopg_connect
 
     m_cursor.fetchall.return_value = [
-        (["cloud", "azure", "growth"],),
-        (["ai", "copilot", "chat"],),
+        ("Cloud & Azure Growth", ["cloud", "azure", "growth"], "Management highlighted accelerating Azure adoption as the primary growth driver."),
+        ("AI & Copilot Momentum", ["ai", "copilot", "chat"], "Copilot integrations are driving seat expansion across enterprise accounts."),
     ]
 
     repo = AnalysisRepository("fake_connection_string")
     topics = repo.get_topics_for_ticker("MSFT")
 
     assert len(topics) == 2
-    assert topics[0] == ["cloud", "azure", "growth"]
+    assert topics[0]["label"] == "Cloud & Azure Growth"
+    assert topics[0]["terms"] == ["cloud", "azure", "growth"]
+    assert "Azure" in topics[0]["summary"]
 
 
 def test_get_synthesis_for_ticker(mock_psycopg_connect):

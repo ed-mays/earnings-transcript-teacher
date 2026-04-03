@@ -99,6 +99,12 @@ class SignalStrip(BaseModel):
     strategic_shift_flagged: bool = False
 
 
+class TopicInfo(BaseModel):
+    label: str
+    terms: list[str] = []
+    summary: str = ""
+
+
 class CallDetail(BaseModel):
     ticker: str
     company_name: str | None = None
@@ -107,7 +113,7 @@ class CallDetail(BaseModel):
     synthesis: SynthesisInfo | None = None
     keywords: list[str] = []
     themes: list[str] = []
-    topics: list[list[str]] = []
+    topics: list[TopicInfo] = []
     evasion_analyses: list[EvasionItem] = []
     strategic_shifts: list[StrategicShift] = []
     speakers: list[SpeakerInfo] = []
@@ -296,7 +302,7 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         synthesis=synthesis,
         keywords=analysis_repo.get_keywords_for_ticker(ticker, conn=conn),
         themes=analysis_repo.get_themes_for_ticker(ticker, conn=conn),
-        topics=analysis_repo.get_topics_for_ticker(ticker, conn=conn),
+        topics=[TopicInfo(**t) for t in analysis_repo.get_topics_for_ticker(ticker, conn=conn)],
         evasion_analyses=evasion_analyses,
         strategic_shifts=strategic_shifts,
         speakers=speakers,
