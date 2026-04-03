@@ -239,7 +239,7 @@ function SpanBlock({ span }: { span: SpanItem }) {
     <div
       className={`rounded-lg border p-4 ${
         isAnalyst
-          ? "border-blue-100 bg-blue-50"
+          ? "border-info/20 bg-info/10"
           : "bg-card"
       }`}
     >
@@ -285,7 +285,7 @@ function SearchResultsView({
         {results.length} result{results.length !== 1 ? "s" : ""} for <em>{query}</em>
       </p>
       {results.map((r, i) => (
-        <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 p-4">
+        <div key={i} className="rounded-lg border border-warning/20 bg-warning/10 p-4">
           <div className="mb-1 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {r.speaker}

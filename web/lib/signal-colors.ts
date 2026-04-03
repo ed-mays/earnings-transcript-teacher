@@ -16,21 +16,21 @@ export interface SentimentStyle {
 export function getEvasionStyle(level: string): EvasionStyle {
   if (level === "high")
     return {
-      bg: "bg-red-50 dark:bg-red-900/30",
-      text: "text-red-700 dark:text-red-400",
+      bg: "bg-destructive/10",
+      text: "text-destructive",
       label: "High",
       emoji: "🔴",
     };
   if (level === "medium")
     return {
-      bg: "bg-amber-50 dark:bg-amber-900/30",
-      text: "text-amber-700 dark:text-amber-400",
+      bg: "bg-warning/10",
+      text: "text-warning-foreground",
       label: "Medium",
       emoji: "🟡",
     };
   return {
-    bg: "bg-green-50 dark:bg-green-900/30",
-    text: "text-green-700 dark:text-green-400",
+    bg: "bg-success/10",
+    text: "text-success",
     label: "Low",
     emoji: "🟢",
   };
@@ -52,8 +52,8 @@ export function getSentimentStyle(sentiment: string): SentimentStyle {
     lower.includes("optimistic")
   )
     return {
-      bg: "bg-green-50 dark:bg-green-900/30",
-      text: "text-green-700 dark:text-green-400",
+      bg: "bg-success/10",
+      text: "text-success",
     };
   if (
     lower.includes("bearish") ||
@@ -61,8 +61,8 @@ export function getSentimentStyle(sentiment: string): SentimentStyle {
     lower.includes("cautious")
   )
     return {
-      bg: "bg-red-50 dark:bg-red-900/30",
-      text: "text-red-700 dark:text-red-400",
+      bg: "bg-destructive/10",
+      text: "text-destructive",
     };
   return { bg: "bg-muted", text: "text-muted-foreground" };
 }

@@ -48,7 +48,7 @@ async function fetchHealth(): Promise<HealthData | null> {
 function StatusDot({ ok }: { ok: boolean }) {
   return (
     <span
-      className={`inline-block h-3 w-3 flex-shrink-0 rounded-full ${ok ? "bg-green-500" : "bg-destructive"}`}
+      className={`inline-block h-3 w-3 flex-shrink-0 rounded-full ${ok ? "bg-success" : "bg-destructive"}`}
     />
   );
 }
@@ -79,7 +79,7 @@ export default async function AdminHealthPage() {
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12">
       <div className="mb-6">
-        <a href="/admin/ingest" className="text-sm text-blue-600 hover:underline">
+        <a href="/admin/ingest" className="text-sm text-primary hover:underline">
           ← Admin Ingest
         </a>
       </div>
