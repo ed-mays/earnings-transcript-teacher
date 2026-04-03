@@ -32,7 +32,7 @@ export function ChatInput({ onSend, onAbort, isStreaming, initialValue = "" }: C
   }
 
   return (
-    <div className="flex items-end gap-2 border-t border pt-4">
+    <div className="flex items-end gap-2 border-t pt-4">
       <Textarea
         ref={textareaRef}
         value={value}

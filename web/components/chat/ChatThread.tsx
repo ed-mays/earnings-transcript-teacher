@@ -61,18 +61,17 @@ export function ChatThread({ messages, streamingContent, suggestions, loadingSug
             </div>
           </div>
         ) : suggestions && suggestions.length > 0 ? (
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
             {suggestions.map((suggestion) => (
-              <Button
+              <button
                 key={suggestion}
-                variant="outline"
                 onClick={() => handleSuggestionClick(suggestion)}
-                className={`rounded-full active:scale-95 transition-all duration-200 ${
+                className={`rounded-lg border bg-card text-card-foreground px-4 py-3 text-sm text-left hover:bg-accent hover:text-accent-foreground active:scale-[0.98] transition-all duration-200 ${
                   fadingOut === suggestion ? "opacity-0 scale-95" : ""
                 }`}
               >
                 {suggestion}
-              </Button>
+              </button>
             ))}
           </div>
         ) : null}
