@@ -48,7 +48,7 @@ async function fetchHealth(): Promise<HealthData | null> {
 function StatusDot({ ok }: { ok: boolean }) {
   return (
     <span
-      className={`inline-block h-3 w-3 flex-shrink-0 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`}
+      className={`inline-block h-3 w-3 flex-shrink-0 rounded-full ${ok ? "bg-green-500" : "bg-destructive"}`}
     />
   );
 }
@@ -57,15 +57,15 @@ function StatusRow({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div className="flex items-center gap-3 py-1.5">
       <StatusDot ok={ok} />
-      <span className="text-sm text-zinc-700">{label}</span>
+      <span className="text-sm text-foreground">{label}</span>
     </div>
   );
 }
 
 function StatusCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-5">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+    <div className="rounded-lg border border-border bg-card p-5">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
       {children}
@@ -83,10 +83,10 @@ export default async function AdminHealthPage() {
           ← Admin Ingest
         </a>
       </div>
-      <h1 className="mb-8 text-3xl font-semibold text-zinc-900">Admin — System Health</h1>
+      <h1 className="mb-8 text-3xl font-semibold text-foreground">Admin — System Health</h1>
 
       {health === null ? (
-        <p className="text-red-500">Unable to fetch health data. Check server configuration.</p>
+        <p className="text-destructive">Unable to fetch health data. Check server configuration.</p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-3">
           <StatusCard title="Database">

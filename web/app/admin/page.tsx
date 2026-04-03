@@ -149,8 +149,8 @@ async function fetchChat(): Promise<ChatData | null> {
 
 function AnalyticsCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-5">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+    <div className="rounded-lg border border-border bg-card p-5">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
       {children}
@@ -180,27 +180,27 @@ export default async function AdminAnalyticsPage() {
           Ingest
         </a>
       </div>
-      <h1 className="mb-8 text-3xl font-semibold text-zinc-900">Admin — Analytics</h1>
+      <h1 className="mb-8 text-3xl font-semibold text-foreground">Admin — Analytics</h1>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AnalyticsCard title={`Session Activity — last 30 days (${totalSessions} total)`}>
           {sessions === null ? (
-            <p className="text-sm text-red-500">Unable to load session data.</p>
+            <p className="text-sm text-destructive">Unable to load session data.</p>
           ) : sessions.length === 0 ? (
-            <p className="text-sm text-zinc-500">No sessions recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No sessions recorded yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="py-1.5 text-left font-medium text-zinc-500">Date</th>
-                  <th className="py-1.5 text-right font-medium text-zinc-500">Sessions</th>
+                <tr className="border-b border-border">
+                  <th className="py-1.5 text-left font-medium text-muted-foreground">Date</th>
+                  <th className="py-1.5 text-right font-medium text-muted-foreground">Sessions</th>
                 </tr>
               </thead>
               <tbody>
                 {sessions.map((row) => (
-                  <tr key={row.date} className="border-b border-zinc-50">
-                    <td className="py-1.5 text-zinc-700">{row.date}</td>
-                    <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.count}</td>
+                  <tr key={row.date} className="border-b border-border">
+                    <td className="py-1.5 text-foreground">{row.date}</td>
+                    <td className="py-1.5 text-right tabular-nums text-foreground">{row.count}</td>
                   </tr>
                 ))}
               </tbody>
@@ -210,26 +210,26 @@ export default async function AdminAnalyticsPage() {
 
         <AnalyticsCard title="API Cost — last 30 days (tokens by service)">
           {costs === null ? (
-            <p className="text-sm text-red-500">Unable to load cost data.</p>
+            <p className="text-sm text-destructive">Unable to load cost data.</p>
           ) : Object.keys(costs.by_service).length === 0 ? (
-            <p className="text-sm text-zinc-500">No API calls recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No API calls recorded yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="py-1.5 text-left font-medium text-zinc-500">Service</th>
-                  <th className="py-1.5 text-right font-medium text-zinc-500">Input</th>
-                  <th className="py-1.5 text-right font-medium text-zinc-500">Output</th>
+                <tr className="border-b border-border">
+                  <th className="py-1.5 text-left font-medium text-muted-foreground">Service</th>
+                  <th className="py-1.5 text-right font-medium text-muted-foreground">Input</th>
+                  <th className="py-1.5 text-right font-medium text-muted-foreground">Output</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(costs.by_service).map(([service, tokens]) => (
-                  <tr key={service} className="border-b border-zinc-50">
-                    <td className="py-1.5 capitalize text-zinc-700">{service}</td>
-                    <td className="py-1.5 text-right tabular-nums text-zinc-900">
+                  <tr key={service} className="border-b border-border">
+                    <td className="py-1.5 capitalize text-foreground">{service}</td>
+                    <td className="py-1.5 text-right tabular-nums text-foreground">
                       {tokens.input_tokens.toLocaleString()}
                     </td>
-                    <td className="py-1.5 text-right tabular-nums text-zinc-900">
+                    <td className="py-1.5 text-right tabular-nums text-foreground">
                       {tokens.output_tokens.toLocaleString()}
                     </td>
                   </tr>
@@ -243,22 +243,22 @@ export default async function AdminAnalyticsPage() {
           title={`Chat Activity — last 30 days (${totalTurns} turns, avg ${chat?.avg_turns_per_session ?? 0} per session)`}
         >
           {chat === null ? (
-            <p className="text-sm text-red-500">Unable to load chat data.</p>
+            <p className="text-sm text-destructive">Unable to load chat data.</p>
           ) : chat.daily.length === 0 ? (
-            <p className="text-sm text-zinc-500">No chat turns recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No chat turns recorded yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="py-1.5 text-left font-medium text-zinc-500">Date</th>
-                  <th className="py-1.5 text-right font-medium text-zinc-500">Turns</th>
+                <tr className="border-b border-border">
+                  <th className="py-1.5 text-left font-medium text-muted-foreground">Date</th>
+                  <th className="py-1.5 text-right font-medium text-muted-foreground">Turns</th>
                 </tr>
               </thead>
               <tbody>
                 {chat.daily.map((row) => (
-                  <tr key={row.date} className="border-b border-zinc-50">
-                    <td className="py-1.5 text-zinc-700">{row.date}</td>
-                    <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.turns}</td>
+                  <tr key={row.date} className="border-b border-border">
+                    <td className="py-1.5 text-foreground">{row.date}</td>
+                    <td className="py-1.5 text-right tabular-nums text-foreground">{row.turns}</td>
                   </tr>
                 ))}
               </tbody>
@@ -268,22 +268,22 @@ export default async function AdminAnalyticsPage() {
 
         <AnalyticsCard title="Feynman Engagement — stage funnel, last 30 days">
           {feynman === null ? (
-            <p className="text-sm text-red-500">Unable to load Feynman data.</p>
+            <p className="text-sm text-destructive">Unable to load Feynman data.</p>
           ) : feynman.by_stage.length === 0 ? (
-            <p className="text-sm text-zinc-500">No Feynman sessions recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No Feynman sessions recorded yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="py-1.5 text-left font-medium text-zinc-500">Stage</th>
-                  <th className="py-1.5 text-right font-medium text-zinc-500">Sessions</th>
+                <tr className="border-b border-border">
+                  <th className="py-1.5 text-left font-medium text-muted-foreground">Stage</th>
+                  <th className="py-1.5 text-right font-medium text-muted-foreground">Sessions</th>
                 </tr>
               </thead>
               <tbody>
                 {feynman.by_stage.map((row) => (
-                  <tr key={row.stage} className="border-b border-zinc-50">
-                    <td className="py-1.5 text-zinc-700">Stage {row.stage}</td>
-                    <td className="py-1.5 text-right tabular-nums text-zinc-900">{row.count}</td>
+                  <tr key={row.stage} className="border-b border-border">
+                    <td className="py-1.5 text-foreground">Stage {row.stage}</td>
+                    <td className="py-1.5 text-right tabular-nums text-foreground">{row.count}</td>
                   </tr>
                 ))}
               </tbody>
@@ -292,22 +292,22 @@ export default async function AdminAnalyticsPage() {
         </AnalyticsCard>
         <AnalyticsCard title="Ingestion History — most recent 100 requests">
           {ingestions === null ? (
-            <p className="text-sm text-red-500">Unable to load ingestion data.</p>
+            <p className="text-sm text-destructive">Unable to load ingestion data.</p>
           ) : ingestions.ingestions.length === 0 ? (
-            <p className="text-sm text-zinc-500">No ingestions recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No ingestions recorded yet.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-100">
-                  <th className="py-1.5 text-left font-medium text-zinc-500">Ticker</th>
-                  <th className="py-1.5 text-right font-medium text-zinc-500">Requested At</th>
+                <tr className="border-b border-border">
+                  <th className="py-1.5 text-left font-medium text-muted-foreground">Ticker</th>
+                  <th className="py-1.5 text-right font-medium text-muted-foreground">Requested At</th>
                 </tr>
               </thead>
               <tbody>
                 {ingestions.ingestions.map((row, i) => (
-                  <tr key={i} className="border-b border-zinc-50">
-                    <td className="py-1.5 font-mono text-zinc-900">{row.ticker}</td>
-                    <td className="py-1.5 text-right text-zinc-700">
+                  <tr key={i} className="border-b border-border">
+                    <td className="py-1.5 font-mono text-foreground">{row.ticker}</td>
+                    <td className="py-1.5 text-right text-foreground">
                       {new Date(row.requested_at).toLocaleString()}
                     </td>
                   </tr>

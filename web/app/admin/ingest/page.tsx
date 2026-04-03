@@ -65,18 +65,18 @@ export default function AdminIngestPage() {
           System Health
         </a>
       </div>
-      <h1 className="mb-2 text-3xl font-semibold text-zinc-900">Admin — Ingest</h1>
-      <p className="mb-8 text-zinc-500">
+      <h1 className="mb-2 text-3xl font-semibold text-foreground">Admin — Ingest</h1>
+      <p className="mb-8 text-muted-foreground">
         Dispatch a ticker to the ingestion pipeline. Returns immediately — processing runs
         asynchronously.
       </p>
 
-      <div className="max-w-sm rounded-lg border border-zinc-200 bg-white p-6">
+      <div className="max-w-sm rounded-lg border border-border bg-card p-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label
               htmlFor="ticker"
-              className="mb-1.5 block text-sm font-medium text-zinc-700"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
               Ticker symbol
             </label>
@@ -87,14 +87,14 @@ export default function AdminIngestPage() {
               onChange={(e) => setTicker(e.target.value)}
               placeholder="e.g. AAPL"
               disabled={status === "submitting"}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 font-mono text-sm uppercase text-zinc-900 placeholder:normal-case placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-zinc-50 disabled:text-zinc-400"
+              className="w-full rounded-md border border-input px-3 py-2 font-mono text-sm uppercase text-foreground placeholder:normal-case placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring disabled:bg-muted disabled:text-muted-foreground"
             />
           </div>
 
           <button
             type="submit"
             disabled={status === "submitting" || !ticker.trim()}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted"
           >
             {status === "submitting" ? "Submitting…" : "Ingest transcript"}
           </button>
@@ -106,7 +106,7 @@ export default function AdminIngestPage() {
           </p>
         )}
         {status === "error" && errorMessage && (
-          <p className="mt-4 text-sm text-red-600">{errorMessage}</p>
+          <p className="mt-4 text-sm text-destructive">{errorMessage}</p>
         )}
       </div>
     </div>

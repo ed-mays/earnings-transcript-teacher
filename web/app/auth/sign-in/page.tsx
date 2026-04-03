@@ -19,24 +19,24 @@ function SignInContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50">
-      <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-2 text-2xl font-semibold text-zinc-900">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 shadow-sm">
+        <h1 className="mb-2 text-2xl font-semibold text-foreground">
           EarningsFluency
         </h1>
-        <p className="mb-8 text-sm text-zinc-500">
+        <p className="mb-8 text-sm text-muted-foreground">
           Sign in to access your earnings transcript library.
         </p>
 
         {error && (
-          <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p className="mb-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {decodeURIComponent(error)}
           </p>
         )}
 
         <button
           onClick={signInWithGoogle}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+          className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium text-card-foreground transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -65,8 +65,8 @@ function SignInContent() {
 
 function SignInSpinner() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700" />
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-foreground" />
     </div>
   );
 }
