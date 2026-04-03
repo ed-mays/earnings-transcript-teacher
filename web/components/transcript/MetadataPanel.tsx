@@ -336,8 +336,10 @@ interface SituateInContextStepProps {
 }
 
 function SituateInContextStep({ call }: SituateInContextStepProps) {
-  const hasNews = call.news_items.length > 0;
-  const hasCompetitors = call.competitors.length > 0;
+  const newsItems = call.news_items ?? [];
+  const competitors = call.competitors ?? [];
+  const hasNews = newsItems.length > 0;
+  const hasCompetitors = competitors.length > 0;
 
   return (
     <div className="space-y-5">
@@ -347,7 +349,7 @@ function SituateInContextStep({ call }: SituateInContextStepProps) {
         </h3>
         {hasNews ? (
           <div className="space-y-2">
-            {call.news_items.map((item) => (
+            {newsItems.map((item) => (
               <NewsCard key={item.headline} item={item} ticker={call.ticker} />
             ))}
           </div>
@@ -361,7 +363,7 @@ function SituateInContextStep({ call }: SituateInContextStepProps) {
           Competitors
         </h3>
         {hasCompetitors ? (
-          <CompetitorList competitors={call.competitors} />
+          <CompetitorList competitors={competitors} />
         ) : (
           <EmptyState title="No competitor data found." />
         )}
