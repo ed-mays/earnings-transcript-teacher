@@ -72,6 +72,7 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     ...Object.fromEntries(ANALYST_STEPS.map((s) => [s.id, s.defaultExpanded])),
     participants: false,
+    keywords: false,
   });
 
   return (
@@ -140,14 +141,23 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
         </Fragment>
       ))}
 
-      {/* Language layer — always visible */}
       {call.keywords.length > 0 && (
-        <div className="border-t px-4 py-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Language &amp; Keywords
-          </p>
-          <KeywordList keywords={call.keywords} />
-        </div>
+        <Collapsible
+          open={expanded.keywords}
+          onOpenChange={(open) => setExpanded((prev) => ({ ...prev, keywords: open }))}
+          className="border-t"
+        >
+          <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-semibold text-foreground">Language &amp; Keywords</span>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">Key terms used in this call</p>
+            </div>
+            <CollapsibleChevron open={expanded.keywords} className="mt-0.5" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="px-4 pb-4 pt-1">
+            <KeywordList keywords={call.keywords} ticker={call.ticker} />
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </Card>
   );
