@@ -444,9 +444,10 @@ def search_transcript(
 # --- Evasion signals ---
 
 _SIGNALS_SYSTEM_PROMPT = (
-    "You are a financial analyst educator. In 2–3 sentences, explain the investor "
-    "implications of the evasion pattern described. Focus on what a careful investor "
-    "or analyst should infer from this behaviour — not just what happened, but why it matters."
+    "You are a financial analyst educator. Return 2–3 numbered points, each on its own line, "
+    "explaining the investor implications of the evasion pattern described. "
+    "Focus on what a careful investor or analyst should infer from this behaviour — "
+    "not just what happened, but why it matters."
 )
 
 
