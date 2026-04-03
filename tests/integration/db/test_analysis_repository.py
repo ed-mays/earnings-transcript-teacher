@@ -22,6 +22,21 @@ def test_get_topics_for_ticker(mock_psycopg_connect):
     assert "Azure" in topics[0]["summary"]
 
 
+def test_get_topics_uses_topic_name_when_terms_empty(mock_psycopg_connect):
+    """topic_name must be used as label even when terms is empty."""
+    m_connect, m_cursor = mock_psycopg_connect
+
+    m_cursor.fetchall.return_value = [
+        ("AI Infrastructure Investment Cycle", [], "AI spending is accelerating."),
+    ]
+
+    repo = AnalysisRepository("fake_connection_string")
+    topics = repo.get_topics_for_ticker("MSFT")
+
+    assert len(topics) == 1
+    assert topics[0]["label"] == "AI Infrastructure Investment Cycle"
+
+
 def test_get_synthesis_for_ticker(mock_psycopg_connect):
     m_connect, m_cursor = mock_psycopg_connect
 

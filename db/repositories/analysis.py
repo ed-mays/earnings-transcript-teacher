@@ -37,7 +37,7 @@ class AnalysisRepository:
                         (ticker, limit),
                     )
                     topics = [
-                        {"label": row[0] or row[1][0] if row[1] else "", "terms": row[1], "summary": row[2]}
+                        {"label": row[0] or (row[1][0] if row[1] else ""), "terms": row[1], "summary": row[2]}
                         for row in cur.fetchall()
                     ]
         except Exception as e:
