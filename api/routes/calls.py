@@ -15,7 +15,11 @@ from pydantic import BaseModel
 from dependencies import CurrentUserDep, DbDep
 from db.analytics import track
 from db.repositories import AnalysisRepository, CallRepository
+from db.repositories.competitors import CompetitorRepository
+from db.repositories.news import NewsRepository
 from limiter import limiter
+from services.competitors import fetch_competitors
+from services.recent_news import fetch_recent_news
 from settings import CHAT_RATE_LIMIT, SEARCH_QUERY_MAX_LENGTH, SEARCH_RATE_LIMIT
 
 router = APIRouter(prefix="/api/calls", tags=["calls"])
@@ -105,6 +109,21 @@ class TopicInfo(BaseModel):
     summary: str = ""
 
 
+class NewsItemInfo(BaseModel):
+    headline: str
+    url: str
+    source: str
+    date: str
+    summary: str
+
+
+class CompetitorInfo(BaseModel):
+    name: str
+    ticker: str
+    description: str
+    mentioned_in_transcript: bool
+
+
 class CallDetail(BaseModel):
     ticker: str
     company_name: str | None = None
@@ -121,6 +140,8 @@ class CallDetail(BaseModel):
     takeaways: list[TakeawayItem] = []
     misconceptions: list[MisconceptionItem] = []
     signal_strip: SignalStrip | None = None
+    news_items: list[NewsItemInfo] = []
+    competitors: list[CompetitorInfo] = []
 
 
 class AdjacentCallInfo(BaseModel):
@@ -293,6 +314,46 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         strategic_shift_flagged=len(raw_shifts) > 0,
     )
 
+    # --- Competitors (lazy hydration) ---
+    comp_repo = CompetitorRepository(db_url)
+    raw_competitors = comp_repo.get(ticker)
+    if not raw_competitors:
+        transcript_text = call_repo.get_transcript_text(ticker, conn=conn)
+        raw_competitors = fetch_competitors(
+            ticker, company_name or "", industry or "", transcript_text
+        )
+        if raw_competitors:
+            comp_repo.save(ticker, raw_competitors)
+    competitors = [
+        CompetitorInfo(
+            name=c.name,
+            ticker=c.ticker,
+            description=c.description,
+            mentioned_in_transcript=c.mentioned_in_transcript,
+        )
+        for c in raw_competitors
+    ]
+
+    # --- News items (lazy hydration) ---
+    news_repo = NewsRepository(db_url)
+    raw_news = news_repo.get(ticker)
+    if not raw_news:
+        themes = analysis_repo.get_themes_for_ticker(ticker, conn=conn)
+        if call_date is not None:
+            raw_news = fetch_recent_news(ticker, company_name or "", call_date, themes)
+            if raw_news:
+                news_repo.save(ticker, raw_news)
+    news_items = [
+        NewsItemInfo(
+            headline=n.headline,
+            url=n.url,
+            source=n.source,
+            date=n.date,
+            summary=n.summary,
+        )
+        for n in raw_news
+    ]
+
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return CallDetail(
         ticker=ticker,
@@ -310,6 +371,8 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         takeaways=takeaways,
         misconceptions=misconceptions,
         signal_strip=signal_strip,
+        news_items=news_items,
+        competitors=competitors,
     )
 
 
@@ -523,6 +586,86 @@ def evasion_signals(
 
     return StreamingResponse(
         _signals_sse_stream(body),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# --- News context ---
+
+_NEWS_CONTEXT_SYSTEM_PROMPT = (
+    "You are a financial analyst educator. "
+    "In 2–3 sentences, explain why the following news headline is relevant "
+    "to an investor who is analyzing the earnings call described. "
+    "Be concrete: connect the news to the specific dynamics of this call."
+)
+
+
+class NewsContextRequest(BaseModel):
+    headline: str
+    summary: str
+    source: str
+    date: str
+
+
+def _news_context_sse_stream(ticker: str, body: NewsContextRequest, conn: psycopg.Connection | None = None):
+    """Generator that streams news-context analysis as SSE events."""
+    import json as _json
+    from services.llm import stream_investor_signals
+
+    call_repo = CallRepository(_db_url())
+    company_name, _ = call_repo.get_company_info(ticker, conn=conn)
+    call_date = call_repo.get_call_date(ticker, conn=conn)
+    call_label = f"{company_name or ticker} ({ticker})"
+    if call_date:
+        call_label += f" earnings call on {call_date}"
+
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Earnings call: {call_label}\n"
+                f"News headline: {body.headline}\n"
+                f"Source: {body.source} ({body.date})\n"
+                f"Summary: {body.summary}"
+            ),
+        }
+    ]
+    logger.debug("news_context stream starting for %s", ticker)
+    try:
+        has_content = False
+        for chunk in stream_investor_signals(messages, _NEWS_CONTEXT_SYSTEM_PROMPT):
+            if not has_content:
+                logger.debug("news_context first token received for %s", ticker)
+            has_content = True
+            yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        logger.debug("news_context stream ended has_content=%s", has_content)
+        if has_content:
+            yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+        else:
+            yield f"data: {_json.dumps({'type': 'error', 'message': 'No content received from model'})}\n\n"
+    except Exception:
+        logger.exception("Error streaming news context for %s", ticker)
+        yield f"data: {_json.dumps({'type': 'error', 'message': 'Stream error'})}\n\n"
+
+
+@router.post("/{ticker}/news-context")
+@limiter.limit(CHAT_RATE_LIMIT)
+def news_context(
+    request: Request,
+    ticker: str,
+    body: NewsContextRequest,
+    user_id: CurrentUserDep,
+) -> StreamingResponse:
+    """Stream a 2–3 sentence explanation of why a news item is relevant to this call as SSE."""
+    if not _ticker_exists(ticker):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+
+    return StreamingResponse(
+        _news_context_sse_stream(ticker, body),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
