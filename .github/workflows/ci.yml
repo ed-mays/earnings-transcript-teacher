@@ -180,12 +180,15 @@ jobs:
         run: npm install --global @railway/cli
 
       - name: Deploy API to staging
+        # RAILWAY_TOKEN must be a project-scoped token tied to the staging environment:
+        # Railway dashboard → project → Settings → Tokens → New Token → select "staging"
+        # RAILWAY_SERVICE_NAME is the display name of the service (e.g. "api") visible
+        # on the service card in the Railway project dashboard.
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_STAGING }}
         run: |
           railway up \
-            --service ${{ secrets.RAILWAY_SERVICE_ID }} \
-            --environment staging \
+            --service ${{ secrets.RAILWAY_SERVICE_NAME }} \
             --detach
 
   deploy-web-preview:
