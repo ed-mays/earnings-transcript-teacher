@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { MetadataPanel } from "@/components/transcript/MetadataPanel";
-import { callDetail } from "../../utils/fixtures";
+import { callDetail, synthesisResponse, speakersResponse } from "../../utils/fixtures";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -20,10 +20,15 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// api.post is called fire-and-forget for section tracking — mock to keep tests clean
+// Mock api — all sections lazy-load via api.get; api.post is fire-and-forget for tracking
 vi.mock("@/lib/api", () => ({
   api: {
-    get: vi.fn().mockResolvedValue({}),
+    get: vi.fn((url: string) => {
+      if (url.includes("/synthesis")) return Promise.resolve(synthesisResponse);
+      if (url.includes("/speakers")) return Promise.resolve(speakersResponse);
+      if (url.includes("/keywords")) return Promise.resolve({ keywords: ["services", "iPhone"] });
+      return Promise.resolve({});
+    }),
     post: vi.fn().mockResolvedValue({ ok: true }),
   },
 }));
@@ -56,5 +61,11 @@ describe("MetadataPanel", () => {
     render(<MetadataPanel call={callDetail} />);
     await userEvent.click(screen.getByText("Orient"));
     expect(screen.getByText("positive")).toBeInTheDocument();
+  });
+
+  it("shows Participants content after expanding", async () => {
+    render(<MetadataPanel call={callDetail} />);
+    await userEvent.click(screen.getByText("Participants"));
+    expect(screen.getByText("Tim Cook")).toBeInTheDocument();
   });
 });

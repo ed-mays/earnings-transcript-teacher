@@ -78,13 +78,22 @@ export interface CallDetail {
   company_name: string | null;
   call_date: string | null;
   industry: string | null;
-  synthesis: SynthesisInfo | null;
-  keywords: string[];
-  speakers: SpeakerInfo[];
   brief: CallBrief | null;
   takeaways: TakeawayItem[];
   misconceptions: MisconceptionItem[];
   signal_strip: SignalStrip | null;
+}
+
+export interface SynthesisResponse {
+  synthesis: SynthesisInfo | null;
+}
+
+export interface SpeakersResponse {
+  speakers: SpeakerInfo[];
+}
+
+export interface KeywordsResponse {
+  keywords: string[];
 }
 
 export interface TopicsResponse {

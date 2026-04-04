@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import type {
   CallDetail,
+  SynthesisResponse,
+  SpeakersResponse,
+  KeywordsResponse,
   TopicsResponse,
   EvasionResponse,
   StrategicShiftsResponse,
@@ -114,7 +117,7 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
 
             {/* Step body */}
             <CollapsibleContent className="px-4 pb-4 pt-1">
-              <StepContent step={step} call={call} isOpen={expanded[step.id]} />
+              <StepContent step={step} ticker={call.ticker} isOpen={expanded[step.id]} signal_strip={call.signal_strip} />
               <Link
                 href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
                 className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
@@ -124,77 +127,46 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
             </CollapsibleContent>
           </Collapsible>
 
-          {step.id === "orient" && call.speakers.length > 0 && (
-            <Collapsible
-              open={expanded.participants}
+          {step.id === "orient" && (
+            <ParticipantsStep
+              ticker={call.ticker}
+              isOpen={expanded.participants}
               onOpenChange={(open) => handleOpenChange("participants", open)}
-              className="border-t"
-            >
-              <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-semibold text-foreground">Participants</span>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-snug">Who was on the call?</p>
-                </div>
-                <CollapsibleChevron open={expanded.participants} className="mt-0.5" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="px-4 pb-4 pt-1">
-                <ul className="space-y-1.5">
-                  {call.speakers.map((s, idx) => (
-                    <li key={idx} className="text-sm">
-                      <span className="font-medium text-foreground">{s.name}</span>
-                      {s.title && <span className="text-muted-foreground">, {s.title}</span>}
-                      {s.firm && <span className="text-muted-foreground/70"> · {s.firm}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </CollapsibleContent>
-            </Collapsible>
+            />
           )}
         </Fragment>
       ))}
 
-      {call.keywords.length > 0 && (
-        <Collapsible
-          open={expanded.keywords}
-          onOpenChange={(open) => handleOpenChange("keywords", open)}
-          className="border-t"
-        >
-          <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-foreground">Language &amp; Keywords</span>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">Key terms used in this call</p>
-            </div>
-            <CollapsibleChevron open={expanded.keywords} className="mt-0.5" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="px-4 pb-4 pt-1">
-            <KeywordList keywords={call.keywords} ticker={call.ticker} />
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+      <KeywordsStep
+        ticker={call.ticker}
+        isOpen={expanded.keywords}
+        onOpenChange={(open) => handleOpenChange("keywords", open)}
+      />
     </Card>
   );
 }
 
 interface StepContentProps {
   step: AnalystStepConfig;
-  call: CallDetail;
+  ticker: string;
   isOpen: boolean;
+  signal_strip: CallDetail["signal_strip"];
 }
 
-function StepContent({ step, call, isOpen }: StepContentProps) {
+function StepContent({ step, ticker, isOpen, signal_strip }: StepContentProps) {
   switch (step.id) {
     case "orient":
-      return <OrientStep call={call} />;
+      return <OrientStep ticker={ticker} isOpen={isOpen} />;
     case "read-the-room":
-      return <ReadTheRoomStep call={call} />;
+      return <ReadTheRoomStep ticker={ticker} isOpen={isOpen} />;
     case "understand-the-narrative":
-      return <UnderstandTheNarrativeStep ticker={call.ticker} isOpen={isOpen} />;
+      return <UnderstandTheNarrativeStep ticker={ticker} isOpen={isOpen} />;
     case "notice-what-was-avoided":
-      return <NoticeWhatWasAvoidedStep ticker={call.ticker} isOpen={isOpen} signal_strip={call.signal_strip} />;
+      return <NoticeWhatWasAvoidedStep ticker={ticker} isOpen={isOpen} signal_strip={signal_strip} />;
     case "track-what-changed":
-      return <TrackWhatChangedStep ticker={call.ticker} isOpen={isOpen} />;
+      return <TrackWhatChangedStep ticker={ticker} isOpen={isOpen} />;
     case "situate-in-context":
-      return <SituateInContextStep ticker={call.ticker} isOpen={isOpen} />;
+      return <SituateInContextStep ticker={ticker} isOpen={isOpen} />;
     default:
       return null;
   }
@@ -213,8 +185,20 @@ function SectionError({ message }: { message: string }) {
   return <EmptyState title={`Failed to load: ${message}`} />;
 }
 
-function OrientStep({ call }: { call: CallDetail }) {
-  const sentiment = call.synthesis?.overall_sentiment;
+function OrientStep({ ticker, isOpen }: { ticker: string; isOpen: boolean }) {
+  const { data, loading, error, trigger } = useLazySection<SynthesisResponse>(() =>
+    api.get(`/api/calls/${ticker}/synthesis`)
+  );
+
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  if (loading) return <SectionLoading />;
+  if (error) return <SectionError message={error} />;
+  if (!data) return null;
+
+  const sentiment = data.synthesis?.overall_sentiment;
 
   if (!sentiment) {
     return <EmptyState title="No orientation data available." />;
@@ -230,8 +214,20 @@ function OrientStep({ call }: { call: CallDetail }) {
   );
 }
 
-function ReadTheRoomStep({ call }: { call: CallDetail }) {
-  const { synthesis } = call;
+function ReadTheRoomStep({ ticker, isOpen }: { ticker: string; isOpen: boolean }) {
+  const { data, loading, error, trigger } = useLazySection<SynthesisResponse>(() =>
+    api.get(`/api/calls/${ticker}/synthesis`)
+  );
+
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  if (loading) return <SectionLoading />;
+  if (error) return <SectionError message={error} />;
+  if (!data) return null;
+
+  const { synthesis } = data;
   const hasSentiment = synthesis?.executive_tone || synthesis?.analyst_sentiment;
 
   return (
@@ -261,6 +257,96 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
         <EmptyState title="No room dynamics data available." />
       )}
     </div>
+  );
+}
+
+interface ParticipantsStepProps {
+  ticker: string;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function ParticipantsStep({ ticker, isOpen, onOpenChange }: ParticipantsStepProps) {
+  const { data, loading, error, trigger } = useLazySection<SpeakersResponse>(() =>
+    api.get(`/api/calls/${ticker}/speakers`)
+  );
+
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={onOpenChange} className="border-t">
+      <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-semibold text-foreground">Participants</span>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">Who was on the call?</p>
+        </div>
+        <CollapsibleChevron open={isOpen} className="mt-0.5" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-4 pb-4 pt-1">
+        {loading ? (
+          <SectionLoading />
+        ) : error ? (
+          <SectionError message={error} />
+        ) : data ? (
+          data.speakers.length > 0 ? (
+            <ul className="space-y-1.5">
+              {data.speakers.map((s, idx) => (
+                <li key={idx} className="text-sm">
+                  <span className="font-medium text-foreground">{s.name}</span>
+                  {s.title && <span className="text-muted-foreground">, {s.title}</span>}
+                  {s.firm && <span className="text-muted-foreground/70"> · {s.firm}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState title="No participant data available." />
+          )
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+interface KeywordsStepProps {
+  ticker: string;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function KeywordsStep({ ticker, isOpen, onOpenChange }: KeywordsStepProps) {
+  const { data, loading, error, trigger } = useLazySection<KeywordsResponse>(() =>
+    api.get(`/api/calls/${ticker}/keywords`)
+  );
+
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={onOpenChange} className="border-t">
+      <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-semibold text-foreground">Language &amp; Keywords</span>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">Key terms used in this call</p>
+        </div>
+        <CollapsibleChevron open={isOpen} className="mt-0.5" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-4 pb-4 pt-1">
+        {loading ? (
+          <SectionLoading />
+        ) : error ? (
+          <SectionError message={error} />
+        ) : data ? (
+          data.keywords.length > 0 ? (
+            <KeywordList keywords={data.keywords} ticker={ticker} />
+          ) : (
+            <EmptyState title="No keywords available." />
+          )
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

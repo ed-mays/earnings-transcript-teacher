@@ -3,6 +3,9 @@ import type {
   CallBrief,
   SignalStrip,
   SpansResponse,
+  SynthesisResponse,
+  SpeakersResponse,
+  KeywordsResponse,
   TakeawayItem,
   MisconceptionItem,
 } from "@/components/transcript/types";
@@ -46,20 +49,29 @@ export const callDetail: CallDetail = {
   company_name: "Apple Inc.",
   call_date: "2024-11-01",
   industry: "Technology",
+  brief: callBrief,
+  takeaways,
+  misconceptions,
+  signal_strip: signalStrip,
+};
+
+export const synthesisResponse: SynthesisResponse = {
   synthesis: {
     overall_sentiment: "positive",
     executive_tone: "confident",
     analyst_sentiment: "bullish",
   },
-  keywords: ["services", "iPhone", "margin"],
+};
+
+export const speakersResponse: SpeakersResponse = {
   speakers: [
     { name: "Tim Cook", role: "executive", title: "CEO", firm: null },
     { name: "Luca Maestri", role: "executive", title: "CFO", firm: null },
   ],
-  brief: callBrief,
-  takeaways,
-  misconceptions,
-  signal_strip: signalStrip,
+};
+
+export const keywordsResponse: KeywordsResponse = {
+  keywords: ["services", "iPhone", "margin"],
 };
 
 export const spansResponse: SpansResponse = {

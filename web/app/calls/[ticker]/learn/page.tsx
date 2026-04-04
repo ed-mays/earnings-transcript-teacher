@@ -9,7 +9,7 @@ import { streamChat } from "@/lib/chat";
 import { api } from "@/lib/api";
 import { buildSuggestions } from "@/lib/suggestions";
 import type { ChatMessage } from "@/lib/chat";
-import type { TopicsResponse } from "@/components/transcript/types";
+import type { TopicsResponse, KeywordsResponse } from "@/components/transcript/types";
 
 /** Feynman-style learning chat for a given ticker's transcript. */
 export default function LearnPage({
@@ -39,10 +39,10 @@ export default function LearnPage({
 
   useEffect(() => {
     Promise.all([
-      api.get<{ keywords: string[] }>(`/api/calls/${ticker}`),
       api.get<TopicsResponse>(`/api/calls/${ticker}/topics`),
+      api.get<KeywordsResponse>(`/api/calls/${ticker}/keywords`),
     ])
-      .then(([detail, topics]) => setSuggestions(buildSuggestions(topics.themes, detail.keywords)))
+      .then(([topics, kw]) => setSuggestions(buildSuggestions(topics.themes, kw.keywords)))
       .catch(() => {
         // Silent degradation — suggestions are a progressive enhancement
       })
