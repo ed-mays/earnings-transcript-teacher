@@ -242,6 +242,18 @@ git commit -m "chore: update <package> to x.y.z"
 
 Vercel automatically creates preview deployments for every PR. To allow all preview URLs through Railway's CORS, set `CORS_ORIGIN_REGEX` in Railway to a regex matching your app's preview URL pattern (e.g. `https://myapp(-[a-z0-9-]+)?\.vercel\.app`).
 
+### Staging / Preview environment
+
+The project includes a staging environment for testing PRs end-to-end before merging.
+
+| Layer | Production | Staging |
+|---|---|---|
+| Frontend | Vercel production deploy | Vercel preview (per PR, auto-deployed by CI) |
+| API | Railway production environment | Railway `staging` environment |
+| Database | Supabase production project | Supabase staging project |
+
+Preview deployments are wired to staging automatically via CI — Vercel previews point at the staging API and staging database. See [`docs/disaster-recovery.md`](docs/disaster-recovery.md) for full setup/rebuild instructions.
+
 ---
 
 ## Environment variable reference
@@ -262,3 +274,18 @@ Vercel automatically creates preview deployments for every PR. To allow all prev
 | `CORS_EXTRA_ORIGINS` | FastAPI CORS | Optional comma-separated extra allowed origins (e.g., Vercel preview URLs in staging) |
 | `MODAL_TOKEN_ID` | FastAPI (admin ingest endpoint) | Modal token ID — required at startup; generate with `modal token new` |
 | `SENTRY_DSN` | FastAPI (optional) | Sentry DSN — enables production exception alerting; service starts without it but logs a warning |
+
+### GitHub Actions secrets
+
+These secrets must be configured in the repo's Settings → Secrets and variables → Actions:
+
+| Secret | Purpose |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI auth (both prod and staging migration deploys) |
+| `SUPABASE_STAGING_PROJECT_REF` | Staging Supabase project ref (for `deploy-migrations-staging` CI job) |
+| `STAGING_SUPABASE_URL` | Staging Supabase project URL (injected into Vercel preview deploys) |
+| `STAGING_SUPABASE_ANON_KEY` | Staging Supabase anon key (injected into Vercel preview deploys) |
+| `STAGING_API_URL` | Railway staging API URL, no trailing slash (injected into Vercel preview deploys) |
+| `VERCEL_TOKEN` | Vercel API token (for preview and production deploys) |
+| `VERCEL_ORG_ID` | Vercel org ID |
+| `VERCEL_PROJECT_ID` | Vercel project ID |
