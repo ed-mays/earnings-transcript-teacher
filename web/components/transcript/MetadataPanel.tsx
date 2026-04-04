@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect } from "react";
 import Link from "next/link";
-import type { CallDetail } from "./types";
+import { Loader2 } from "lucide-react";
+import type {
+  CallDetail,
+  TopicsResponse,
+  EvasionResponse,
+  StrategicShiftsResponse,
+  CompetitorsResponse,
+  NewsResponse,
+} from "./types";
 import { KeywordList } from "./KeywordList";
 import { ThemeCard } from "./ThemeCard";
 import { EvasionCard } from "./EvasionCard";
@@ -18,12 +26,13 @@ import {
   CollapsibleChevron,
 } from "@/components/ui/collapsible";
 import { getEvasionStyle } from "@/lib/signal-colors";
+import { api } from "@/lib/api";
+import { useLazySection } from "@/hooks/useLazySection";
 
 interface AnalystStepConfig {
   id: string;
   label: string;
   question: string;
-  defaultExpanded: boolean;
 }
 
 const ANALYST_STEPS: AnalystStepConfig[] = [
@@ -31,37 +40,31 @@ const ANALYST_STEPS: AnalystStepConfig[] = [
     id: "orient",
     label: "Orient",
     question: "What is this call about, and what was expected?",
-    defaultExpanded: true,
   },
   {
     id: "read-the-room",
     label: "Read the Room",
     question: "How did management sound?",
-    defaultExpanded: false,
   },
   {
     id: "understand-the-narrative",
     label: "Understand the Narrative",
     question: "What story did management tell?",
-    defaultExpanded: false,
   },
   {
     id: "notice-what-was-avoided",
     label: "Notice What Was Avoided",
     question: "What wasn't said?",
-    defaultExpanded: false,
   },
   {
     id: "track-what-changed",
     label: "Track What Changed",
     question: "What's different from last quarter?",
-    defaultExpanded: false,
   },
   {
     id: "situate-in-context",
     label: "Situate in Context",
     question: "How does this fit the bigger picture?",
-    defaultExpanded: false,
   },
 ];
 
@@ -71,11 +74,18 @@ interface MetadataPanelProps {
 
 /** Sidebar panel with analyst step framework: 6 collapsible sections teaching a mental model. */
 export function MetadataPanel({ call }: MetadataPanelProps) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    ...Object.fromEntries(ANALYST_STEPS.map((s) => [s.id, s.defaultExpanded])),
-    participants: false,
-    keywords: false,
-  });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(
+    Object.fromEntries(
+      [...ANALYST_STEPS.map((s) => [s.id, false]), ["participants", false], ["keywords", false]]
+    )
+  );
+
+  function handleOpenChange(id: string, open: boolean) {
+    setExpanded((prev) => ({ ...prev, [id]: open }));
+    api
+      .post<{ ok: boolean }>(`/api/calls/${call.ticker}/track`, { section: id, open })
+      .catch(() => {});
+  }
 
   return (
     <Card className="p-0 gap-0 overflow-hidden">
@@ -87,7 +97,7 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
         <Fragment key={step.id}>
           <Collapsible
             open={expanded[step.id]}
-            onOpenChange={(open) => setExpanded((prev) => ({ ...prev, [step.id]: open }))}
+            onOpenChange={(open) => handleOpenChange(step.id, open)}
             className={i > 0 ? "border-t" : ""}
           >
             {/* Step header */}
@@ -104,7 +114,7 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
 
             {/* Step body */}
             <CollapsibleContent className="px-4 pb-4 pt-1">
-              <StepContent step={step} call={call} />
+              <StepContent step={step} call={call} isOpen={expanded[step.id]} />
               <Link
                 href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
                 className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
@@ -117,7 +127,7 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
           {step.id === "orient" && call.speakers.length > 0 && (
             <Collapsible
               open={expanded.participants}
-              onOpenChange={(open) => setExpanded((prev) => ({ ...prev, participants: open }))}
+              onOpenChange={(open) => handleOpenChange("participants", open)}
               className="border-t"
             >
               <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
@@ -146,7 +156,7 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
       {call.keywords.length > 0 && (
         <Collapsible
           open={expanded.keywords}
-          onOpenChange={(open) => setExpanded((prev) => ({ ...prev, keywords: open }))}
+          onOpenChange={(open) => handleOpenChange("keywords", open)}
           className="border-t"
         >
           <CollapsibleTrigger className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted transition-colors">
@@ -168,25 +178,39 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
 interface StepContentProps {
   step: AnalystStepConfig;
   call: CallDetail;
+  isOpen: boolean;
 }
 
-function StepContent({ step, call }: StepContentProps) {
+function StepContent({ step, call, isOpen }: StepContentProps) {
   switch (step.id) {
     case "orient":
       return <OrientStep call={call} />;
     case "read-the-room":
       return <ReadTheRoomStep call={call} />;
     case "understand-the-narrative":
-      return <UnderstandTheNarrativeStep call={call} />;
+      return <UnderstandTheNarrativeStep ticker={call.ticker} isOpen={isOpen} />;
     case "notice-what-was-avoided":
-      return <NoticeWhatWasAvoidedStep call={call} />;
+      return <NoticeWhatWasAvoidedStep ticker={call.ticker} isOpen={isOpen} signal_strip={call.signal_strip} />;
     case "track-what-changed":
-      return <TrackWhatChangedStep call={call} />;
+      return <TrackWhatChangedStep ticker={call.ticker} isOpen={isOpen} />;
     case "situate-in-context":
-      return <SituateInContextStep call={call} />;
+      return <SituateInContextStep ticker={call.ticker} isOpen={isOpen} />;
     default:
       return null;
   }
+}
+
+function SectionLoading() {
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      Loading…
+    </div>
+  );
+}
+
+function SectionError({ message }: { message: string }) {
+  return <EmptyState title={`Failed to load: ${message}`} />;
 }
 
 function OrientStep({ call }: { call: CallDetail }) {
@@ -240,15 +264,29 @@ function ReadTheRoomStep({ call }: { call: CallDetail }) {
   );
 }
 
-function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
-  if (call.topics.length === 0 && call.themes.length === 0) {
+function UnderstandTheNarrativeStep({ ticker, isOpen }: { ticker: string; isOpen: boolean }) {
+  const { data, loading, error, trigger } = useLazySection<TopicsResponse>(() =>
+    api.get(`/api/calls/${ticker}/topics`)
+  );
+
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  if (loading) return <SectionLoading />;
+  if (error) return <SectionError message={error} />;
+  if (!data) return null;
+
+  const { topics, themes } = data;
+
+  if (topics.length === 0 && themes.length === 0) {
     return <EmptyState title="No themes extracted." />;
   }
 
-  if (call.topics.length > 0) {
+  if (topics.length > 0) {
     return (
       <div className="space-y-3">
-        {call.topics.map((topic, i) => (
+        {topics.map((topic, i) => (
           <ThemeCard key={i} label={topic.label || `Topic ${i + 1}`} summary={topic.summary} />
         ))}
       </div>
@@ -257,22 +295,44 @@ function UnderstandTheNarrativeStep({ call }: { call: CallDetail }) {
 
   return (
     <div className="space-y-3">
-      {call.themes.map((theme, i) => (
+      {themes.map((theme, i) => (
         <ThemeCard key={i} label={theme} summary="" />
       ))}
     </div>
   );
 }
 
+function NoticeWhatWasAvoidedStep({
+  ticker,
+  isOpen,
+  signal_strip,
+}: {
+  ticker: string;
+  isOpen: boolean;
+  signal_strip: CallDetail["signal_strip"];
+}) {
+  const { data, loading, error, trigger } = useLazySection<EvasionResponse>(() =>
+    api.get(`/api/calls/${ticker}/evasion`)
+  );
 
-function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
-  if (call.evasion_analyses.length === 0) {
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  if (loading) return <SectionLoading />;
+  if (error) return <SectionError message={error} />;
+  if (!data) return null;
+
+  const { evasion_analyses } = data;
+
+  if (evasion_analyses.length === 0) {
     return <EmptyState title="No evasion patterns detected." />;
   }
 
-  const evasionLevel = call.signal_strip?.evasion_level ?? null;
-  const qaItems = call.evasion_analyses.filter((item) => item.analyst_name !== null);
-  const prepItems = call.evasion_analyses.filter((item) => item.analyst_name === null);
+  // Use evasion_level from the loaded data; fall back to signal_strip if data not yet enriched
+  const evasionLevel = data.evasion_level ?? signal_strip?.evasion_level ?? null;
+  const qaItems = evasion_analyses.filter((item) => item.analyst_name !== null);
+  const prepItems = evasion_analyses.filter((item) => item.analyst_name === null);
 
   return (
     <div className="space-y-4">
@@ -294,7 +354,7 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
           </p>
           <div className="space-y-2">
             {qaItems.map((item, i) => (
-              <EvasionCard key={i} item={item} ticker={call.ticker} />
+              <EvasionCard key={i} item={item} ticker={ticker} />
             ))}
           </div>
         </div>
@@ -308,7 +368,7 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
           </p>
           <div className="space-y-2">
             {prepItems.map((item, i) => (
-              <EvasionCard key={i} item={item} ticker={call.ticker} />
+              <EvasionCard key={i} item={item} ticker={ticker} />
             ))}
           </div>
         </div>
@@ -317,29 +377,49 @@ function NoticeWhatWasAvoidedStep({ call }: { call: CallDetail }) {
   );
 }
 
-function TrackWhatChangedStep({ call }: { call: CallDetail }) {
-  if (call.strategic_shifts.length === 0) {
+function TrackWhatChangedStep({ ticker, isOpen }: { ticker: string; isOpen: boolean }) {
+  const { data, loading, error, trigger } = useLazySection<StrategicShiftsResponse>(() =>
+    api.get(`/api/calls/${ticker}/strategic-shifts`)
+  );
+
+  useEffect(() => {
+    if (isOpen) trigger();
+  }, [isOpen, trigger]);
+
+  if (loading) return <SectionLoading />;
+  if (error) return <SectionError message={error} />;
+  if (!data) return null;
+
+  if (data.strategic_shifts.length === 0) {
     return <EmptyState title="No strategic shifts identified." />;
   }
 
   return (
     <div className="space-y-3">
-      {call.strategic_shifts.map((shift, i) => (
+      {data.strategic_shifts.map((shift, i) => (
         <StrategicShiftCard key={i} shift={shift} />
       ))}
     </div>
   );
 }
 
-interface SituateInContextStepProps {
-  call: CallDetail;
-}
+function SituateInContextStep({ ticker, isOpen }: { ticker: string; isOpen: boolean }) {
+  const news = useLazySection<NewsResponse>(() =>
+    api.get(`/api/calls/${ticker}/news`)
+  );
+  const competitors = useLazySection<CompetitorsResponse>(() =>
+    api.get(`/api/calls/${ticker}/competitors`)
+  );
 
-function SituateInContextStep({ call }: SituateInContextStepProps) {
-  const newsItems = call.news_items ?? [];
-  const competitors = call.competitors ?? [];
-  const hasNews = newsItems.length > 0;
-  const hasCompetitors = competitors.length > 0;
+  useEffect(() => {
+    if (isOpen) {
+      news.trigger();
+      competitors.trigger();
+    }
+  }, [isOpen, news.trigger, competitors.trigger]);
+
+  const newsItems = news.data?.news_items ?? [];
+  const competitorList = competitors.data?.competitors ?? [];
 
   return (
     <div className="space-y-5">
@@ -347,26 +427,38 @@ function SituateInContextStep({ call }: SituateInContextStepProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Recent News
         </h3>
-        {hasNews ? (
-          <div className="space-y-2">
-            {newsItems.map((item) => (
-              <NewsCard key={item.headline} item={item} ticker={call.ticker} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="No recent news found." />
-        )}
+        {news.loading ? (
+          <SectionLoading />
+        ) : news.error ? (
+          <SectionError message={news.error} />
+        ) : news.data ? (
+          newsItems.length > 0 ? (
+            <div className="space-y-2">
+              {newsItems.map((item) => (
+                <NewsCard key={item.headline} item={item} ticker={ticker} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No recent news found." />
+          )
+        ) : null}
       </section>
 
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Competitors
         </h3>
-        {hasCompetitors ? (
-          <CompetitorList competitors={competitors} />
-        ) : (
-          <EmptyState title="No competitor data found." />
-        )}
+        {competitors.loading ? (
+          <SectionLoading />
+        ) : competitors.error ? (
+          <SectionError message={competitors.error} />
+        ) : competitors.data ? (
+          competitorList.length > 0 ? (
+            <CompetitorList competitors={competitorList} />
+          ) : (
+            <EmptyState title="No competitor data found." />
+          )
+        ) : null}
       </section>
     </div>
   );

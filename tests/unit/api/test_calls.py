@@ -666,3 +666,29 @@ class TestGetCallNews:
         assert response.status_code == 200
         mock_fetch.assert_not_called()
         assert response.json()["news_items"] == []
+
+
+class TestTrackSection:
+    PAYLOAD = {"section": "understand-the-narrative", "open": True}
+
+    def test_returns_ok(self, api_client):
+        with patch("routes.calls.track") as mock_track:
+            response = api_client.post("/api/calls/AAPL/track", json=self.PAYLOAD)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+    def test_calls_track_with_correct_properties(self, api_client):
+        with patch("routes.calls.track") as mock_track:
+            api_client.post("/api/calls/AAPL/track", json=self.PAYLOAD)
+        mock_track.assert_called_once_with(
+            "section_toggled",
+            properties={"ticker": "AAPL", "section": "understand-the-narrative", "open": True},
+        )
+
+    def test_tracks_close_event(self, api_client):
+        with patch("routes.calls.track") as mock_track:
+            api_client.post("/api/calls/AAPL/track", json={"section": "orient", "open": False})
+        mock_track.assert_called_once_with(
+            "section_toggled",
+            properties={"ticker": "AAPL", "section": "orient", "open": False},
+        )

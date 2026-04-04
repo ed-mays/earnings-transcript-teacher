@@ -52,10 +52,6 @@ export const callDetail: CallDetail = {
     analyst_sentiment: "bullish",
   },
   keywords: ["services", "iPhone", "margin"],
-  themes: ["services growth", "hardware resilience"],
-  topics: [["services growth", "subscription"], ["hardware resilience"]],
-  evasion_analyses: [],
-  strategic_shifts: [],
   speakers: [
     { name: "Tim Cook", role: "executive", title: "CEO", firm: null },
     { name: "Luca Maestri", role: "executive", title: "CFO", firm: null },

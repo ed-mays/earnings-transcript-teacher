@@ -755,3 +755,25 @@ def news_context(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- Section usage tracking ---
+
+class TrackEventRequest(BaseModel):
+    section: str
+    open: bool
+
+
+@router.post("/{ticker}/track")
+def track_section_event(
+    ticker: str,
+    body: TrackEventRequest,
+    user_id: CurrentUserDep,
+) -> dict:
+    """Record a section expand/collapse event for usage analytics."""
+    logger.debug("POST /api/calls/%s/track section=%s open=%s", ticker, body.section, body.open)
+    track(
+        "section_toggled",
+        properties={"ticker": ticker, "section": body.section, "open": body.open},
+    )
+    return {"ok": True}
