@@ -1,3 +1,5 @@
+> **Status: Implemented** — see PR #355 and [`docs/disaster-recovery.md`](../docs/disaster-recovery.md) for the current setup.
+
 # Staging Environments — Supabase + Railway + Vercel
 
 GitHub Issue: [#156](https://github.com/ed-mays/earnings-transcript-teacher/issues/156)

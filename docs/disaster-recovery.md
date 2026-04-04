@@ -250,6 +250,28 @@ curl https://[railway-domain]/admin/health \
 
 ---
 
+## 5. GitHub Actions
+
+CI/CD workflows (`.github/workflows/ci.yml`) require these repository secrets. Configure them in the repo's Settings → Secrets and variables → Actions.
+
+| Secret | Where to find the value |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Supabase dashboard → Account → Access tokens → Generate new token |
+| `SUPABASE_STAGING_PROJECT_REF` | Supabase dashboard → staging project → Settings → General → Reference ID |
+| `STAGING_SUPABASE_URL` | Supabase dashboard → staging project → Settings → API → Project URL |
+| `STAGING_SUPABASE_ANON_KEY` | Supabase dashboard → staging project → Settings → API → `anon` `public` key |
+| `STAGING_API_URL` | Railway dashboard → staging environment → public domain (e.g. `https://...-staging.up.railway.app`). **No trailing slash.** |
+| `VERCEL_TOKEN` | Vercel dashboard → Account Settings → Tokens → Create |
+| `VERCEL_ORG_ID` | Vercel dashboard → Settings → General → Team ID (or run `vercel whoami`) |
+| `VERCEL_PROJECT_ID` | Vercel dashboard → Project Settings → General → Project ID |
+
+These secrets power three CI jobs:
+- **`deploy-migrations-staging`** — pushes migrations to the staging Supabase project on PRs that change `supabase/migrations/**`
+- **`deploy-web-preview`** — deploys Vercel previews with staging env vars injected via `vercel deploy -b/-e` flags
+- **`deploy-migrations`** / **`deploy-web`** — production deploys on merge to main
+
+---
+
 ## Environment variable summary
 
 Complete reference of all env vars, grouped by where they're set:
@@ -292,7 +314,7 @@ If starting from zero:
 
 - [ ] Create Supabase production project
 - [ ] Enable pgvector extension on production
-- [ ] Run migrations on production (`python migrate.py`)
+- [ ] Run migrations on production (`supabase db push`)
 - [ ] Backfill profiles table and promote admin user on production (see §1.3a)
 - [ ] Configure Google OAuth on production (redirect URLs)
 - [ ] Create Supabase staging project
@@ -309,4 +331,5 @@ If starting from zero:
 - [ ] Set preview-scoped env vars in Vercel (staging Supabase + Railway staging)
 - [ ] Create Modal `earnings-secrets` secret group
 - [ ] Deploy Modal app (`modal deploy pipeline/ingest.py`)
+- [ ] Configure GitHub Actions secrets (see §5)
 - [ ] Smoke-test each service (Supabase auth, Railway `/health`, Vercel preview, Modal ingest)

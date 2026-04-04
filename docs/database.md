@@ -12,6 +12,17 @@ supabase db push
 
 This is idempotent — already-applied migrations are tracked by Supabase and skipped.
 
+By default this targets the linked project (production). To push to staging instead:
+
+```bash
+supabase link --project-ref <staging-project-ref>
+supabase db push
+```
+
+Re-link to production afterward: `supabase link --project-ref qxdexukkmzidalnrzfqf`
+
+CI handles this automatically — the `deploy-migrations-staging` job pushes to staging on PRs that change migration files.
+
 ## Adding a migration
 
 1. Create a new file: `supabase/migrations/YYYYMMDDHHMMSS_description.sql`
