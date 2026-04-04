@@ -200,7 +200,10 @@ jobs:
           url=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes \
             -b NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }} \
             -b NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }} \
-            -b NEXT_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }})
+            -b NEXT_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }} \
+            -e NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }} \
+            -e NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }} \
+            -e NEXT_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }})
           echo "url=$url" >> $GITHUB_OUTPUT
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
