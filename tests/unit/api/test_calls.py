@@ -97,47 +97,25 @@ class TestGetCall:
         assert any("AAPL" in r.message for r in caplog.records)
 
     def test_returns_call_detail(self, api_client):
-        from core.models import Competitor, NewsItem
-
         with (
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.CallRepository") as MockCallRepo,
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
-            patch("routes.calls.CompetitorRepository") as MockCompRepo,
-            patch("routes.calls.NewsRepository") as MockNewsRepo,
         ):
             call_repo = MockCallRepo.return_value
             call_repo.get_company_info.return_value = ("Apple Inc.", "Technology")
             call_repo.get_call_date.return_value = None
-            call_repo.get_transcript_text.return_value = ""
 
             analysis_repo = MockAnalysisRepo.return_value
             analysis_repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
             analysis_repo.get_keywords_for_ticker.return_value = ["AI", "cloud"]
-            analysis_repo.get_themes_for_ticker.return_value = ["Growth", "Margins"]
-            analysis_repo.get_topics_for_ticker.return_value = [
-                {"label": "AI & Cloud", "terms": ["ai", "cloud"], "summary": "AI and cloud adoption dominated the discussion."},
-                {"label": "Revenue Growth", "terms": ["revenue"], "summary": ""},
-            ]
-            analysis_repo.get_evasion_for_ticker.return_value = [
-                ("margin compression", 3, "Deflected with guidance", "margin guidance", "John Smith")
-            ]
-            analysis_repo.get_strategic_shifts_for_ticker.return_value = [
-                {"prior_position": "on-prem", "current_position": "cloud", "investor_significance": "high"}
-            ]
             analysis_repo.get_speakers_for_ticker.return_value = [
                 ("Tim Cook", "executive", "CEO", "Apple Inc.")
             ]
             analysis_repo.get_call_brief_for_ticker.return_value = None
             analysis_repo.get_takeaways_for_ticker.return_value = []
             analysis_repo.get_misconceptions_for_ticker.return_value = []
-
-            MockCompRepo.return_value.get.return_value = [
-                Competitor(name="Google", ticker="GOOGL", description="Search giant.", mentioned_in_transcript=True)
-            ]
-            MockNewsRepo.return_value.get.return_value = [
-                NewsItem(headline="Apple beats estimates", url="https://example.com", source="Reuters", date="2025-01-31", summary="Strong Q1.")
-            ]
+            analysis_repo.get_signal_strip_flags_for_ticker.return_value = ("low", True)
 
             response = api_client.get("/api/calls/AAPL")
 
@@ -147,52 +125,41 @@ class TestGetCall:
         assert data["company_name"] == "Apple Inc."
         assert data["synthesis"]["overall_sentiment"] == "bullish"
         assert data["keywords"] == ["AI", "cloud"]
-        assert len(data["evasion_analyses"]) == 1
-        assert data["evasion_analyses"][0]["defensiveness_score"] == 3
-        assert len(data["strategic_shifts"]) == 1
         assert len(data["speakers"]) == 1
         assert data["speakers"][0]["name"] == "Tim Cook"
-        assert len(data["competitors"]) == 1
-        assert data["competitors"][0]["name"] == "Google"
-        assert data["competitors"][0]["mentioned_in_transcript"] is True
-        assert len(data["news_items"]) == 1
-        assert data["news_items"][0]["headline"] == "Apple beats estimates"
+        assert "evasion_analyses" not in data
+        assert "strategic_shifts" not in data
+        assert "topics" not in data
+        assert "themes" not in data
+        assert "news_items" not in data
+        assert "competitors" not in data
 
-    def test_call_detail_empty_news_and_competitors(self, api_client):
-        """When repos return empty and call_date is None, news/competitors default to []."""
+    def test_signal_strip_uses_flags_from_repo(self, api_client):
+        """signal_strip is built from get_signal_strip_flags_for_ticker, not full evasion data."""
         with (
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.CallRepository") as MockCallRepo,
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
-            patch("routes.calls.CompetitorRepository") as MockCompRepo,
-            patch("routes.calls.NewsRepository") as MockNewsRepo,
         ):
             call_repo = MockCallRepo.return_value
             call_repo.get_company_info.return_value = ("Apple Inc.", "Technology")
             call_repo.get_call_date.return_value = None
-            call_repo.get_transcript_text.return_value = ""
 
             analysis_repo = MockAnalysisRepo.return_value
-            analysis_repo.get_synthesis_for_ticker.return_value = None
+            analysis_repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
             analysis_repo.get_keywords_for_ticker.return_value = []
-            analysis_repo.get_themes_for_ticker.return_value = []
-            analysis_repo.get_topics_for_ticker.return_value = []
-            analysis_repo.get_evasion_for_ticker.return_value = []
-            analysis_repo.get_strategic_shifts_for_ticker.return_value = []
             analysis_repo.get_speakers_for_ticker.return_value = []
             analysis_repo.get_call_brief_for_ticker.return_value = None
             analysis_repo.get_takeaways_for_ticker.return_value = []
             analysis_repo.get_misconceptions_for_ticker.return_value = []
-
-            MockCompRepo.return_value.get.return_value = []
-            MockNewsRepo.return_value.get.return_value = []
+            analysis_repo.get_signal_strip_flags_for_ticker.return_value = ("high", True)
 
             response = api_client.get("/api/calls/AAPL")
 
         assert response.status_code == 200
-        data = response.json()
-        assert data["news_items"] == []
-        assert data["competitors"] == []
+        strip = response.json()["signal_strip"]
+        assert strip["evasion_level"] == "high"
+        assert strip["strategic_shift_flagged"] is True
 
 
 class TestGetSpans:
@@ -495,3 +462,207 @@ class TestNewsContext:
         events = self._parse_sse(response.text)
         assert len(events) == 1
         assert events[0]["type"] == "error"
+
+
+class TestGetCallTopics:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/topics")
+        assert response.status_code == 404
+
+    def test_returns_topics_and_themes(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            repo = MockAnalysisRepo.return_value
+            repo.get_topics_for_ticker.return_value = [
+                {"label": "AI & Cloud", "terms": ["ai", "cloud"], "summary": "Adoption accelerating."},
+            ]
+            repo.get_themes_for_ticker.return_value = ["Growth", "Margins"]
+            response = api_client.get("/api/calls/AAPL/topics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["topics"]) == 1
+        assert data["topics"][0]["label"] == "AI & Cloud"
+        assert data["themes"] == ["Growth", "Margins"]
+
+    def test_empty_state(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            repo = MockAnalysisRepo.return_value
+            repo.get_topics_for_ticker.return_value = []
+            repo.get_themes_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/topics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["topics"] == []
+        assert data["themes"] == []
+
+
+class TestGetCallEvasion:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/evasion")
+        assert response.status_code == 404
+
+    def test_returns_evasion_analyses_with_level(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_evasion_for_ticker.return_value = [
+                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith"),
+                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe"),
+            ]
+            response = api_client.get("/api/calls/AAPL/evasion")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["evasion_analyses"]) == 2
+        assert data["evasion_analyses"][0]["defensiveness_score"] == 7
+        assert data["evasion_level"] == "high"
+
+    def test_empty_state_returns_null_level(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_evasion_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/evasion")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["evasion_analyses"] == []
+        assert data["evasion_level"] is None
+
+
+class TestGetCallStrategicShifts:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/strategic-shifts")
+        assert response.status_code == 404
+
+    def test_returns_strategic_shifts(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_strategic_shifts_for_ticker.return_value = [
+                {"prior_position": "on-prem", "current_position": "cloud", "investor_significance": "high"},
+            ]
+            response = api_client.get("/api/calls/AAPL/strategic-shifts")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["strategic_shifts"]) == 1
+        assert data["strategic_shifts"][0]["current_position"] == "cloud"
+
+    def test_empty_state(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_strategic_shifts_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/strategic-shifts")
+
+        assert response.status_code == 200
+        assert response.json()["strategic_shifts"] == []
+
+
+class TestGetCallCompetitors:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/competitors")
+        assert response.status_code == 404
+
+    def test_returns_cached_competitors(self, api_client):
+        from core.models import Competitor
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository"),
+            patch("routes.calls.CompetitorRepository") as MockCompRepo,
+        ):
+            MockCompRepo.return_value.get.return_value = [
+                Competitor(name="Google", ticker="GOOGL", description="Search.", mentioned_in_transcript=True)
+            ]
+            response = api_client.get("/api/calls/AAPL/competitors")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["competitors"]) == 1
+        assert data["competitors"][0]["name"] == "Google"
+        assert data["competitors"][0]["mentioned_in_transcript"] is True
+
+    def test_lazy_hydration_on_cache_miss(self, api_client):
+        """When cache is empty, fetch_competitors is called and result is returned."""
+        from core.models import Competitor
+
+        fetched = [Competitor(name="Microsoft", ticker="MSFT", description="Cloud.", mentioned_in_transcript=False)]
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+            patch("routes.calls.CompetitorRepository") as MockCompRepo,
+            patch("routes.calls.fetch_competitors", return_value=fetched) as mock_fetch,
+        ):
+            MockCallRepo.return_value.get_company_info.return_value = ("Apple Inc.", "Technology")
+            MockCallRepo.return_value.get_transcript_text.return_value = "transcript text"
+            MockCompRepo.return_value.get.return_value = []
+            response = api_client.get("/api/calls/AAPL/competitors")
+
+        assert response.status_code == 200
+        mock_fetch.assert_called_once()
+        data = response.json()
+        assert len(data["competitors"]) == 1
+        assert data["competitors"][0]["ticker"] == "MSFT"
+
+
+class TestGetCallNews:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/news")
+        assert response.status_code == 404
+
+    def test_returns_cached_news(self, api_client):
+        from core.models import NewsItem
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository"),
+            patch("routes.calls.AnalysisRepository"),
+            patch("routes.calls.NewsRepository") as MockNewsRepo,
+        ):
+            MockNewsRepo.return_value.get.return_value = [
+                NewsItem(headline="Apple beats Q1", url="https://example.com", source="Reuters", date="2025-01-31", summary="Strong quarter.")
+            ]
+            response = api_client.get("/api/calls/AAPL/news")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["news_items"]) == 1
+        assert data["news_items"][0]["headline"] == "Apple beats Q1"
+
+    def test_lazy_hydration_skipped_when_call_date_none(self, api_client):
+        """When cache is empty and call_date is None, fetch_recent_news is not called."""
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.CallRepository") as MockCallRepo,
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+            patch("routes.calls.NewsRepository") as MockNewsRepo,
+            patch("routes.calls.fetch_recent_news") as mock_fetch,
+        ):
+            MockCallRepo.return_value.get_company_info.return_value = ("Apple Inc.", "Technology")
+            MockCallRepo.return_value.get_call_date.return_value = None
+            MockAnalysisRepo.return_value.get_themes_for_ticker.return_value = []
+            MockNewsRepo.return_value.get.return_value = []
+            response = api_client.get("/api/calls/AAPL/news")
+
+        assert response.status_code == 200
+        mock_fetch.assert_not_called()
+        assert response.json()["news_items"] == []
