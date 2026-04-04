@@ -183,10 +183,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Vercel CLI and pnpm
-        run: |
-          npm install --global vercel@latest
-          npm install --global pnpm
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
 
       - name: Create GitHub deployment
         uses: bobheadxi/deployments@v1
@@ -196,19 +194,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           env: preview/${{ github.head_ref }}
 
-      - name: Pull Vercel preview environment
-        run: |
-          cp -r web/.vercel .vercel
-          vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-          cp .vercel/.env.preview.local web/.vercel/.env.preview.local 2>/dev/null || true
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
       - name: Deploy preview
         id: deploy
         run: |
-          url=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes)
+          url=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes \
+            -b NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }} \
+            -b NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }} \
+            -b NEXT_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }})
           echo "url=$url" >> $GITHUB_OUTPUT
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
