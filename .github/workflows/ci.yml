@@ -183,8 +183,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+      - name: Install Vercel CLI and pnpm
+        run: |
+          npm install --global vercel@latest
+          npm install --global pnpm
 
       - name: Create GitHub deployment
         uses: bobheadxi/deployments@v1
