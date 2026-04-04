@@ -108,10 +108,6 @@ class TestGetCall:
 
             analysis_repo = MockAnalysisRepo.return_value
             analysis_repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
-            analysis_repo.get_keywords_for_ticker.return_value = ["AI", "cloud"]
-            analysis_repo.get_speakers_for_ticker.return_value = [
-                ("Tim Cook", "executive", "CEO", "Apple Inc.")
-            ]
             analysis_repo.get_call_brief_for_ticker.return_value = None
             analysis_repo.get_takeaways_for_ticker.return_value = []
             analysis_repo.get_misconceptions_for_ticker.return_value = []
@@ -123,10 +119,9 @@ class TestGetCall:
         data = response.json()
         assert data["ticker"] == "AAPL"
         assert data["company_name"] == "Apple Inc."
-        assert data["synthesis"]["overall_sentiment"] == "bullish"
-        assert data["keywords"] == ["AI", "cloud"]
-        assert len(data["speakers"]) == 1
-        assert data["speakers"][0]["name"] == "Tim Cook"
+        assert "synthesis" not in data
+        assert "keywords" not in data
+        assert "speakers" not in data
         assert "evasion_analyses" not in data
         assert "strategic_shifts" not in data
         assert "topics" not in data
@@ -147,8 +142,6 @@ class TestGetCall:
 
             analysis_repo = MockAnalysisRepo.return_value
             analysis_repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
-            analysis_repo.get_keywords_for_ticker.return_value = []
-            analysis_repo.get_speakers_for_ticker.return_value = []
             analysis_repo.get_call_brief_for_ticker.return_value = None
             analysis_repo.get_takeaways_for_ticker.return_value = []
             analysis_repo.get_misconceptions_for_ticker.return_value = []
@@ -666,3 +659,128 @@ class TestGetCallNews:
         assert response.status_code == 200
         mock_fetch.assert_not_called()
         assert response.json()["news_items"] == []
+
+
+class TestGetCallSynthesis:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/synthesis")
+        assert response.status_code == 404
+
+    def test_returns_synthesis(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_synthesis_for_ticker.return_value = (
+                "bullish", "confident", "neutral"
+            )
+            response = api_client.get("/api/calls/AAPL/synthesis")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["synthesis"]["overall_sentiment"] == "bullish"
+        assert data["synthesis"]["executive_tone"] == "confident"
+        assert data["synthesis"]["analyst_sentiment"] == "neutral"
+
+    def test_returns_null_synthesis_when_none(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_synthesis_for_ticker.return_value = None
+            response = api_client.get("/api/calls/AAPL/synthesis")
+
+        assert response.status_code == 200
+        assert response.json()["synthesis"] is None
+
+
+class TestGetCallSpeakers:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/speakers")
+        assert response.status_code == 404
+
+    def test_returns_speakers(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_speakers_for_ticker.return_value = [
+                ("Tim Cook", "executive", "CEO", "Apple Inc."),
+                ("Luca Maestri", "executive", "CFO", "Apple Inc."),
+            ]
+            response = api_client.get("/api/calls/AAPL/speakers")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["speakers"]) == 2
+        assert data["speakers"][0]["name"] == "Tim Cook"
+        assert data["speakers"][0]["title"] == "CEO"
+        assert data["speakers"][1]["name"] == "Luca Maestri"
+
+    def test_empty_state(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_speakers_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/speakers")
+
+        assert response.status_code == 200
+        assert response.json()["speakers"] == []
+
+
+class TestGetCallKeywords:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/keywords")
+        assert response.status_code == 404
+
+    def test_returns_keywords(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_keywords_for_ticker.return_value = ["AI", "cloud", "margin"]
+            response = api_client.get("/api/calls/AAPL/keywords")
+
+        assert response.status_code == 200
+        assert response.json()["keywords"] == ["AI", "cloud", "margin"]
+
+    def test_empty_state(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_keywords_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/keywords")
+
+        assert response.status_code == 200
+        assert response.json()["keywords"] == []
+
+
+class TestTrackSection:
+    PAYLOAD = {"section": "understand-the-narrative", "open": True}
+
+    def test_returns_ok(self, api_client):
+        with patch("routes.calls.track") as mock_track:
+            response = api_client.post("/api/calls/AAPL/track", json=self.PAYLOAD)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+    def test_calls_track_with_correct_properties(self, api_client):
+        with patch("routes.calls.track") as mock_track:
+            api_client.post("/api/calls/AAPL/track", json=self.PAYLOAD)
+        mock_track.assert_called_once_with(
+            "section_toggled",
+            properties={"ticker": "AAPL", "section": "understand-the-narrative", "open": True},
+        )
+
+    def test_tracks_close_event(self, api_client):
+        with patch("routes.calls.track") as mock_track:
+            api_client.post("/api/calls/AAPL/track", json={"section": "orient", "open": False})
+        mock_track.assert_called_once_with(
+            "section_toggled",
+            properties={"ticker": "AAPL", "section": "orient", "open": False},
+        )

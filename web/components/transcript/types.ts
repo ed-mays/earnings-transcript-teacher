@@ -78,19 +78,44 @@ export interface CallDetail {
   company_name: string | null;
   call_date: string | null;
   industry: string | null;
-  synthesis: SynthesisInfo | null;
-  keywords: string[];
-  themes: string[];
-  topics: TopicInfo[];
-  evasion_analyses: EvasionItem[];
-  strategic_shifts: StrategicShift[];
-  speakers: SpeakerInfo[];
   brief: CallBrief | null;
   takeaways: TakeawayItem[];
   misconceptions: MisconceptionItem[];
   signal_strip: SignalStrip | null;
-  news_items: NewsItem[];
+}
+
+export interface SynthesisResponse {
+  synthesis: SynthesisInfo | null;
+}
+
+export interface SpeakersResponse {
+  speakers: SpeakerInfo[];
+}
+
+export interface KeywordsResponse {
+  keywords: string[];
+}
+
+export interface TopicsResponse {
+  topics: TopicInfo[];
+  themes: string[];
+}
+
+export interface EvasionResponse {
+  evasion_analyses: EvasionItem[];
+  evasion_level: string | null;
+}
+
+export interface StrategicShiftsResponse {
+  strategic_shifts: StrategicShift[];
+}
+
+export interface CompetitorsResponse {
   competitors: Competitor[];
+}
+
+export interface NewsResponse {
+  news_items: NewsItem[];
 }
 
 export interface SpanItem {

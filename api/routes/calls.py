@@ -129,13 +129,22 @@ class CallDetail(BaseModel):
     company_name: str | None = None
     call_date: str | None = None
     industry: str | None = None
-    synthesis: SynthesisInfo | None = None
-    keywords: list[str] = []
-    speakers: list[SpeakerInfo] = []
     brief: CallBrief | None = None
     takeaways: list[TakeawayItem] = []
     misconceptions: list[MisconceptionItem] = []
     signal_strip: SignalStrip | None = None
+
+
+class SynthesisResponse(BaseModel):
+    synthesis: SynthesisInfo | None = None
+
+
+class SpeakersResponse(BaseModel):
+    speakers: list[SpeakerInfo] = []
+
+
+class KeywordsResponse(BaseModel):
+    keywords: list[str] = []
 
 
 class TopicsResponse(BaseModel):
@@ -267,18 +276,6 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
     call_date = call_repo.get_call_date(ticker, conn=conn)
 
     raw_synthesis = analysis_repo.get_synthesis_for_ticker(ticker, conn=conn)
-    synthesis = (
-        SynthesisInfo(
-            overall_sentiment=raw_synthesis[0],
-            executive_tone=raw_synthesis[1],
-            analyst_sentiment=raw_synthesis[2],
-        )
-        if raw_synthesis
-        else None
-    )
-
-    raw_speakers = analysis_repo.get_speakers_for_ticker(ticker, conn=conn)
-    speakers = [SpeakerInfo(name=r[0], role=r[1], title=r[2], firm=r[3]) for r in raw_speakers]
 
     # Brief
     raw_brief = analysis_repo.get_call_brief_for_ticker(ticker)
@@ -313,14 +310,65 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         company_name=company_name or None,
         call_date=str(call_date) if call_date else None,
         industry=industry or None,
-        synthesis=synthesis,
-        keywords=analysis_repo.get_keywords_for_ticker(ticker, conn=conn),
-        speakers=speakers,
         brief=brief,
         takeaways=takeaways,
         misconceptions=misconceptions,
         signal_strip=signal_strip,
     )
+
+
+@router.get("/{ticker}/synthesis", response_model=SynthesisResponse)
+def get_call_synthesis(ticker: str, conn: DbDep, response: Response) -> SynthesisResponse:
+    """Return synthesis sentiment data for a call (Orient / Read the Room sections)."""
+    logger.info("GET /api/calls/%s/synthesis", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    raw = analysis_repo.get_synthesis_for_ticker(ticker, conn=conn)
+    synthesis = (
+        SynthesisInfo(
+            overall_sentiment=raw[0],
+            executive_tone=raw[1],
+            analyst_sentiment=raw[2],
+        )
+        if raw
+        else None
+    )
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return SynthesisResponse(synthesis=synthesis)
+
+
+@router.get("/{ticker}/speakers", response_model=SpeakersResponse)
+def get_call_speakers(ticker: str, conn: DbDep, response: Response) -> SpeakersResponse:
+    """Return speaker list for a call (Participants section and TranscriptBrowser filter)."""
+    logger.info("GET /api/calls/%s/speakers", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    raw = analysis_repo.get_speakers_for_ticker(ticker, conn=conn)
+    speakers = [SpeakerInfo(name=r[0], role=r[1], title=r[2], firm=r[3]) for r in raw]
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return SpeakersResponse(speakers=speakers)
+
+
+@router.get("/{ticker}/keywords", response_model=KeywordsResponse)
+def get_call_keywords(ticker: str, conn: DbDep, response: Response) -> KeywordsResponse:
+    """Return keyword list for a call (Keywords section and learn page suggestions)."""
+    logger.info("GET /api/calls/%s/keywords", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return KeywordsResponse(keywords=analysis_repo.get_keywords_for_ticker(ticker, conn=conn))
 
 
 @router.get("/{ticker}/topics", response_model=TopicsResponse)
@@ -755,3 +803,25 @@ def news_context(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- Section usage tracking ---
+
+class TrackEventRequest(BaseModel):
+    section: str
+    open: bool
+
+
+@router.post("/{ticker}/track")
+def track_section_event(
+    ticker: str,
+    body: TrackEventRequest,
+    user_id: CurrentUserDep,
+) -> dict:
+    """Record a section expand/collapse event for usage analytics."""
+    logger.debug("POST /api/calls/%s/track section=%s open=%s", ticker, body.section, body.open)
+    track(
+        "section_toggled",
+        properties={"ticker": ticker, "section": body.section, "open": body.open},
+    )
+    return {"ok": True}

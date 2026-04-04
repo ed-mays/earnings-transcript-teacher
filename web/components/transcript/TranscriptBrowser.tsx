@@ -7,6 +7,7 @@ import type {
   CallDetail,
   SearchResponse,
   SearchResult,
+  SpeakersResponse,
   SpanItem,
   SpansResponse,
 } from "./types";
@@ -66,6 +67,7 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [loading, setLoading] = useState(true);
+  const [speakerNames, setSpeakerNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -131,7 +133,11 @@ export function TranscriptBrowser({ ticker, call }: TranscriptBrowserProps) {
   const totalPages = Math.ceil(total / pageSize);
   const inSearchMode = Boolean(debouncedQuery.trim());
 
-  const speakerNames = call.speakers.map((s) => s.name);
+  useEffect(() => {
+    api.get<SpeakersResponse>(`/api/calls/${ticker}/speakers`)
+      .then((r) => setSpeakerNames(r.speakers.map((s) => s.name)))
+      .catch(() => {});
+  }, [ticker]);
 
   const topRef = useRef<HTMLDivElement>(null);
   const hasMounted = useRef(false);
