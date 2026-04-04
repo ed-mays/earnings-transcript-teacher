@@ -168,6 +168,26 @@ jobs:
         working-directory: web
         run: npm test
 
+  deploy-api-staging:
+    needs: [test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli
+
+      - name: Deploy API to staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_ID }} \
+            --environment staging \
+            --detach
+
   deploy-web-preview:
     needs: [test, test-web]
     if: github.event_name == 'pull_request'
