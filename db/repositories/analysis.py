@@ -123,6 +123,48 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch strategic_shifts for {ticker}: {e}")
         return None
 
+    def get_signal_strip_flags_for_ticker(
+        self, ticker: str, conn: psycopg.Connection | None = None
+    ) -> tuple[str | None, bool]:
+        """Return (evasion_level, strategic_shift_flagged) for a ticker using lightweight SQL.
+
+        Uses AVG + CASE (same pattern as list_calls) rather than loading full evasion rows.
+        Returns (None, False) if no data exists or the ticker is not found.
+        """
+        try:
+            ctx = nullcontext(conn) if conn is not None else psycopg.connect(self.conn_str)
+            with ctx as c:
+                with c.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            CASE
+                                WHEN COUNT(ea.id) = 0 THEN NULL
+                                WHEN AVG(ea.defensiveness_score) <= 3 THEN 'low'
+                                WHEN AVG(ea.defensiveness_score) <= 6 THEN 'medium'
+                                ELSE 'high'
+                            END AS evasion_level,
+                            CASE
+                                WHEN cs.strategic_shifts IS NOT NULL
+                                     AND array_length(cs.strategic_shifts, 1) > 0
+                                THEN true
+                                ELSE false
+                            END AS strategic_shift_flagged
+                        FROM calls c
+                        LEFT JOIN call_synthesis cs ON cs.call_id = c.id
+                        LEFT JOIN evasion_analysis ea ON ea.call_id = c.id
+                        WHERE c.ticker = %s
+                        GROUP BY cs.strategic_shifts
+                        """,
+                        (ticker,),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        return row[0], bool(row[1])
+        except Exception as e:
+            logger.warning(f"Could not fetch signal strip flags for {ticker}: {e}")
+        return None, False
+
     def get_call_summary_for_ticker(self, ticker: str) -> str | None:
         """Return the call_summary paragraph for a ticker, or None if absent."""
         try:

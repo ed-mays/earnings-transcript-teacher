@@ -131,17 +131,33 @@ class CallDetail(BaseModel):
     industry: str | None = None
     synthesis: SynthesisInfo | None = None
     keywords: list[str] = []
-    themes: list[str] = []
-    topics: list[TopicInfo] = []
-    evasion_analyses: list[EvasionItem] = []
-    strategic_shifts: list[StrategicShift] = []
     speakers: list[SpeakerInfo] = []
     brief: CallBrief | None = None
     takeaways: list[TakeawayItem] = []
     misconceptions: list[MisconceptionItem] = []
     signal_strip: SignalStrip | None = None
-    news_items: list[NewsItemInfo] = []
+
+
+class TopicsResponse(BaseModel):
+    topics: list[TopicInfo] = []
+    themes: list[str] = []
+
+
+class EvasionResponse(BaseModel):
+    evasion_analyses: list[EvasionItem] = []
+    evasion_level: str | None = None
+
+
+class StrategicShiftsResponse(BaseModel):
+    strategic_shifts: list[StrategicShift] = []
+
+
+class CompetitorsResponse(BaseModel):
     competitors: list[CompetitorInfo] = []
+
+
+class NewsResponse(BaseModel):
+    news_items: list[NewsItemInfo] = []
 
 
 class AdjacentCallInfo(BaseModel):
@@ -261,28 +277,6 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         else None
     )
 
-    raw_shifts = analysis_repo.get_strategic_shifts_for_ticker(ticker, conn=conn) or []
-    strategic_shifts = [
-        StrategicShift(
-            prior_position=s.get("prior_position", ""),
-            current_position=s.get("current_position", ""),
-            investor_significance=s.get("investor_significance", ""),
-        )
-        for s in raw_shifts
-    ]
-
-    raw_evasion = analysis_repo.get_evasion_for_ticker(ticker, conn=conn)
-    evasion_analyses = [
-        EvasionItem(
-            analyst_concern=r[0],
-            defensiveness_score=r[1],
-            evasion_explanation=r[2],
-            question_topic=r[3],
-            analyst_name=r[4],
-        )
-        for r in raw_evasion
-    ]
-
     raw_speakers = analysis_repo.get_speakers_for_ticker(ticker, conn=conn)
     speakers = [SpeakerInfo(name=r[0], role=r[1], title=r[2], firm=r[3]) for r in raw_speakers]
 
@@ -301,23 +295,118 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         for r in raw_misconceptions[:3]
     ]
 
-    # Signal strip
-    evasion_level = None
-    if raw_evasion:
-        avg_score = sum(r[1] for r in raw_evasion) / len(raw_evasion)
-        evasion_level = "high" if avg_score > 6 else ("medium" if avg_score > 3 else "low")
+    # Signal strip — lightweight flags query, no full evasion/shift data load
+    evasion_level, strategic_shift_flagged = analysis_repo.get_signal_strip_flags_for_ticker(
+        ticker, conn=conn
+    )
     signal_strip = SignalStrip(
         overall_sentiment=raw_synthesis[0] if raw_synthesis else None,
         executive_sentiment=raw_synthesis[1] if raw_synthesis else None,
         analyst_sentiment=raw_synthesis[2] if raw_synthesis else None,
         evasion_level=evasion_level,
-        strategic_shift_flagged=len(raw_shifts) > 0,
+        strategic_shift_flagged=strategic_shift_flagged,
     )
 
-    # --- Competitors (lazy hydration) ---
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return CallDetail(
+        ticker=ticker,
+        company_name=company_name or None,
+        call_date=str(call_date) if call_date else None,
+        industry=industry or None,
+        synthesis=synthesis,
+        keywords=analysis_repo.get_keywords_for_ticker(ticker, conn=conn),
+        speakers=speakers,
+        brief=brief,
+        takeaways=takeaways,
+        misconceptions=misconceptions,
+        signal_strip=signal_strip,
+    )
+
+
+@router.get("/{ticker}/topics", response_model=TopicsResponse)
+def get_call_topics(ticker: str, conn: DbDep, response: Response) -> TopicsResponse:
+    """Return topics and themes for a call (Understand the Narrative section)."""
+    logger.info("GET /api/calls/%s/topics", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return TopicsResponse(
+        topics=[TopicInfo(**t) for t in analysis_repo.get_topics_for_ticker(ticker, conn=conn)],
+        themes=analysis_repo.get_themes_for_ticker(ticker, conn=conn),
+    )
+
+
+@router.get("/{ticker}/evasion", response_model=EvasionResponse)
+def get_call_evasion(ticker: str, conn: DbDep, response: Response) -> EvasionResponse:
+    """Return evasion analyses for a call (Notice What Was Avoided section)."""
+    logger.info("GET /api/calls/%s/evasion", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    raw_evasion = analysis_repo.get_evasion_for_ticker(ticker, conn=conn)
+    evasion_analyses = [
+        EvasionItem(
+            analyst_concern=r[0],
+            defensiveness_score=r[1],
+            evasion_explanation=r[2],
+            question_topic=r[3],
+            analyst_name=r[4],
+        )
+        for r in raw_evasion
+    ]
+    evasion_level = None
+    if raw_evasion:
+        avg_score = sum(r[1] for r in raw_evasion) / len(raw_evasion)
+        evasion_level = "high" if avg_score > 6 else ("medium" if avg_score > 3 else "low")
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return EvasionResponse(evasion_analyses=evasion_analyses, evasion_level=evasion_level)
+
+
+@router.get("/{ticker}/strategic-shifts", response_model=StrategicShiftsResponse)
+def get_call_strategic_shifts(ticker: str, conn: DbDep, response: Response) -> StrategicShiftsResponse:
+    """Return strategic shifts for a call (Track What Changed section)."""
+    logger.info("GET /api/calls/%s/strategic-shifts", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    raw_shifts = analysis_repo.get_strategic_shifts_for_ticker(ticker, conn=conn) or []
+    strategic_shifts = [
+        StrategicShift(
+            prior_position=s.get("prior_position", ""),
+            current_position=s.get("current_position", ""),
+            investor_significance=s.get("investor_significance", ""),
+        )
+        for s in raw_shifts
+    ]
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return StrategicShiftsResponse(strategic_shifts=strategic_shifts)
+
+
+@router.get("/{ticker}/competitors", response_model=CompetitorsResponse)
+def get_call_competitors(ticker: str, conn: DbDep, response: Response) -> CompetitorsResponse:
+    """Return competitors for a call with lazy hydration on cache miss (Situate in Context)."""
+    logger.info("GET /api/calls/%s/competitors", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    db_url = _db_url()
+    call_repo = CallRepository(db_url)
     comp_repo = CompetitorRepository(db_url)
     raw_competitors = comp_repo.get(ticker)
     if not raw_competitors:
+        company_name, industry = call_repo.get_company_info(ticker, conn=conn)
         transcript_text = call_repo.get_transcript_text(ticker, conn=conn)
         raw_competitors = fetch_competitors(
             ticker, company_name or "", industry or "", transcript_text
@@ -333,11 +422,27 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         )
         for c in raw_competitors
     ]
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return CompetitorsResponse(competitors=competitors)
 
-    # --- News items (lazy hydration) ---
+
+@router.get("/{ticker}/news", response_model=NewsResponse)
+def get_call_news(ticker: str, conn: DbDep, response: Response) -> NewsResponse:
+    """Return recent news items for a call with lazy hydration on cache miss (Situate in Context)."""
+    logger.info("GET /api/calls/%s/news", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    db_url = _db_url()
+    call_repo = CallRepository(db_url)
+    analysis_repo = AnalysisRepository(db_url)
     news_repo = NewsRepository(db_url)
     raw_news = news_repo.get(ticker)
     if not raw_news:
+        company_name, _ = call_repo.get_company_info(ticker, conn=conn)
+        call_date = call_repo.get_call_date(ticker, conn=conn)
         themes = analysis_repo.get_themes_for_ticker(ticker, conn=conn)
         if call_date is not None:
             raw_news = fetch_recent_news(ticker, company_name or "", call_date, themes)
@@ -353,27 +458,8 @@ def get_call(ticker: str, conn: DbDep, response: Response) -> CallDetail:
         )
         for n in raw_news
     ]
-
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
-    return CallDetail(
-        ticker=ticker,
-        company_name=company_name or None,
-        call_date=str(call_date) if call_date else None,
-        industry=industry or None,
-        synthesis=synthesis,
-        keywords=analysis_repo.get_keywords_for_ticker(ticker, conn=conn),
-        themes=analysis_repo.get_themes_for_ticker(ticker, conn=conn),
-        topics=[TopicInfo(**t) for t in analysis_repo.get_topics_for_ticker(ticker, conn=conn)],
-        evasion_analyses=evasion_analyses,
-        strategic_shifts=strategic_shifts,
-        speakers=speakers,
-        brief=brief,
-        takeaways=takeaways,
-        misconceptions=misconceptions,
-        signal_strip=signal_strip,
-        news_items=news_items,
-        competitors=competitors,
-    )
+    return NewsResponse(news_items=news_items)
 
 
 @router.get("/{ticker}/adjacent", response_model=AdjacentCalls)
