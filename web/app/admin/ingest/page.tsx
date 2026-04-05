@@ -3,6 +3,9 @@
 /** Admin page for triggering transcript ingestion. Client component (form state). */
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Status = "idle" | "submitting" | "accepted" | "error";
 
@@ -71,7 +74,8 @@ export default function AdminIngestPage() {
         asynchronously.
       </p>
 
-      <div className="max-w-sm rounded-lg border border-border bg-card p-6">
+      <Card className="max-w-sm">
+        <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label
@@ -80,24 +84,24 @@ export default function AdminIngestPage() {
             >
               Ticker symbol
             </label>
-            <input
+            <Input
               id="ticker"
               type="text"
               value={ticker}
               onChange={(e) => setTicker(e.target.value)}
               placeholder="e.g. AAPL"
               disabled={status === "submitting"}
-              className="w-full rounded-md border border-input px-3 py-2 font-mono text-sm uppercase text-foreground placeholder:normal-case placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring disabled:bg-muted disabled:text-muted-foreground"
+              className="font-mono uppercase placeholder:normal-case"
             />
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={status === "submitting" || !ticker.trim()}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted"
+            className="w-full"
           >
             {status === "submitting" ? "Submitting…" : "Ingest transcript"}
-          </button>
+          </Button>
         </form>
 
         {status === "accepted" && (
@@ -108,7 +112,8 @@ export default function AdminIngestPage() {
         {status === "error" && errorMessage && (
           <p className="mt-4 text-sm text-destructive">{errorMessage}</p>
         )}
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 /** Dropdown to switch between light, dark, and system themes. */
 export function ThemePicker() {
@@ -18,8 +19,7 @@ export function ThemePicker() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Toggle theme"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+        render={<Button variant="ghost" size="icon" aria-label="Toggle theme" />}
       >
         <Icon className="h-4 w-4" />
       </DropdownMenuTrigger>
