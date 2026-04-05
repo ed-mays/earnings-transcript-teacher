@@ -103,7 +103,7 @@ export default function LearnPage({
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-baseline gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <h1 className="text-3xl font-semibold text-foreground">
               Learn:{" "}
               <span className="uppercase">{upperTicker}</span>
             </h1>

@@ -3,6 +3,7 @@
 /** Shared "What this signals" section — three-state: content / error / fetch button. */
 
 import ReactMarkdown from "react-markdown";
+import { Button } from "@/components/ui/button";
 import remarkGfm from "remark-gfm";
 
 interface SignalsSectionProps {
@@ -90,12 +91,14 @@ export function SignalsSection({
   }
 
   return (
-    <button
+    <Button
+      variant="outline"
+      size="sm"
       onClick={onFetch}
       disabled={loading}
-      className={`${topMargin} w-full rounded-md border ${s.button} px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50`}
+      className={`${topMargin} w-full ${s.button}`}
     >
       {loading ? "Analysing…" : label}
-    </button>
+    </Button>
   );
 }

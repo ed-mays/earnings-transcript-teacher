@@ -8,6 +8,7 @@ import { MisconceptionCard } from "./MisconceptionCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getEvasionStyle, getSentimentStyle } from "@/lib/signal-colors";
+import { Button } from "@/components/ui/button";
 
 interface CallBriefPanelProps {
   brief: CallBrief;
@@ -129,12 +130,14 @@ export function CallBriefPanel({ brief, takeaways, misconceptions, signal_strip 
                 Common Misreadings
               </p>
               {misconceptions.length >= 2 && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="xs"
                   onClick={() => setAllExpanded((prev) => !prev)}
-                  className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                  className="text-muted-foreground"
                 >
                   {allExpanded ? "Collapse all" : "Expand all"}
-                </button>
+                </Button>
               )}
             </div>
             <div className="space-y-2">
