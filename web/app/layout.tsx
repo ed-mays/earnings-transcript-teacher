@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import SignOutButton from "./SignOutButton";
@@ -63,34 +64,34 @@ export default async function RootLayout({
             <>
               <nav className="border-b bg-card">
                 <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-                  <a
+                  <Link
                     href="/"
                     className="text-lg font-semibold text-foreground hover:text-foreground/80"
                   >
                     EarningsFluency
-                  </a>
+                  </Link>
                   <div className="flex items-center gap-4">
                     {/* Desktop admin links */}
                     {isAdmin && (
                       <div className="hidden items-center gap-4 md:flex">
-                        <a
+                        <Link
                           href="/admin"
                           className="text-sm text-muted-foreground hover:text-foreground"
                         >
                           Admin Analytics
-                        </a>
-                        <a
+                        </Link>
+                        <Link
                           href="/admin/health"
                           className="text-sm text-muted-foreground hover:text-foreground"
                         >
                           Admin Health
-                        </a>
-                        <a
+                        </Link>
+                        <Link
                           href="/admin/ingest"
                           className="text-sm text-muted-foreground hover:text-foreground"
                         >
                           Admin Ingest
-                        </a>
+                        </Link>
                       </div>
                     )}
                     <span className="text-sm text-muted-foreground">{user.email}</span>
@@ -113,24 +114,24 @@ export default async function RootLayout({
                               <SheetTitle>Menu</SheetTitle>
                             </SheetHeader>
                             <nav className="flex flex-col gap-1 px-4 pb-4">
-                              <a
+                              <Link
                                 href="/admin"
                                 className="py-2 text-sm text-muted-foreground hover:text-foreground"
                               >
                                 Admin Analytics
-                              </a>
-                              <a
+                              </Link>
+                              <Link
                                 href="/admin/health"
                                 className="py-2 text-sm text-muted-foreground hover:text-foreground"
                               >
                                 Admin Health
-                              </a>
-                              <a
+                              </Link>
+                              <Link
                                 href="/admin/ingest"
                                 className="py-2 text-sm text-muted-foreground hover:text-foreground"
                               >
                                 Admin Ingest
-                              </a>
+                              </Link>
                             </nav>
                           </SheetContent>
                         </Sheet>
