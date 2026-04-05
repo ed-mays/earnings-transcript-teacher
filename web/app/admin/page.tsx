@@ -172,14 +172,6 @@ export default async function AdminAnalyticsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12">
-      <div className="mb-6 flex gap-4 text-sm">
-        <a href="/admin/health" className="text-primary hover:underline">
-          System Health
-        </a>
-        <a href="/admin/ingest" className="text-primary hover:underline">
-          Ingest
-        </a>
-      </div>
       <h1 className="mb-8 text-3xl font-semibold text-foreground">Admin — Analytics</h1>
 
       <div className="grid gap-6 lg:grid-cols-2">

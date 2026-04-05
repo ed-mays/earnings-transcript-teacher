@@ -78,11 +78,6 @@ export default async function AdminHealthPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12">
-      <div className="mb-6">
-        <a href="/admin/ingest" className="text-sm text-primary hover:underline">
-          ← Admin Ingest
-        </a>
-      </div>
       <h1 className="mb-8 text-3xl font-semibold text-foreground">Admin — System Health</h1>
 
       {health === null ? (

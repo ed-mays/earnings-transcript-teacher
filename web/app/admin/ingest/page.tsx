@@ -60,14 +60,6 @@ export default function AdminIngestPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-12">
-      <div className="mb-6 flex gap-4 text-sm">
-        <a href="/admin" className="text-primary hover:underline">
-          Analytics
-        </a>
-        <a href="/admin/health" className="text-primary hover:underline">
-          System Health
-        </a>
-      </div>
       <h1 className="mb-2 text-3xl font-semibold text-foreground">Admin — Ingest</h1>
       <p className="mb-8 text-muted-foreground">
         Dispatch a ticker to the ingestion pipeline. Returns immediately — processing runs
