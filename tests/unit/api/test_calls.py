@@ -497,6 +497,157 @@ class TestGetCallTopics:
         assert data["themes"] == []
 
 
+class TestThemeSignals:
+    PAYLOAD = {
+        "label": "AI & Cloud",
+        "summary": "Management repeatedly emphasised AI-driven efficiency gains.",
+    }
+
+    def _parse_sse(self, text: str) -> list[dict]:
+        """Parse SSE response body into a list of event dicts."""
+        import json
+        events = []
+        for block in text.split("\n\n"):
+            for line in block.splitlines():
+                if line.startswith("data: "):
+                    events.append(json.loads(line[len("data: "):]))
+        return events
+
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.post("/api/calls/UNKNOWN/theme-signals", json=self.PAYLOAD)
+        assert response.status_code == 404
+
+    def test_happy_path_streams_tokens_and_done(self, api_client):
+        """When stream_investor_signals yields tokens, endpoint emits token events then done."""
+        def _fake_stream(messages, system_prompt):
+            yield "This theme "
+            yield "signals intent."
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_fake_stream),
+        ):
+            response = api_client.post("/api/calls/AAPL/theme-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        token_events = [e for e in events if e["type"] == "token"]
+        assert len(token_events) == 2
+        assert token_events[0]["content"] == "This theme "
+        assert token_events[1]["content"] == "signals intent."
+        assert events[-1] == {"type": "done"}
+
+    def test_no_content_emits_error_event(self, api_client):
+        def _empty_stream(messages, system_prompt):
+            return
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_empty_stream),
+        ):
+            response = api_client.post("/api/calls/AAPL/theme-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert "No content" in events[0]["message"]
+
+    def test_api_exception_emits_error_event(self, api_client):
+        def _failing_stream(messages, system_prompt):
+            raise RuntimeError("upstream API error")
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_failing_stream),
+        ):
+            response = api_client.post("/api/calls/AAPL/theme-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+
+
+class TestShiftSignals:
+    PAYLOAD = {
+        "prior_position": "Focused on hardware margins.",
+        "current_position": "Pivoting to services-led revenue mix.",
+        "investor_significance": "Services carry ~70% gross margin vs ~35% for hardware.",
+    }
+
+    def _parse_sse(self, text: str) -> list[dict]:
+        """Parse SSE response body into a list of event dicts."""
+        import json
+        events = []
+        for block in text.split("\n\n"):
+            for line in block.splitlines():
+                if line.startswith("data: "):
+                    events.append(json.loads(line[len("data: "):]))
+        return events
+
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.post("/api/calls/UNKNOWN/shift-signals", json=self.PAYLOAD)
+        assert response.status_code == 404
+
+    def test_happy_path_streams_tokens_and_done(self, api_client):
+        """When stream_investor_signals yields tokens, endpoint emits token events then done."""
+        def _fake_stream(messages, system_prompt):
+            yield "This shift "
+            yield "changes the thesis."
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_fake_stream),
+        ):
+            response = api_client.post("/api/calls/AAPL/shift-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        token_events = [e for e in events if e["type"] == "token"]
+        assert len(token_events) == 2
+        assert token_events[0]["content"] == "This shift "
+        assert token_events[1]["content"] == "changes the thesis."
+        assert events[-1] == {"type": "done"}
+
+    def test_no_content_emits_error_event(self, api_client):
+        def _empty_stream(messages, system_prompt):
+            return
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_empty_stream),
+        ):
+            response = api_client.post("/api/calls/AAPL/shift-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert "No content" in events[0]["message"]
+
+    def test_api_exception_emits_error_event(self, api_client):
+        def _failing_stream(messages, system_prompt):
+            raise RuntimeError("upstream API error")
+            yield  # make it a generator
+
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("services.llm.stream_investor_signals", side_effect=_failing_stream),
+        ):
+            response = api_client.post("/api/calls/AAPL/shift-signals", json=self.PAYLOAD)
+
+        assert response.status_code == 200
+        events = self._parse_sse(response.text)
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+
+
 class TestGetCallEvasion:
     def test_404_for_unknown_ticker(self, api_client):
         with patch("routes.calls._ticker_exists", return_value=False):

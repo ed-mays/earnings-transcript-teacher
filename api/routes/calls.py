@@ -805,6 +805,141 @@ def news_context(
     )
 
 
+# --- Theme signals ---
+
+_THEME_SIGNALS_SYSTEM_PROMPT = (
+    "You are a financial analyst educator. Return 2–3 numbered points, each on its own line, "
+    "explaining what this recurring theme signals about management's priorities and the company's trajectory. "
+    "Focus on what a careful investor should infer — not just what was said, but what it implies for the investment thesis."
+)
+
+
+class ThemeSignalsRequest(BaseModel):
+    label: str
+    summary: str
+
+
+def _theme_signals_sse_stream(body: ThemeSignalsRequest):
+    """Generator that streams investor-implications framing for a theme as SSE events."""
+    import json as _json
+    from services.llm import stream_investor_signals
+
+    messages = [
+        {
+            "role": "user",
+            "content": f"Theme: {body.label}\nManagement's framing: {body.summary}",
+        }
+    ]
+    logger.debug("theme_signals stream starting")
+    try:
+        has_content = False
+        for chunk in stream_investor_signals(messages, _THEME_SIGNALS_SYSTEM_PROMPT):
+            if not has_content:
+                logger.debug("theme_signals first token received")
+            has_content = True
+            yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        logger.debug("theme_signals stream ended has_content=%s", has_content)
+        if has_content:
+            yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+        else:
+            yield f"data: {_json.dumps({'type': 'error', 'message': 'No content received from model'})}\n\n"
+    except Exception:
+        logger.exception("Error streaming theme signals")
+        yield f"data: {_json.dumps({'type': 'error', 'message': 'Stream error'})}\n\n"
+
+
+@router.post("/{ticker}/theme-signals")
+@limiter.limit(CHAT_RATE_LIMIT)
+def theme_signals(
+    request: Request,
+    ticker: str,
+    body: ThemeSignalsRequest,
+    user_id: CurrentUserDep,
+) -> StreamingResponse:
+    """Stream investor-implications framing for a recurring theme as SSE."""
+    if not _ticker_exists(ticker):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+
+    return StreamingResponse(
+        _theme_signals_sse_stream(body),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# --- Strategic shift signals ---
+
+_SHIFT_SIGNALS_SYSTEM_PROMPT = (
+    "You are a financial analyst educator. Return 2–3 numbered points, each on its own line, "
+    "explaining the magnitude and direction of this strategic shift and what it implies for the investment thesis. "
+    "Focus on what a careful investor should watch for: execution risk, opportunity opened, or thesis change."
+)
+
+
+class StrategicShiftSignalsRequest(BaseModel):
+    prior_position: str
+    current_position: str
+    investor_significance: str
+
+
+def _shift_signals_sse_stream(body: StrategicShiftSignalsRequest):
+    """Generator that streams investor-implications framing for a strategic shift as SSE events."""
+    import json as _json
+    from services.llm import stream_investor_signals
+
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"Before: {body.prior_position}\n"
+                f"Now: {body.current_position}\n"
+                f"Context: {body.investor_significance}"
+            ),
+        }
+    ]
+    logger.debug("shift_signals stream starting")
+    try:
+        has_content = False
+        for chunk in stream_investor_signals(messages, _SHIFT_SIGNALS_SYSTEM_PROMPT):
+            if not has_content:
+                logger.debug("shift_signals first token received")
+            has_content = True
+            yield f"data: {_json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        logger.debug("shift_signals stream ended has_content=%s", has_content)
+        if has_content:
+            yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+        else:
+            yield f"data: {_json.dumps({'type': 'error', 'message': 'No content received from model'})}\n\n"
+    except Exception:
+        logger.exception("Error streaming shift signals")
+        yield f"data: {_json.dumps({'type': 'error', 'message': 'Stream error'})}\n\n"
+
+
+@router.post("/{ticker}/shift-signals")
+@limiter.limit(CHAT_RATE_LIMIT)
+def shift_signals(
+    request: Request,
+    ticker: str,
+    body: StrategicShiftSignalsRequest,
+    user_id: CurrentUserDep,
+) -> StreamingResponse:
+    """Stream investor-implications framing for a strategic shift as SSE."""
+    if not _ticker_exists(ticker):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+
+    return StreamingResponse(
+        _shift_signals_sse_stream(body),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # --- Section usage tracking ---
 
 class TrackEventRequest(BaseModel):
