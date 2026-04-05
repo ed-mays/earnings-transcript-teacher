@@ -1,6 +1,7 @@
 /** Renders a split list of competitors: mentioned in call vs. other. */
 
 import type { Competitor } from "./types";
+import { Badge } from "@/components/ui/badge";
 
 interface CompetitorListProps {
   competitors: Competitor[];
@@ -13,9 +14,9 @@ function CompetitorItem({ competitor }: { competitor: Competitor }) {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-foreground">{competitor.name}</span>
           {competitor.ticker && (
-            <span className="inline-flex rounded px-1.5 py-0.5 text-xs font-mono font-semibold bg-muted text-muted-foreground">
+            <Badge variant="secondary" className="rounded font-mono">
               {competitor.ticker}
-            </span>
+            </Badge>
           )}
         </div>
         {competitor.description && (
