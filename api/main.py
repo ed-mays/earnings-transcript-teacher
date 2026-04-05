@@ -88,7 +88,7 @@ logger = logging.getLogger(__name__)
 from db.analytics import drain as drain_analytics
 from dependencies import set_pool
 from limiter import limiter
-from routes import admin, calls, chat, define
+from routes import admin, calls, chat, define, flags
 from settings import REQUIRED_ENV_VARS
 from shutdown import shutdown_event
 
@@ -202,6 +202,7 @@ app.include_router(calls.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(define.router)
+app.include_router(flags.router)
 
 
 @app.exception_handler(Exception)
