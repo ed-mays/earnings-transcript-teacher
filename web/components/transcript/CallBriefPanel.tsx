@@ -113,7 +113,7 @@ export function CallBriefPanel({ brief, takeaways, misconceptions, signal_strip 
             <SignalBadge label="Analyst mood" value={signal_strip.analyst_sentiment} />
             <EvasionBadge level={signal_strip.evasion_level} />
             {signal_strip.strategic_shift_flagged && (
-              <span className="rounded-md px-2.5 py-1 text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+              <span className="rounded-md px-2.5 py-1 text-xs font-medium bg-info/10 text-info-foreground">
                 Strategic shift flagged
               </span>
             )}
