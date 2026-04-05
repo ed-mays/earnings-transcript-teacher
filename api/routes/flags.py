@@ -4,11 +4,12 @@ import logging
 from datetime import datetime
 from typing import Any
 
-import psycopg.errors
 import psycopg
+import psycopg.errors
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
+from db.repositories import FlagRepository
 from dependencies import DbDep, FlagsDep, RequireAdminDep, get_flag_provider
 
 logger = logging.getLogger(__name__)
@@ -87,64 +88,47 @@ def get_flags(flags: FlagsDep) -> dict[str, bool]:
 @router.get("/admin/flags", response_model=FlagListResponse)
 def list_flags(_: RequireAdminDep, conn: DbDep) -> FlagListResponse:
     """List all feature flags with full metadata. Admin only."""
-    rows = conn.execute(
-        "SELECT key, enabled, description, category, metadata, created_at, updated_at"
-        " FROM public.feature_flags ORDER BY key"
-    ).fetchall()
-    return FlagListResponse(flags=[_row_to_flag(row) for row in rows])
+    repo = FlagRepository(conn)
+    return FlagListResponse(flags=[_row_to_flag(row) for row in repo.list_all()])
 
 
 @router.post("/admin/flags", response_model=FlagResponse, status_code=status.HTTP_201_CREATED)
 def create_flag(_: RequireAdminDep, conn: DbDep, body: FlagCreate) -> FlagResponse:
     """Create a new feature flag. Returns 409 if the key already exists. Admin only."""
+    repo = FlagRepository(conn)
     try:
-        row = conn.execute(
-            "INSERT INTO public.feature_flags (key, enabled, description, category, metadata)"
-            " VALUES (%s, %s, %s, %s, %s)"
-            " RETURNING key, enabled, description, category, metadata, created_at, updated_at",
-            (body.key, body.enabled, body.description, body.category, psycopg.types.json.Jsonb(body.metadata)),
-        ).fetchone()
+        row = repo.create(body.key, body.enabled, body.description, body.category, body.metadata)
     except psycopg.errors.UniqueViolation:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Flag '{body.key}' already exists",
         )
+    get_flag_provider().invalidate_cache()
+    logger.info("Feature flag created: %s (enabled=%s)", body.key, body.enabled)
     return _row_to_flag(row)
 
 
 @router.put("/admin/flags/{key}", response_model=FlagResponse)
 def update_flag(_: RequireAdminDep, conn: DbDep, key: str, body: FlagUpdate) -> FlagResponse:
-    """Update an existing flag's enabled state or description. Admin only."""
-    # Build SET clause from provided fields only
-    updates: list[str] = []
-    params: list[Any] = []
+    """Update an existing flag's fields. Admin only."""
+    fields: dict[str, Any] = {}
     if body.enabled is not None:
-        updates.append("enabled = %s")
-        params.append(body.enabled)
+        fields["enabled"] = body.enabled
     if body.description is not None:
-        updates.append("description = %s")
-        params.append(body.description)
+        fields["description"] = body.description
     if body.category is not None:
-        updates.append("category = %s")
-        params.append(body.category)
+        fields["category"] = body.category
     if body.metadata is not None:
-        updates.append("metadata = %s")
-        params.append(psycopg.types.json.Jsonb(body.metadata))
+        fields["metadata"] = body.metadata
 
-    if not updates:
+    if not fields:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="No fields to update",
         )
 
-    params.append(key)
-    row = conn.execute(
-        f"UPDATE public.feature_flags SET {', '.join(updates)}"
-        f" WHERE key = %s"
-        f" RETURNING key, enabled, description, category, metadata, created_at, updated_at",
-        params,
-    ).fetchone()
-
+    repo = FlagRepository(conn)
+    row = repo.update(key, fields)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -152,18 +136,18 @@ def update_flag(_: RequireAdminDep, conn: DbDep, key: str, body: FlagUpdate) -> 
         )
 
     get_flag_provider().invalidate_cache()
+    logger.info("Feature flag updated: %s fields=%s", key, list(fields))
     return _row_to_flag(row)
 
 
 @router.delete("/admin/flags/{key}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_flag(_: RequireAdminDep, conn: DbDep, key: str) -> None:
     """Delete a feature flag. Admin only."""
-    result = conn.execute(
-        "DELETE FROM public.feature_flags WHERE key = %s", (key,)
-    )
-    if result.rowcount == 0:
+    repo = FlagRepository(conn)
+    if repo.delete(key) == 0:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Flag '{key}' not found",
         )
     get_flag_provider().invalidate_cache()
+    logger.info("Feature flag deleted: %s", key)

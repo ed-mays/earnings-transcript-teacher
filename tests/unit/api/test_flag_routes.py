@@ -212,8 +212,8 @@ def test_admin_create_flag_returns_201(client):
             headers=ADMIN_AUTH,
         )
     assert resp.status_code == 201
-    body = resp.json()
-    assert body["key"] == "new_flag"
+    assert resp.json()["key"] == "new_flag"
+    mock_provider.invalidate_cache.assert_called_once()
 
 
 def test_admin_create_flag_requires_admin(client):
@@ -277,17 +277,15 @@ def test_admin_update_flag_calls_invalidate_cache(client):
 
 
 def test_admin_update_nonexistent_flag_returns_404(client):
-    # fetchone=None means the UPDATE RETURNING found no row
-    conn = _make_mock_conn("admin", fetchone=None)
     # side_effect list: [role_result, update_result_with_None]
     role_result = MagicMock()
     role_result.fetchone.return_value = ("admin",)
     update_result = MagicMock()
     update_result.fetchone.return_value = None
-    conn2 = MagicMock()
-    conn2.execute.side_effect = [role_result, update_result]
+    conn = MagicMock()
+    conn.execute.side_effect = [role_result, update_result]
     mock_provider = _mock_flag_provider()
-    with patch("psycopg.connect", return_value=conn2), \
+    with patch("psycopg.connect", return_value=conn), \
          patch("routes.flags.get_flag_provider", return_value=mock_provider):
         resp = client.put(
             "/admin/flags/nonexistent",
