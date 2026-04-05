@@ -373,7 +373,7 @@ function UnderstandTheNarrativeStep({ ticker, isOpen }: { ticker: string; isOpen
     return (
       <div className="space-y-3">
         {topics.map((topic, i) => (
-          <ThemeCard key={i} label={topic.label || `Topic ${i + 1}`} summary={topic.summary} />
+          <ThemeCard key={i} label={topic.label || `Topic ${i + 1}`} summary={topic.summary} ticker={ticker} />
         ))}
       </div>
     );
@@ -382,7 +382,7 @@ function UnderstandTheNarrativeStep({ ticker, isOpen }: { ticker: string; isOpen
   return (
     <div className="space-y-3">
       {themes.map((theme, i) => (
-        <ThemeCard key={i} label={theme} summary="" />
+        <ThemeCard key={i} label={theme} summary="" ticker={ticker} />
       ))}
     </div>
   );
@@ -483,7 +483,7 @@ function TrackWhatChangedStep({ ticker, isOpen }: { ticker: string; isOpen: bool
   return (
     <div className="space-y-3">
       {data.strategic_shifts.map((shift, i) => (
-        <StrategicShiftCard key={i} shift={shift} />
+        <StrategicShiftCard key={i} shift={shift} ticker={ticker} />
       ))}
     </div>
   );
