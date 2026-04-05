@@ -3,8 +3,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { streamShiftSignals } from "@/lib/signals";
 import type { StrategicShift } from "./types";
 import { Card } from "@/components/ui/card";
@@ -14,6 +12,7 @@ import {
   CollapsibleContent,
   CollapsibleChevron,
 } from "@/components/ui/collapsible";
+import { SignalsSection } from "./SignalsSection";
 
 interface StrategicShiftCardProps {
   shift: StrategicShift;
@@ -100,36 +99,13 @@ export function StrategicShiftCard({ shift, ticker }: StrategicShiftCardProps) {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Signals section — on-demand "go deeper" action */}
-      {signals ? (
-        <div className="rounded-md bg-warning/10 border border-warning/30 px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-warning-foreground mb-1">
-            📈 What this signals for investors
-          </p>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              p: ({ children }) => <p className="text-sm text-warning-foreground mb-1 last:mb-0">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc list-inside text-sm text-warning-foreground space-y-2 mb-1">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-warning-foreground space-y-2 mb-1">{children}</ol>,
-              li: ({ children }) => <li className="text-sm text-warning-foreground border-l-2 border-warning/40 pl-2">{children}</li>,
-              strong: ({ children }) => <strong className="font-semibold text-warning-foreground">{children}</strong>,
-            }}
-          >
-            {signals}
-          </ReactMarkdown>
-        </div>
-      ) : signalsError ? (
-        <p className="text-xs text-destructive">{signalsError}</p>
-      ) : (
-        <button
-          onClick={handleSignalsClick}
-          disabled={loadingSignals}
-          className="w-full rounded-md border border-warning/30 bg-warning/10 px-3 py-1.5 text-xs font-medium text-warning-foreground hover:bg-warning/20 transition-colors disabled:opacity-50"
-        >
-          {loadingSignals ? "Analysing…" : "📈 What this signals for investors"}
-        </button>
-      )}
+      <SignalsSection
+        signals={signals}
+        loading={loadingSignals}
+        error={signalsError}
+        onFetch={handleSignalsClick}
+        topMargin=""
+      />
     </Card>
   );
 }

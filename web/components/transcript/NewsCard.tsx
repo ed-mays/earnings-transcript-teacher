@@ -3,10 +3,9 @@
 /** Card for a single news item with a streaming "Why does this matter?" explainer. */
 
 import { useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { streamNewsContext } from "@/lib/signals";
 import type { NewsItem } from "./types";
+import { SignalsSection } from "./SignalsSection";
 
 interface NewsCardProps {
   item: NewsItem;
@@ -72,33 +71,15 @@ export function NewsCard({ item, ticker }: NewsCardProps) {
         </p>
       </div>
 
-      {context ? (
-        <div className="rounded-md bg-muted/50 border px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
-            Why this matters for this call
-          </p>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              p: ({ children }) => (
-                <p className="text-sm text-foreground/80 mb-1 last:mb-0">{children}</p>
-              ),
-            }}
-          >
-            {context}
-          </ReactMarkdown>
-        </div>
-      ) : error ? (
-        <p className="text-xs text-destructive">{error}</p>
-      ) : (
-        <button
-          onClick={handleContextClick}
-          disabled={loading}
-          className="w-full rounded-md border bg-muted/30 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
-        >
-          {loading ? "Analysing…" : "Why does this matter for this call?"}
-        </button>
-      )}
+      <SignalsSection
+        signals={context}
+        loading={loading}
+        error={error}
+        onFetch={handleContextClick}
+        label="Why does this matter for this call?"
+        variant="muted"
+        topMargin=""
+      />
     </div>
   );
 }

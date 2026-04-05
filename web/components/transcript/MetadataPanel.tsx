@@ -21,6 +21,7 @@ import { StrategicShiftCard } from "./StrategicShiftCard";
 import { NewsCard } from "./NewsCard";
 import { CompetitorList } from "./CompetitorList";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Collapsible,
@@ -426,9 +427,9 @@ function NoticeWhatWasAvoidedStep({
       {evasionLevel && (() => {
         const style = getEvasionStyle(evasionLevel);
         return (
-          <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${style.bg} ${style.text}`}>
+          <Badge className={`rounded-full gap-1 ${style.bg} ${style.text}`}>
             {style.emoji} Evasion index: {evasionLevel}
-          </div>
+          </Badge>
         );
       })()}
 
