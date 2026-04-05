@@ -3,12 +3,15 @@
 import logging
 import os
 from collections.abc import Generator
-from typing import Annotated
+from typing import Annotated, TYPE_CHECKING
 
 import jwt
 import psycopg
 from jwt import PyJWKClient
 from fastapi import Depends, Header, HTTPException, status
+
+if TYPE_CHECKING:
+    from flags.provider import FeatureFlagProvider
 
 logger = logging.getLogger(__name__)
 
@@ -117,3 +120,13 @@ def require_admin(user_id: CurrentUserDep, conn: DbDep) -> str:
 
 
 RequireAdminDep = Annotated[str, Depends(require_admin)]
+
+
+def get_flag_provider() -> "FeatureFlagProvider":
+    """Return the module-level feature flag provider singleton."""
+    from flags import get_flag_provider as _get_flag_provider
+
+    return _get_flag_provider()
+
+
+FlagsDep = Annotated["FeatureFlagProvider", Depends(get_flag_provider)]
