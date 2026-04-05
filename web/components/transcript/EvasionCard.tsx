@@ -69,7 +69,7 @@ export function EvasionCard({ item, ticker }: EvasionCardProps) {
     <Collapsible
       open={revealed}
       onOpenChange={setRevealed}
-      className="rounded-lg border overflow-hidden bg-card"
+      className="rounded-xl ring-1 ring-foreground/10 overflow-hidden bg-card"
     >
       {/* Always-visible header: severity badge → analyst concern → topic */}
       <CollapsibleTrigger className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted transition-colors">

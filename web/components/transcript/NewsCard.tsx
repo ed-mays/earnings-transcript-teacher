@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { streamNewsContext } from "@/lib/signals";
 import type { NewsItem } from "./types";
 import { SignalsSection } from "./SignalsSection";
+import { Card } from "@/components/ui/card";
 
 interface NewsCardProps {
   item: NewsItem;
@@ -56,7 +57,7 @@ export function NewsCard({ item, ticker }: NewsCardProps) {
   }
 
   return (
-    <div className="rounded-lg border bg-card px-4 py-3 space-y-2">
+    <Card className="px-4 py-3 gap-2">
       <div className="space-y-1">
         <a
           href={item.url}
@@ -80,6 +81,6 @@ export function NewsCard({ item, ticker }: NewsCardProps) {
         variant="muted"
         topMargin=""
       />
-    </div>
+    </Card>
   );
 }
