@@ -1,6 +1,7 @@
 /** Admin analytics dashboard — aggregated observability panels. Server component. */
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Card } from "@/components/ui/card";
 
 interface DailyCount {
   date: string;
@@ -149,12 +150,12 @@ async function fetchChat(): Promise<ChatData | null> {
 
 function AnalyticsCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
+    <Card className="p-5 gap-0">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
       {children}
-    </div>
+    </Card>
   );
 }
 

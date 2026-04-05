@@ -285,6 +285,7 @@ function SpanListView({
 
 function SpanBlock({ span }: { span: SpanItem }) {
   const isAnalyst = span.section === "qa" && span.speaker.toLowerCase().includes("analyst");
+  // Intentional: SpanBlock uses semantic border colors (analyst vs. speaker), not Card surface
   return (
     <div
       className={`rounded-lg border p-4 ${

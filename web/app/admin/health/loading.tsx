@@ -8,7 +8,7 @@ export default function AdminHealthLoading() {
       {/* 3-column status card skeleton */}
       <div className="grid gap-6 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="rounded-lg border border-border bg-card p-5">
+          <div key={i} className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
             <div className="mb-3 h-3 w-28 animate-pulse rounded bg-muted" />
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, j) => (

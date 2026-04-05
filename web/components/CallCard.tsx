@@ -51,7 +51,7 @@ export function CallCard({ call }: CallCardProps) {
             {call.overall_sentiment && (() => {
               const s = getSentimentStyle(call.overall_sentiment);
               return (
-                <Badge className={`rounded-md ${s.bg} ${s.text}`}>
+                <Badge className={`rounded-md whitespace-normal h-auto w-auto shrink ${s.bg} ${s.text}`}>
                   {call.overall_sentiment}
                 </Badge>
               );
@@ -59,7 +59,7 @@ export function CallCard({ call }: CallCardProps) {
             {call.evasion_level && (() => {
               const s = getEvasionStyle(call.evasion_level);
               return (
-                <Badge className={`rounded-md ${s.bg} ${s.text}`}>
+                <Badge className={`rounded-md whitespace-normal h-auto w-auto shrink ${s.bg} ${s.text}`}>
                   {call.evasion_level} evasion
                 </Badge>
               );

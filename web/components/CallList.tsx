@@ -7,7 +7,7 @@ import { CallCard, type CallSummary } from "./CallCard";
 /** Skeleton placeholder shown while call list is loading. */
 function CallCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border p-6 shadow-sm bg-card">
+    <div className="animate-pulse rounded-xl p-6 shadow-sm bg-card ring-1 ring-foreground/10">
       <div className="flex items-start justify-between gap-4">
         <div className="h-7 w-16 rounded bg-muted" />
         <div className="h-4 w-24 rounded bg-muted" />
