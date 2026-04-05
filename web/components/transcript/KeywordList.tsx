@@ -4,6 +4,7 @@
 
 import { useState, useRef } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { lookupTerm } from "@/lib/glossary";
 import { streamDefine } from "@/lib/define";
 
@@ -50,12 +51,14 @@ function KeywordDefContent({ term, ticker }: KeywordDefContentProps) {
       <div>
         <p className="text-xs text-muted-foreground mb-2">Not in the static glossary.</p>
         {ticker && (
-          <button
+          <Button
+            variant="link"
+            size="xs"
             onClick={handleDefine}
-            className="text-xs text-foreground underline underline-offset-2 hover:no-underline"
+            className="text-foreground"
           >
             Define with AI
-          </button>
+          </Button>
         )}
       </div>
     );

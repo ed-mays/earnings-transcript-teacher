@@ -63,15 +63,16 @@ export function ChatThread({ messages, streamingContent, suggestions, loadingSug
         ) : suggestions && suggestions.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
             {suggestions.map((suggestion) => (
-              <button
+              <Button
                 key={suggestion}
+                variant="outline"
                 onClick={() => handleSuggestionClick(suggestion)}
-                className={`rounded-lg border bg-card text-card-foreground px-4 py-3 text-sm text-left hover:bg-accent hover:text-accent-foreground active:scale-[0.98] transition-all duration-200 ${
+                className={`h-auto whitespace-normal px-4 py-3 text-left active:scale-[0.98] ${
                   fadingOut === suggestion ? "opacity-0 scale-95" : ""
                 }`}
               >
                 {suggestion}
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -95,12 +96,13 @@ export function ChatThread({ messages, streamingContent, suggestions, loadingSug
         <div ref={bottomRef} />
       </div>
       {streamingContent && !isNearBottom && (
-        <button
+        <Button
+          size="sm"
           onClick={scrollToBottom}
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full shadow-md"
         >
           ↓ New messages
-        </button>
+        </Button>
       )}
     </div>
   );
