@@ -32,14 +32,13 @@ def _make_pool(rows: list[tuple]) -> MagicMock:
 @pytest.fixture(autouse=True)
 def fresh_provider():
     """Import a fresh SupabaseFlagProvider for each test."""
-    # Remove cached module so singleton state doesn't bleed between tests
-    for mod in list(sys.modules.keys()):
-        if "flags" in mod:
-            del sys.modules[mod]
+    # Only remove the flags package modules, not unrelated modules that contain 'flags' as a substring.
+    _flags_mods = {"flags", "flags.provider", "flags.supabase_provider"}
+    for mod in _flags_mods:
+        sys.modules.pop(mod, None)
     yield
-    for mod in list(sys.modules.keys()):
-        if "flags" in mod:
-            del sys.modules[mod]
+    for mod in _flags_mods:
+        sys.modules.pop(mod, None)
 
 
 def _make_provider(rows: list[tuple], use_pool: bool = True):

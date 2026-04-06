@@ -9,6 +9,7 @@ from db.repositories.analysis import AnalysisRepository
 from db.repositories.calls import CallRepository
 from db.repositories.competitors import CompetitorRepository
 from db.repositories.embeddings import EmbeddingRepository
+from db.repositories.flags import FlagRepository
 from db.repositories.learning import LearningRepository, SYSTEM_USER_ID
 from db.repositories.progress import ProgressRepository
 from db.repositories.schema import (
@@ -24,6 +25,7 @@ __all__ = [
     "CallRepository",
     "CompetitorRepository",
     "EmbeddingRepository",
+    "FlagRepository",
     "LearningRepository",
     "SYSTEM_USER_ID",
     "ProgressRepository",
