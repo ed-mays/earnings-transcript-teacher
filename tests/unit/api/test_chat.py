@@ -309,3 +309,34 @@ class TestChatInputBounds:
                 headers={"Authorization": AUTH_HEADER},
             )
         assert response.status_code == 429
+
+
+class TestChatKillSwitch:
+    def test_503_when_chat_disabled_via_flag(self, client):
+        """chat_enabled=False returns 503 before any ticker or key check."""
+        mock_provider = MagicMock()
+        mock_provider.is_enabled.return_value = False
+        with patch("routes.chat.get_flag_provider", return_value=mock_provider):
+            response = client.post(
+                "/api/calls/AAPL/chat",
+                json={"message": "explain revenue"},
+                headers={"Authorization": AUTH_HEADER},
+            )
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    def test_chat_works_normally_when_flag_enabled(self, client):
+        """chat_enabled=True does not short-circuit the endpoint."""
+        mock_provider = MagicMock()
+        mock_provider.is_enabled.return_value = True
+        with (
+            patch("routes.chat.get_flag_provider", return_value=mock_provider),
+            patch("routes.chat._ticker_exists", return_value=False),
+        ):
+            response = client.post(
+                "/api/calls/AAPL/chat",
+                json={"message": "explain revenue"},
+                headers={"Authorization": AUTH_HEADER},
+            )
+        # Kill switch passed → reaches ticker check → 404, not 503
+        assert response.status_code == 404
