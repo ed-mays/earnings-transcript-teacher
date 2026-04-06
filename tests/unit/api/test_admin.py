@@ -479,3 +479,28 @@ def test_startup_succeeds_with_all_required_vars():
             pass
         with TestClient(app):
             pass  # No exception raised
+
+
+# ---------------------------------------------------------------------------
+# Kill switch — POST /admin/ingest
+# ---------------------------------------------------------------------------
+
+def test_ingest_503_when_ingestion_disabled_via_flag(client):
+    """ingestion_enabled=False returns 503 before Modal dispatch."""
+    mock_provider = MagicMock()
+    mock_provider.is_enabled.return_value = False
+    with patch("routes.admin.get_flag_provider", return_value=mock_provider):
+        resp = client.post("/admin/ingest", json={"ticker": "AAPL"}, headers=ADMIN_AUTH)
+    assert resp.status_code == 503
+    assert "disabled" in resp.json()["detail"].lower()
+
+
+def test_ingest_dispatches_when_flag_enabled(client):
+    """ingestion_enabled=True does not short-circuit; Modal dispatch proceeds."""
+    mock_fn = _make_modal_fn()
+    MODAL_STUB.Function.from_name.return_value = mock_fn
+    mock_provider = MagicMock()
+    mock_provider.is_enabled.return_value = True
+    with patch("routes.admin.get_flag_provider", return_value=mock_provider):
+        resp = client.post("/admin/ingest", json={"ticker": "AAPL"}, headers=ADMIN_AUTH)
+    assert resp.status_code == 202

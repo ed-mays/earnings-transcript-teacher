@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from db.analytics import track
 from db.repositories import CallRepository, LearningRepository
-from dependencies import CurrentUserDep
+from dependencies import CurrentUserDep, get_flag_provider
 from limiter import limiter
 from settings import CHAT_MESSAGE_MAX_LENGTH, CHAT_RATE_LIMIT, SESSION_HISTORY_MAX_TURNS
 from shutdown import shutdown_event
@@ -173,6 +173,12 @@ def chat(
            data: {type: done, session_id: ...} on completion,
            data: {type: error, message: ...}  on failure.
     """
+    if not get_flag_provider().is_enabled("chat_enabled", default=True):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Chat is temporarily unavailable",
+        )
+
     if not _ticker_exists(ticker):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

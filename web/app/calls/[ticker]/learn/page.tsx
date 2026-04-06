@@ -7,6 +7,7 @@ import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { streamChat } from "@/lib/chat";
 import { api } from "@/lib/api";
+import { useFlag } from "@/lib/useFlag";
 import { buildSuggestions } from "@/lib/suggestions";
 import type { ChatMessage } from "@/lib/chat";
 import type { TopicsResponse, KeywordsResponse } from "@/components/transcript/types";
@@ -22,6 +23,8 @@ export default function LearnPage({
   const { ticker } = use(params);
   const { topic } = use(searchParams);
   const upperTicker = ticker.toUpperCase();
+
+  const chatEnabled = useFlag("chat_enabled", true);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
@@ -130,33 +133,43 @@ export default function LearnPage({
         </div>
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <span className="flex-1">{error}</span>
-          <button
-            onClick={() => setError(null)}
-            aria-label="Dismiss error"
-            className="shrink-0 text-destructive/60 hover:text-destructive"
-          >
-            ✕
-          </button>
+      {!chatEnabled ? (
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-sm text-muted-foreground">
+            Chat is temporarily unavailable. Please check back later.
+          </p>
         </div>
+      ) : (
+        <>
+          {/* Error banner */}
+          {error && (
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <span className="flex-1">{error}</span>
+              <button
+                onClick={() => setError(null)}
+                aria-label="Dismiss error"
+                className="shrink-0 text-destructive/60 hover:text-destructive"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Chat thread */}
+          <ChatThread
+            messages={messages}
+            streamingContent={streamingContent}
+            suggestions={suggestions}
+            loadingSuggestions={loadingSuggestions}
+            onSuggestionClick={handleSend}
+          />
+
+          {/* Input */}
+          <div className="mt-4">
+            <ChatInput onSend={handleSend} onAbort={handleAbort} isStreaming={isStreaming} initialValue={topic ?? ""} />
+          </div>
+        </>
       )}
-
-      {/* Chat thread */}
-      <ChatThread
-        messages={messages}
-        streamingContent={streamingContent}
-        suggestions={suggestions}
-        loadingSuggestions={loadingSuggestions}
-        onSuggestionClick={handleSend}
-      />
-
-      {/* Input */}
-      <div className="mt-4">
-        <ChatInput onSend={handleSend} onAbort={handleAbort} isStreaming={isStreaming} initialValue={topic ?? ""} />
-      </div>
     </div>
   );
 }

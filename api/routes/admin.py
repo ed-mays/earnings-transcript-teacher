@@ -14,7 +14,7 @@ from pydantic import BaseModel, field_validator
 
 from db.analytics import track
 from db.repositories import AnalyticsRepository, SchemaRepository
-from dependencies import RequireAdminDep
+from dependencies import RequireAdminDep, get_flag_provider
 from settings import INGEST_RATE_LIMIT_WINDOW_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -148,6 +148,9 @@ async def trigger_ingestion(body: IngestRequest, user_id: RequireAdminDep) -> di
                 status_code=429,
                 detail=f"Rate limit: wait {remaining}s before ingesting {body.ticker} again.",
             )
+    if not get_flag_provider().is_enabled("ingestion_enabled", default=True):
+        raise HTTPException(status_code=503, detail="Ingestion is temporarily disabled")
+
     try:
         fn = modal.Function.from_name("earnings-ingestion", "ingest_ticker")
         await fn.spawn.aio(body.ticker)

@@ -144,6 +144,23 @@ Use `tools/prompt_tuner.py` to run a side-by-side comparison of production vs. c
 
 ---
 
+## Feature flag conventions
+
+Feature flags are stored in `public.feature_flags` and managed via `/admin/flags`.
+
+**Kill switches** (category `kill_switch`): default to `True` — the system works normally without the flag row. Create the row and set `enabled = false` to disable the feature. Check with `get_flag_provider().is_enabled("key", default=True)`.
+
+**Feature gates** (category `feature`): default to `False` — disabled until explicitly enabled. Check with `get_flag_provider().is_enabled("key", default=False)`.
+
+Active kill switches and where they are enforced:
+
+| Flag | Enforced in | Effect when `false` |
+|---|---|---|
+| `chat_enabled` | `api/routes/chat.py`, `web/app/calls/[ticker]/learn/page.tsx` | 503 from API; disabled message in UI |
+| `ingestion_enabled` | `api/routes/admin.py` (`trigger_ingestion`), `web/app/admin/ingest/page.tsx` | 503 from API; form disabled in UI |
+
+---
+
 ## Commit and PR message conventions
 
 - Do **not** add `Co-Authored-By` trailers or any other attribution to Claude in commit or PR messages.
