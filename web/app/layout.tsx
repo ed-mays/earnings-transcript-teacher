@@ -107,6 +107,12 @@ export default async function RootLayout({
                           >
                             Admin Ingest
                           </Link>
+                          <Link
+                            href="/admin/flags"
+                            className="text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            Feature Flags
+                          </Link>
                         </div>
                       )}
                       <span className="text-sm text-muted-foreground">{user.email}</span>
@@ -146,6 +152,12 @@ export default async function RootLayout({
                                   className="py-2 text-sm text-muted-foreground hover:text-foreground"
                                 >
                                   Admin Ingest
+                                </Link>
+                                <Link
+                                  href="/admin/flags"
+                                  className="py-2 text-sm text-muted-foreground hover:text-foreground"
+                                >
+                                  Feature Flags
                                 </Link>
                               </nav>
                             </SheetContent>
