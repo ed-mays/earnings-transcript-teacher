@@ -7,6 +7,8 @@ import SignOutButton from "./SignOutButton";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemePicker } from "@/components/ThemePicker";
 import { BreadcrumbBar } from "@/components/BreadcrumbBar";
+import { FlagProvider } from "@/components/FlagProvider";
+import { getFeatureFlags } from "@/lib/flags-server";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -38,9 +40,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [{ data: { user } }, flags] = await Promise.all([
+    supabase.auth.getUser(),
+    getFeatureFlags(),
+  ]);
 
   let isAdmin = false;
   if (user) {
@@ -52,6 +55,8 @@ export default async function RootLayout({
     isAdmin = profile?.role === "admin";
   }
 
+  const chatEnabled = flags["chat_enabled"] ?? true;
+
   return (
     <html
       lang="en"
@@ -60,90 +65,101 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-background">
         <ThemeProvider>
-          {user && (
-            <>
-              <nav className="border-b bg-card">
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-                  <Link
-                    href="/"
-                    className="text-lg font-semibold text-foreground hover:text-foreground/80"
-                  >
-                    EarningsFluency
-                  </Link>
-                  <div className="flex items-center gap-4">
-                    {/* Desktop admin links */}
-                    {isAdmin && (
-                      <div className="hidden items-center gap-4 md:flex">
+          <FlagProvider initialFlags={flags}>
+            {user && (
+              <>
+                <nav className="border-b bg-card">
+                  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+                    <Link
+                      href="/"
+                      className="text-lg font-semibold text-foreground hover:text-foreground/80"
+                    >
+                      EarningsFluency
+                    </Link>
+                    <div className="flex items-center gap-4">
+                      {/* Learn link — gated by chat_enabled kill switch */}
+                      {chatEnabled && (
                         <Link
-                          href="/admin"
-                          className="text-sm text-muted-foreground hover:text-foreground"
+                          href="/"
+                          className="hidden text-sm text-muted-foreground hover:text-foreground md:block"
                         >
-                          Admin Analytics
+                          Library
                         </Link>
-                        <Link
-                          href="/admin/health"
-                          className="text-sm text-muted-foreground hover:text-foreground"
-                        >
-                          Admin Health
-                        </Link>
-                        <Link
-                          href="/admin/ingest"
-                          className="text-sm text-muted-foreground hover:text-foreground"
-                        >
-                          Admin Ingest
-                        </Link>
-                      </div>
-                    )}
-                    <span className="text-sm text-muted-foreground">{user.email}</span>
-                    <ThemePicker />
-                    <SignOutButton />
-                    {/* Mobile hamburger — admin only */}
-                    {isAdmin && (
-                      <div className="md:hidden">
-                        <Sheet>
-                          <SheetTrigger
-                            render={
-                              <Button variant="ghost" size="icon" aria-label="Open menu" />
-                            }
+                      )}
+                      {/* Desktop admin links */}
+                      {isAdmin && (
+                        <div className="hidden items-center gap-4 md:flex">
+                          <Link
+                            href="/admin"
+                            className="text-sm text-muted-foreground hover:text-foreground"
                           >
-                            <Menu className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </SheetTrigger>
-                          <SheetContent side="right">
-                            <SheetHeader>
-                              <SheetTitle>Menu</SheetTitle>
-                            </SheetHeader>
-                            <nav className="flex flex-col gap-1 px-4 pb-4">
-                              <Link
-                                href="/admin"
-                                className="py-2 text-sm text-muted-foreground hover:text-foreground"
-                              >
-                                Admin Analytics
-                              </Link>
-                              <Link
-                                href="/admin/health"
-                                className="py-2 text-sm text-muted-foreground hover:text-foreground"
-                              >
-                                Admin Health
-                              </Link>
-                              <Link
-                                href="/admin/ingest"
-                                className="py-2 text-sm text-muted-foreground hover:text-foreground"
-                              >
-                                Admin Ingest
-                              </Link>
-                            </nav>
-                          </SheetContent>
-                        </Sheet>
-                      </div>
-                    )}
+                            Admin Analytics
+                          </Link>
+                          <Link
+                            href="/admin/health"
+                            className="text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            Admin Health
+                          </Link>
+                          <Link
+                            href="/admin/ingest"
+                            className="text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            Admin Ingest
+                          </Link>
+                        </div>
+                      )}
+                      <span className="text-sm text-muted-foreground">{user.email}</span>
+                      <ThemePicker />
+                      <SignOutButton />
+                      {/* Mobile hamburger — admin only */}
+                      {isAdmin && (
+                        <div className="md:hidden">
+                          <Sheet>
+                            <SheetTrigger
+                              render={
+                                <Button variant="ghost" size="icon" aria-label="Open menu" />
+                              }
+                            >
+                              <Menu className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </SheetTrigger>
+                            <SheetContent side="right">
+                              <SheetHeader>
+                                <SheetTitle>Menu</SheetTitle>
+                              </SheetHeader>
+                              <nav className="flex flex-col gap-1 px-4 pb-4">
+                                <Link
+                                  href="/admin"
+                                  className="py-2 text-sm text-muted-foreground hover:text-foreground"
+                                >
+                                  Admin Analytics
+                                </Link>
+                                <Link
+                                  href="/admin/health"
+                                  className="py-2 text-sm text-muted-foreground hover:text-foreground"
+                                >
+                                  Admin Health
+                                </Link>
+                                <Link
+                                  href="/admin/ingest"
+                                  className="py-2 text-sm text-muted-foreground hover:text-foreground"
+                                >
+                                  Admin Ingest
+                                </Link>
+                              </nav>
+                            </SheetContent>
+                          </Sheet>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </nav>
-              <BreadcrumbBar />
-            </>
-          )}
-          <main className="flex flex-1 flex-col">{children}</main>
+                </nav>
+                <BreadcrumbBar />
+              </>
+            )}
+            <main className="flex flex-1 flex-col">{children}</main>
+          </FlagProvider>
         </ThemeProvider>
       </body>
     </html>
