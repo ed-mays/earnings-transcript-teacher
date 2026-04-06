@@ -6,10 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { useFlag } from "@/lib/useFlag";
 
 type Status = "idle" | "submitting" | "accepted" | "error";
 
 export default function AdminIngestPage() {
+  const ingestionEnabled = useFlag("ingestion_enabled", true);
+
   const [ticker, setTicker] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,6 +69,12 @@ export default function AdminIngestPage() {
         asynchronously.
       </p>
 
+      {!ingestionEnabled && (
+        <p className="mb-6 text-sm text-muted-foreground">
+          Ingestion is temporarily disabled. Enable the <code>ingestion_enabled</code> flag to dispatch jobs.
+        </p>
+      )}
+
       <Card className="max-w-sm">
         <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -82,14 +91,14 @@ export default function AdminIngestPage() {
               value={ticker}
               onChange={(e) => setTicker(e.target.value)}
               placeholder="e.g. AAPL"
-              disabled={status === "submitting"}
+              disabled={status === "submitting" || !ingestionEnabled}
               className="font-mono uppercase placeholder:normal-case"
             />
           </div>
 
           <Button
             type="submit"
-            disabled={status === "submitting" || !ticker.trim()}
+            disabled={status === "submitting" || !ticker.trim() || !ingestionEnabled}
             className="w-full"
           >
             {status === "submitting" ? "Submitting…" : "Ingest transcript"}
