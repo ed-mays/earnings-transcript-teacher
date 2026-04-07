@@ -59,3 +59,4 @@ feynman_sessions/
 
 # Prompt tuner raw results (stored locally, not committed)
 tools/eval/results/
+.gstack/

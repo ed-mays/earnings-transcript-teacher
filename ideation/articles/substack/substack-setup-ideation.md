@@ -20,9 +20,9 @@ Here's the full summary of everything decided and written in this session:
 
 ## Author Bio (Proposed)
 
-> I spent thirty years building production software before deciding to learn something completely new: how to build AI-native applications from scratch. No Python background. No NLP experience. No prior knowledge of LLM APIs. Just an idea and a willingness to figure it out.
+> Thirty years of building production software, and almost none of it prepared me for what I found when I started building with AI. Not the syntax — the gap between "I followed the tutorial" and "I shipped something that actually works." Every guide gets you to a toy example. None tell you what happens when you add real users, test coverage, deployment pipelines, and non-functional requirements.
 >
-> What I didn't expect was how hard it would be to close the gap between "I followed the tutorial" and "I shipped something that actually works." Every guide gets you to a toy example. None tell you what happens when you add real users, test coverage, deployment pipelines, and non-functional requirements. That gap is what *Beyond the Tutorial* is about.
+> That gap is what *Beyond the Tutorial* is about — an honest practitioner documenting what actually happened, not an expert prescribing what you should do.
 >
 > Technology consultant and mentor. Currently building the Earnings Transcript Teacher. Writing from Vilcabamba, Ecuador.
 
@@ -74,14 +74,12 @@ If something I write saves you a day of debugging, a bad architectural decision,
 
 Welcome, and thank you for subscribing.
 
-I started this project convinced that I could learn AI development the same way I've learned everything else over thirty years: find the best resources, follow them, and fill in the gaps. What I found instead was that the gaps *were* the curriculum.
-
-Almost everything worth knowing about building AI-native applications lives in the space tutorials don't cover — the production failures, the architectural pivots, the tool choices that look obvious only in hindsight. That's what I write about here.
-
-The best place to start is the first article:
+The best place to start is the article that kicked this off:
 **[Why I Built an Earnings Transcript Parser to Learn AI →](#)**
 
-New articles land every one to two weeks. I'm glad you're along for it.
+New articles land weekly for the first month, then every two weeks after that. Each one draws from a real project I'm building — no hypotheticals, no toy examples.
+
+I'm glad you're here.
 
 — Ed
 
@@ -95,4 +93,3 @@ New articles land every one to two weeks. I'm glad you're along for it.
 - [ ] Add "Start here: [Article 1 link]" to the bottom of the author bio once Article 1 is live
 - [ ] Create logo, header image, and profile photo before launch
 - [ ] Polish Article 001 ending to function as a series anchor
-- [ ] Update `publishing-sequence.proposed.md` in the repo to add Phase 4 articles
