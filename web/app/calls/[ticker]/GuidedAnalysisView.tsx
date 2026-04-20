@@ -192,15 +192,17 @@ export function GuidedAnalysisView({ call, adjacent, initialTopic }: GuidedAnaly
           </div>
         </header>
 
-        {/* Layer toggle + sentiment bar */}
+        {/* Layer toggle */}
         <LayerToggle layers={layers} onChange={toggleLayer} />
-        {layers.sentiment ? (
-          <SentimentBar synthesis={annotations?.synthesis ?? null} />
-        ) : null}
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-4 py-6">
+            {/* Sentiment summary — inline so it scrolls with the content */}
+            {layers.sentiment ? (
+              <SentimentBar synthesis={annotations?.synthesis ?? null} />
+            ) : null}
+
             {/* Brief */}
             {call.brief ? (
               <CallBriefPanel

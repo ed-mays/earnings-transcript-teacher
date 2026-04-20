@@ -15,11 +15,14 @@ const SAMPLE: QAEvasionItem = {
 };
 
 describe("EvasionCard", () => {
-  it("renders analyst concern and defensiveness score by default", () => {
+  it("renders analyst concern, evasion tag, and defensiveness detail by default", () => {
     render(<EvasionCard item={SAMPLE} onChatClick={() => {}} />);
     expect(screen.getByText("Dodged the margin question")).toBeInTheDocument();
-    expect(screen.getByText(/Defensiveness: 7\/10/)).toBeInTheDocument();
-    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    // Primary framing: "Evasion · [Level]"
+    expect(screen.getByText(/Evasion · Medium/i)).toBeInTheDocument();
+    // Numeric score demoted to secondary metadata
+    expect(screen.getByText(/defensiveness 7\/10/)).toBeInTheDocument();
+    expect(screen.getByText(/Jane Doe/)).toBeInTheDocument();
   });
 
   it("invokes onChatClick with an evasion context when the chat icon is clicked", async () => {
