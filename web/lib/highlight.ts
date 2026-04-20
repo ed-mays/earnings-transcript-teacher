@@ -1,18 +1,7 @@
 import type { ReactNode } from "react";
+import type { SpanItem, TermDefinition } from "@/components/transcript/types";
 
-export interface TermDefinition {
-  term: string;
-  definition: string;
-  explanation: string;
-  category: "industry" | "financial";
-}
-
-export interface SpanItem {
-  speaker: string;
-  section: string;
-  text: string;
-  sequence_order: number;
-}
+export type { SpanItem, TermDefinition };
 
 function escapeRegex(source: string): string {
   return source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
