@@ -40,7 +40,7 @@ export function LayerToggle({ layers, onChange }: LayerToggleProps) {
             aria-label={`Toggle ${layer.label} layer`}
             onClick={() => onChange(layer.key)}
             className={cn(
-              "inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
+              "inline-flex min-h-[44px] items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors",
               active
                 ? "border-foreground/20 bg-foreground/5 text-foreground"
                 : "border-transparent bg-transparent text-muted-foreground hover:bg-foreground/5",
