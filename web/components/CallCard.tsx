@@ -41,7 +41,7 @@ export function CallCard({ call }: CallCardProps) {
         )}
         {call.industry && (
           <div>
-            <Badge variant="secondary" className="rounded-full">
+            <Badge variant="secondary" className="rounded-md">
               {call.industry}
             </Badge>
           </div>
