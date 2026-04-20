@@ -74,10 +74,12 @@ const ANALYST_STEPS: AnalystStepConfig[] = [
 
 interface MetadataPanelProps {
   call: CallDetail;
+  /** When provided, "Explore with Feynman" opens the in-page chat with this topic instead of navigating. */
+  onExploreTopic?: (topic: string) => void;
 }
 
 /** Sidebar panel with analyst step framework: 6 collapsible sections teaching a mental model. */
-export function MetadataPanel({ call }: MetadataPanelProps) {
+export function MetadataPanel({ call, onExploreTopic }: MetadataPanelProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(
       [...ANALYST_STEPS.map((s) => [s.id, false]), ["participants", false], ["keywords", false]]
@@ -119,12 +121,22 @@ export function MetadataPanel({ call }: MetadataPanelProps) {
             {/* Step body */}
             <CollapsibleContent className="px-4 pb-4 pt-1">
               <StepContent step={step} ticker={call.ticker} isOpen={expanded[step.id]} signal_strip={call.signal_strip} />
-              <Link
-                href={`/calls/${call.ticker}/learn?topic=${encodeURIComponent(step.question)}`}
-                className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                Explore with Feynman →
-              </Link>
+              {onExploreTopic ? (
+                <button
+                  type="button"
+                  onClick={() => onExploreTopic(step.question)}
+                  className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  Explore with Feynman →
+                </button>
+              ) : (
+                <Link
+                  href={`/calls/${call.ticker}?topic=${encodeURIComponent(step.question)}`}
+                  className="mt-4 block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  Explore with Feynman →
+                </Link>
+              )}
             </CollapsibleContent>
           </Collapsible>
 

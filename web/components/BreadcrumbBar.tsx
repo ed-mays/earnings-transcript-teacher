@@ -14,34 +14,7 @@ import {
 export function BreadcrumbBar() {
   const path = usePathname()
 
-  // /calls/[ticker]/learn — check before /calls/[ticker]
-  const learnMatch = path.match(/^\/calls\/([^/]+)\/learn$/)
-  if (learnMatch) {
-    const ticker = learnMatch[1].toUpperCase()
-    return (
-      <div className="border-b px-6 py-2">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href="/" />}>Library</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href={`/calls/${ticker}`} />}>
-                {ticker}
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Study</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
-    )
-  }
-
-  // /calls/[ticker]
+  // /calls/[ticker] — guided analysis view (consolidated from former /learn).
   const callsMatch = path.match(/^\/calls\/([^/]+)$/)
   if (callsMatch) {
     const ticker = callsMatch[1].toUpperCase()
@@ -54,7 +27,7 @@ export function BreadcrumbBar() {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{ticker}</BreadcrumbPage>
+              <BreadcrumbPage>{ticker} · Guided Analysis</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
