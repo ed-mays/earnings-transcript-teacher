@@ -125,6 +125,31 @@ export interface SpanItem {
   sequence_order: number;
 }
 
+export interface TermDefinition {
+  term: string;
+  definition: string;
+  explanation: string;
+  category: "industry" | "financial";
+}
+
+export interface QAEvasionItem {
+  analyst_name: string | null;
+  question_topic: string | null;
+  question_text: string | null;
+  answer_text: string | null;
+  analyst_concern: string;
+  defensiveness_score: number;
+  evasion_explanation: string;
+}
+
+export interface LearnAnnotationsResponse {
+  terms: TermDefinition[];
+  evasion: QAEvasionItem[];
+  takeaways: TakeawayItem[];
+  misconceptions: MisconceptionItem[];
+  synthesis: SynthesisInfo | null;
+}
+
 export interface SpansResponse {
   total: number;
   page: number;
