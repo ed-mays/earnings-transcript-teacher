@@ -507,6 +507,81 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch financial terms: {e}")
         return terms
 
+    def get_learn_annotations_for_ticker(self, ticker: str, term_limit: int = 50) -> dict:
+        """Return composed annotation data for the learn page.
+
+        Combines industry + financial terms (capped at `term_limit` total, industry first),
+        Q&A evasion entries, takeaways, misconceptions, and synthesis for a ticker.
+        """
+        # Industry first (usually fewer, higher value), then financial to fill the budget.
+        industry = self.get_industry_terms_for_ticker(ticker, limit=term_limit)
+        remaining = max(0, term_limit - len(industry))
+        financial = (
+            self.get_financial_terms_for_ticker(ticker, limit=remaining) if remaining else []
+        )
+
+        terms: list[dict] = []
+        for term, definition, explanation in industry:
+            terms.append(
+                {
+                    "term": term,
+                    "definition": definition,
+                    "explanation": explanation,
+                    "category": "industry",
+                }
+            )
+        for term, definition, explanation in financial:
+            terms.append(
+                {
+                    "term": term,
+                    "definition": definition,
+                    "explanation": explanation,
+                    "category": "financial",
+                }
+            )
+
+        raw_evasion = self.get_qa_evasion_for_ticker(ticker)
+        evasion = [
+            {
+                "analyst_name": r[0],
+                "question_topic": r[1],
+                "question_text": r[2],
+                "answer_text": r[3],
+                "analyst_concern": r[4],
+                "defensiveness_score": r[5],
+                "evasion_explanation": r[6],
+            }
+            for r in raw_evasion
+        ]
+
+        raw_takeaways = self.get_takeaways_for_ticker(ticker)
+        takeaways = [{"takeaway": r[0], "why_it_matters": r[1]} for r in raw_takeaways]
+
+        raw_misconceptions = self.get_misconceptions_for_ticker(ticker)
+        misconceptions = [
+            {"fact": r[0], "misinterpretation": r[1], "correction": r[2]}
+            for r in raw_misconceptions
+        ]
+
+        raw_synthesis = self.get_synthesis_for_ticker(ticker)
+        synthesis = (
+            {
+                "overall_sentiment": raw_synthesis[0],
+                "executive_tone": raw_synthesis[1],
+                "analyst_sentiment": raw_synthesis[2],
+            }
+            if raw_synthesis
+            else None
+        )
+
+        return {
+            "terms": terms,
+            "evasion": evasion,
+            "takeaways": takeaways,
+            "misconceptions": misconceptions,
+            "synthesis": synthesis,
+        }
+
     def get_extracted_terms_for_ticker(self, ticker: str, limit: int = 15) -> list[tuple[str, str, str]]:
         """Return deduplicated terms of all categories for a ticker (legacy method)."""
         terms = []
