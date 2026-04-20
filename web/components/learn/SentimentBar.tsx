@@ -27,7 +27,10 @@ export function SentimentBar({ synthesis }: SentimentBarProps) {
   if (visible.length === 0) return null;
 
   return (
-    <div className="sticky top-[56px] z-[9] flex flex-wrap gap-2 border-b bg-background/90 px-4 py-2 text-xs backdrop-blur">
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Sentiment
+      </span>
       {visible.map(({ label, value }) => {
         const style = getSentimentStyle(value);
         return (

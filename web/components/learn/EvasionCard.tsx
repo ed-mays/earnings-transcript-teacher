@@ -44,16 +44,19 @@ export function EvasionCard({ item, onChatClick }: EvasionCardProps) {
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium",
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide",
                   style.bg,
                   style.text,
                 )}
               >
                 <span aria-hidden>{style.emoji}</span>
-                Defensiveness: {item.defensiveness_score}/10
+                Evasion · {style.label}
+              </span>
+              <span className="text-muted-foreground">
+                defensiveness {item.defensiveness_score}/10
               </span>
               {item.analyst_name ? (
-                <span className="text-muted-foreground">{item.analyst_name}</span>
+                <span className="text-muted-foreground">· {item.analyst_name}</span>
               ) : null}
               {item.question_topic ? (
                 <span className="text-muted-foreground">· {item.question_topic}</span>
