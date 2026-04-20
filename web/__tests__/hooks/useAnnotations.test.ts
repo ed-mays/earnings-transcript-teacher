@@ -52,13 +52,19 @@ describe("useAnnotations", () => {
     expect(result.current.termMap.get("arr")).toBeDefined();
   });
 
-  it("filters out single-word financial terms from the term map", async () => {
+  it("filters ambiguous lowercase financial words but keeps acronyms and multi-word terms", async () => {
     getMock.mockResolvedValueOnce(
       makeResponse({
         terms: [
+          // Ambiguous lowercase single word — filtered out
           { term: "margin", definition: "", explanation: "", category: "financial" },
+          // Multi-word financial — kept
           { term: "gross margin", definition: "", explanation: "", category: "financial" },
-          { term: "EBITDA", definition: "", explanation: "", category: "industry" },
+          // Financial acronym — kept (was the bug: previous rule dropped these)
+          { term: "EBITDA", definition: "", explanation: "", category: "financial" },
+          { term: "ARR", definition: "", explanation: "", category: "financial" },
+          // Industry — always kept regardless of shape
+          { term: "yield", definition: "", explanation: "", category: "industry" },
         ],
       }),
     );
@@ -69,6 +75,8 @@ describe("useAnnotations", () => {
     expect(result.current.termMap.has("margin")).toBe(false);
     expect(result.current.termMap.has("gross margin")).toBe(true);
     expect(result.current.termMap.has("ebitda")).toBe(true);
+    expect(result.current.termMap.has("arr")).toBe(true);
+    expect(result.current.termMap.has("yield")).toBe(true); // industry category bypasses filter
     expect(result.current.termRegex).not.toBeNull();
   });
 

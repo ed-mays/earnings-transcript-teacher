@@ -18,8 +18,14 @@ export function TermTooltip({ term, definition }: TermTooltipProps) {
     <Popover>
       <PopoverTrigger
         data-slot="term-trigger"
-        className="cursor-help border-b border-dashed border-green-500/70 text-foreground hover:text-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
         aria-label={`Definition of ${term}`}
+        render={
+          <span
+            tabIndex={0}
+            role="button"
+            className="cursor-help rounded bg-green-500/10 px-0.5 text-foreground underline decoration-green-600 decoration-dashed decoration-2 underline-offset-2 hover:bg-green-500/20 hover:text-green-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+          />
+        }
       >
         {term}
       </PopoverTrigger>
