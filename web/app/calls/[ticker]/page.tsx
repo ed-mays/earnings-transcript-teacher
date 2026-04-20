@@ -135,9 +135,9 @@ export default async function TranscriptPage({
           <MetadataPanel call={call} />
           <Link href={`/calls/${call.ticker}/learn`} className="mt-4 block group">
             <Card className="p-4 transition-colors group-hover:bg-muted">
-              <p className="text-sm font-semibold text-foreground">Study with Feynman chat</p>
+              <p className="text-sm font-semibold text-foreground">Study the annotated transcript</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Explain what you&apos;ve learned — the AI will probe your understanding
+                Toggle guidance, evasion, sentiment, and term layers — then chat about any passage.
               </p>
             </Card>
           </Link>

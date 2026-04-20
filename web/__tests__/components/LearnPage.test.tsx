@@ -1,9 +1,10 @@
 import React, { Suspense } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 import LearnPage from "@/app/calls/[ticker]/learn/page";
-import { callDetail } from "../utils/fixtures";
+import { callDetail, spansResponse } from "../utils/fixtures";
+import type { LearnAnnotationsResponse } from "@/components/transcript/types";
 
 /**
  * React 19's use() hook checks promise.status === "fulfilled" to return
@@ -47,10 +48,29 @@ vi.mock("@/lib/chat", () => ({
 }));
 
 import { api } from "@/lib/api";
-import { streamChat } from "@/lib/chat";
 
 const mockGet = api.get as ReturnType<typeof vi.fn>;
-const mockStreamChat = streamChat as ReturnType<typeof vi.fn>;
+
+const emptyAnnotations: LearnAnnotationsResponse = {
+  terms: [],
+  evasion: [],
+  takeaways: [],
+  misconceptions: [],
+  synthesis: null,
+};
+
+function setupApiResponses(overrides: Partial<{ annotations: LearnAnnotationsResponse }> = {}) {
+  mockGet.mockImplementation((path: string) => {
+    if (path.includes("/learn-annotations")) {
+      return Promise.resolve(overrides.annotations ?? emptyAnnotations);
+    }
+    if (path.includes("/spans")) {
+      return Promise.resolve(spansResponse);
+    }
+    // /api/calls/{ticker}
+    return Promise.resolve(callDetail);
+  });
+}
 
 function renderLearnPage(ticker = "aapl", topic?: string) {
   return render(
@@ -59,100 +79,53 @@ function renderLearnPage(ticker = "aapl", topic?: string) {
         params={fulfilledPromise({ ticker })}
         searchParams={fulfilledPromise({ topic })}
       />
-    </Suspense>
+    </Suspense>,
   );
 }
 
 describe("LearnPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGet.mockResolvedValue(callDetail);
-    mockStreamChat.mockResolvedValue(undefined);
+    setupApiResponses();
   });
 
   it("renders the heading with the uppercased ticker", async () => {
     renderLearnPage("aapl");
-    expect(screen.getByText(/AAPL/)).toBeInTheDocument();
-    // Wait for the suggestions useEffect to settle so act() warnings don't appear
+    expect(screen.getByRole("heading", { name: /Learn:/i })).toHaveTextContent(/AAPL/);
     await waitFor(() => expect(mockGet).toHaveBeenCalled());
   });
 
-  it("loads CallDetail and shows suggestion buttons from themes", async () => {
+  it("fetches learn-annotations, spans, and call detail on mount", async () => {
     renderLearnPage("aapl");
-    // callDetail has themes: ["services growth", "hardware resilience"]
-    // buildSuggestions generates questions from those
     await waitFor(() => {
-      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining("/api/calls/aapl"));
+      const paths = mockGet.mock.calls.map(([p]) => p as string);
+      expect(paths.some((p) => p.includes("/learn-annotations"))).toBe(true);
+      expect(paths.some((p) => p.includes("/spans"))).toBe(true);
+      expect(paths.some((p) => p === "/api/calls/aapl")).toBe(true);
     });
   });
 
-  it("appends user message to thread when Send is clicked", async () => {
+  it("renders all four annotation layer switches", async () => {
     renderLearnPage("aapl");
-    const textarea = screen.getByRole("textbox");
-    await userEvent.type(textarea, "What drove services revenue?");
-    await userEvent.keyboard("{Enter}");
     await waitFor(() => {
-      expect(screen.getByText("What drove services revenue?")).toBeInTheDocument();
-    });
-    expect(mockStreamChat).toHaveBeenCalledWith(
-      "aapl",
-      "What drove services revenue?",
-      null,
-      expect.any(Object),
-      expect.any(AbortSignal)
-    );
-  });
-
-  it("shows a dismissible error banner when streamChat calls onError", async () => {
-    mockStreamChat.mockImplementation(
-      (_ticker: unknown, _message: unknown, _sessionId: unknown, callbacks: { onError: (msg: string) => void }) => {
-        callbacks.onError("Something went wrong.");
-        return Promise.resolve();
-      }
-    );
-
-    renderLearnPage("aapl");
-    const textarea = screen.getByRole("textbox");
-    await userEvent.type(textarea, "Tell me about revenue");
-    await userEvent.keyboard("{Enter}");
-
-    await waitFor(() => {
-      expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
-    });
-
-    await userEvent.click(screen.getByRole("button", { name: /dismiss error/i }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Something went wrong.")).not.toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: /Guidance/i })).toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: /Evasion/i })).toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: /Sentiment/i })).toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: /Terms/i })).toBeInTheDocument();
     });
   });
 
-  it("clears messages and resets state when New session is clicked", async () => {
-    // Make streamChat call onDone to add an assistant message
-    mockStreamChat.mockImplementation(
-      (_ticker: unknown, _message: unknown, _sessionId: unknown, callbacks: { onToken: (t: string) => void; onDone: (id: string) => void }) => {
-        callbacks.onToken("Great question.");
-        callbacks.onDone("session-1");
-        return Promise.resolve();
-      }
-    );
-
+  it("opens the chat panel when the Discuss button is clicked", async () => {
     renderLearnPage("aapl");
-    const textarea = screen.getByRole("textbox");
-    await userEvent.type(textarea, "Tell me about iPhone");
-    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole("button", { name: /Discuss/i }));
+    expect(screen.getByRole("complementary", { name: /Learning chat/i })).toBeInTheDocument();
+  });
 
-    // Wait for the assistant message to appear
+  it("pre-opens the chat panel when a ?topic= search param is supplied", async () => {
+    renderLearnPage("aapl", "EBITDA");
     await waitFor(() => {
-      expect(screen.getByText("Tell me about iPhone")).toBeInTheDocument();
-    });
-
-    // Click "New session"
-    await userEvent.click(screen.getByRole("button", { name: /new session/i }));
-
-    // Messages should be gone
-    await waitFor(() => {
-      expect(screen.queryByText("Tell me about iPhone")).not.toBeInTheDocument();
+      expect(screen.getByRole("complementary", { name: /Learning chat/i })).toBeInTheDocument();
     });
   });
 });

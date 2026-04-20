@@ -1,18 +1,35 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ChatThread } from "@/components/chat/ChatThread";
-import { ChatInput } from "@/components/chat/ChatInput";
-import { streamChat } from "@/lib/chat";
 import { api } from "@/lib/api";
 import { useFlag } from "@/lib/useFlag";
-import { buildSuggestions } from "@/lib/suggestions";
-import type { ChatMessage } from "@/lib/chat";
-import type { TopicsResponse, KeywordsResponse } from "@/components/transcript/types";
+import { findEvasionSpanIndex } from "@/lib/highlight";
+import { useAnnotations } from "@/hooks/useAnnotations";
+import { AnnotatedSpanBlock } from "@/components/learn/AnnotatedSpanBlock";
+import { ChatPanel } from "@/components/learn/ChatPanel";
+import { EvasionCard } from "@/components/learn/EvasionCard";
+import { LayerToggle } from "@/components/learn/LayerToggle";
+import { SectionCheckpoint } from "@/components/learn/SectionCheckpoint";
+import { SentimentBar } from "@/components/learn/SentimentBar";
+import { CallBriefPanel } from "@/components/transcript/CallBriefPanel";
+import {
+  DEFAULT_LAYERS,
+  type AnnotationLayer,
+  type AnnotationLayers,
+  type ChatContext,
+} from "@/components/learn/types";
+import type {
+  CallDetail,
+  QAEvasionItem,
+  SpansResponse,
+} from "@/components/transcript/types";
 
-/** Feynman-style learning chat for a given ticker's transcript. */
+const PAGE_SIZE = 50;
+
+/** Annotated transcript + chat panel learning experience. */
 export default function LearnPage({
   params,
   searchParams,
@@ -23,153 +40,259 @@ export default function LearnPage({
   const { ticker } = use(params);
   const { topic } = use(searchParams);
   const upperTicker = ticker.toUpperCase();
-
   const chatEnabled = useFlag("chat_enabled", true);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [streamingContent, setStreamingContent] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [layers, setLayers] = useState<AnnotationLayers>(DEFAULT_LAYERS);
+  const [chatContext, setChatContext] = useState<ChatContext | null>(
+    topic ? { type: "term", text: topic } : null,
+  );
+  const [chatOpen, setChatOpen] = useState<boolean>(Boolean(topic));
 
-  // Cancel any in-flight stream when the component unmounts (navigation away)
-  useEffect(() => {
-    return () => { abortControllerRef.current?.abort(); };
-  }, []);
+  const [call, setCall] = useState<CallDetail | null>(null);
+  const [spans, setSpans] = useState<SpansResponse | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [spansError, setSpansError] = useState<string | null>(null);
+
+  const {
+    annotations,
+    termMap,
+    termRegex,
+    loading: annotationsLoading,
+    error: annotationsError,
+  } = useAnnotations(ticker);
 
   useEffect(() => {
-    Promise.all([
-      api.get<TopicsResponse>(`/api/calls/${ticker}/topics`),
-      api.get<KeywordsResponse>(`/api/calls/${ticker}/keywords`),
-    ])
-      .then(([topics, kw]) => setSuggestions(buildSuggestions(topics.themes, kw.keywords)))
-      .catch(() => {
-        // Silent degradation — suggestions are a progressive enhancement
-      })
-      .finally(() => setLoadingSuggestions(false));
+    api
+      .get<CallDetail>(`/api/calls/${ticker}`)
+      .then(setCall)
+      .catch(() => setCall(null));
   }, [ticker]);
 
-  function handleAbort() {
-    abortControllerRef.current?.abort();
-    setStreamingContent("");
-    setIsStreaming(false);
-  }
+  useEffect(() => {
+    setSpansError(null);
+    api
+      .get<SpansResponse>(
+        `/api/calls/${ticker}/spans?section=all&page=${page}&page_size=${PAGE_SIZE}`,
+      )
+      .then(setSpans)
+      .catch((err: unknown) => {
+        setSpans(null);
+        setSpansError(err instanceof Error ? err.message : "Failed to load transcript");
+      });
+  }, [ticker, page]);
 
-  async function handleSend(message: string) {
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  const evasionBySpanIndex = useMemo(() => {
+    const map = new Map<number, QAEvasionItem>();
+    if (!annotations || !spans) return map;
+    for (const item of annotations.evasion) {
+      if (!item.answer_text) continue;
+      const idx = findEvasionSpanIndex(item.answer_text, spans.spans);
+      if (idx !== null && !map.has(idx)) {
+        map.set(idx, item);
+      }
+    }
+    return map;
+  }, [annotations, spans]);
 
-    setError(null);
-    setIsStreaming(true);
-    setStreamingContent("");
-    setMessages((prev) => [...prev, { role: "user", content: message }]);
+  const preparedToQaBoundary = useMemo(() => {
+    if (!spans) return -1;
+    for (let i = 0; i < spans.spans.length; i += 1) {
+      if (spans.spans[i].section === "qa") return i;
+    }
+    return -1;
+  }, [spans]);
 
-    let accumulated = "";
+  const toggleLayer = useCallback((layer: AnnotationLayer) => {
+    setLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
+  }, []);
 
-    await streamChat(ticker, message, sessionId, {
-      onToken(token) {
-        accumulated += token;
-        setStreamingContent(accumulated);
-      },
-      onDone(newSessionId) {
-        setSessionId(newSessionId);
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: accumulated },
-        ]);
-        setStreamingContent("");
-        setIsStreaming(false);
-      },
-      onError(msg) {
-        if (controller.signal.aborted) return;
-        setError(msg);
-        setStreamingContent("");
-        setIsStreaming(false);
-      },
-    }, controller.signal);
-  }
+  const handleChatClick = useCallback((context: ChatContext) => {
+    setChatContext(context);
+    setChatOpen(true);
+  }, []);
 
-  function handleNewSession() {
-    setMessages([]);
-    setStreamingContent("");
-    setSessionId(null);
-    setError(null);
-  }
+  const handleOpenChat = useCallback(() => {
+    setChatContext(null);
+    setChatOpen(true);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setChatOpen(false);
+  }, []);
+
+  const totalPages = spans ? Math.max(1, Math.ceil(spans.total / spans.page_size)) : 1;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 min-h-0 flex-col px-6 py-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
+    <div className="flex h-[calc(100dvh-var(--nav-height))] w-full overflow-hidden">
+      <section
+        className={chatOpen ? "hidden min-w-0 flex-1 lg:flex lg:flex-col" : "flex min-w-0 flex-1 flex-col"}
+        aria-label="Annotated transcript"
+      >
+        {/* Header */}
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground">
-              Learn:{" "}
-              <span className="uppercase">{upperTicker}</span>
+            <h1 className="text-xl font-semibold text-foreground">
+              Learn: <span className="uppercase">{upperTicker}</span>
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Explain what you&apos;ve learned in your own words — the AI will probe your understanding
+            <p className="text-xs text-muted-foreground">
+              Toggle layers to explore guidance, evasion, sentiment, and terms.
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewSession}
-            disabled={isStreaming}
-          >
-            New session
-          </Button>
-          <Link
-            href={`/calls/${upperTicker}`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            View transcript
-          </Link>
-        </div>
-      </div>
-
-      {!chatEnabled ? (
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-sm text-muted-foreground">
-            Chat is temporarily unavailable. Please check back later.
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Error banner */}
-          {error && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              <span className="flex-1">{error}</span>
-              <button
-                onClick={() => setError(null)}
-                aria-label="Dismiss error"
-                className="shrink-0 text-destructive/60 hover:text-destructive"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Chat thread */}
-          <ChatThread
-            messages={messages}
-            streamingContent={streamingContent}
-            suggestions={suggestions}
-            loadingSuggestions={loadingSuggestions}
-            onSuggestionClick={handleSend}
-          />
-
-          {/* Input */}
-          <div className="mt-4">
-            <ChatInput onSend={handleSend} onAbort={handleAbort} isStreaming={isStreaming} initialValue={topic ?? ""} />
+          <div className="flex items-center gap-2">
+            {chatEnabled ? (
+              <Button variant="outline" size="sm" onClick={handleOpenChat}>
+                <MessageCircle className="mr-1 h-4 w-4" aria-hidden />
+                Discuss
+              </Button>
+            ) : null}
+            <Link
+              href={`/calls/${upperTicker}`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              View transcript
+            </Link>
           </div>
-        </>
-      )}
+        </header>
+
+        {/* Layer toggle + sentiment bar */}
+        <LayerToggle layers={layers} onChange={toggleLayer} />
+        {layers.sentiment ? <SentimentBar synthesis={annotations?.synthesis ?? null} /> : null}
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl px-4 py-6">
+            {/* Brief */}
+            {call?.brief ? (
+              <CallBriefPanel
+                brief={call.brief}
+                takeaways={call.takeaways}
+                misconceptions={call.misconceptions}
+                signal_strip={call.signal_strip ?? null}
+              />
+            ) : null}
+
+            {/* Errors */}
+            {spansError ? (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              >
+                {spansError}
+              </div>
+            ) : null}
+            {annotationsError ? (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground"
+              >
+                Some annotations could not load. The transcript is still readable.
+              </div>
+            ) : null}
+
+            {/* Transcript */}
+            {spans ? (
+              <div className="divide-y rounded-lg border bg-background">
+                {spans.spans.map((span, index) => {
+                  const elements: React.ReactNode[] = [];
+
+                  if (
+                    layers.guidance &&
+                    index === preparedToQaBoundary &&
+                    call?.misconceptions?.length
+                  ) {
+                    elements.push(
+                      <SectionCheckpoint
+                        key={`checkpoint-${span.sequence_order}`}
+                        misconceptions={call.misconceptions}
+                      />,
+                    );
+                  }
+
+                  elements.push(
+                    <AnnotatedSpanBlock
+                      key={`span-${span.sequence_order}`}
+                      span={span}
+                      layers={layers}
+                      termRegex={layers.terms ? termRegex : null}
+                      termMap={termMap}
+                      evasionContext={
+                        layers.evasion && evasionBySpanIndex.has(index)
+                          ? {
+                              type: "evasion",
+                              text: span.text,
+                              metadata:
+                                evasionBySpanIndex.get(index)?.analyst_concern,
+                            }
+                          : undefined
+                      }
+                      onChatClick={handleChatClick}
+                    />,
+                  );
+
+                  if (layers.evasion && evasionBySpanIndex.has(index)) {
+                    elements.push(
+                      <EvasionCard
+                        key={`evasion-${span.sequence_order}`}
+                        item={evasionBySpanIndex.get(index)!}
+                        onChatClick={handleChatClick}
+                      />,
+                    );
+                  }
+
+                  return <div key={span.sequence_order}>{elements}</div>;
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {annotationsLoading ? "Loading transcript…" : "No transcript spans found."}
+              </p>
+            )}
+
+            {/* Pagination */}
+            {spans && totalPages > 1 ? (
+              <nav
+                aria-label="Transcript pagination"
+                className="mt-6 flex items-center justify-between gap-3"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </nav>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {chatEnabled && chatOpen ? (
+        <div className="fixed inset-0 z-40 flex lg:static lg:z-auto lg:inset-auto">
+          {/* Backdrop for mobile */}
+          <button
+            type="button"
+            aria-label="Close chat overlay"
+            onClick={handleCloseChat}
+            className="flex-1 bg-black/30 lg:hidden"
+          />
+          <div className="h-full w-full bg-background lg:w-[400px] lg:border-l">
+            <ChatPanel ticker={ticker} context={chatContext} onClose={handleCloseChat} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
