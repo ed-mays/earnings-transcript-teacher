@@ -16,10 +16,28 @@ export interface UseAnnotationsResult {
   error: string | null;
 }
 
+// Common lowercase financial words that are ambiguous in prose — they appear
+// constantly in sentences without referring to the financial concept.
+// Everything else (acronyms like EBITDA/ARR, multi-word phrases, industry
+// terms) passes through.
+const AMBIGUOUS_SINGLE_WORDS = new Set([
+  "call",
+  "margin",
+  "note",
+  "yield",
+  "cash",
+  "debt",
+  "equity",
+  "bond",
+  "share",
+  "unit",
+]);
+
 function filterTerms(terms: readonly TermDefinition[]): TermDefinition[] {
   return terms.filter((t) => {
     if (t.category === "industry") return true;
-    return t.term.includes(" ");
+    if (t.term.includes(" ")) return true;
+    return !AMBIGUOUS_SINGLE_WORDS.has(t.term.toLowerCase());
   });
 }
 

@@ -52,6 +52,10 @@ describe("AnnotatedSpanBlock", () => {
       .getAllByText("data center GPU")
       .find((el) => el.getAttribute("data-slot") === "term-trigger");
     expect(trigger).toBeDefined();
+    // Must be visibly styled (not the default unstyled inline button) —
+    // confirms the green highlight wraps the term text.
+    expect(trigger!.className).toMatch(/bg-green/);
+    expect(trigger!.className).toMatch(/underline/);
   });
 
   it("renders an evasion chat icon when evasionContext is provided and fires onChatClick", async () => {
