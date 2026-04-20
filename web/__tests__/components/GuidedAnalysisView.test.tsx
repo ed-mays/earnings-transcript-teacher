@@ -1,25 +1,10 @@
-import React, { Suspense } from "react";
+import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import LearnPage from "@/app/calls/[ticker]/learn/page";
+import { GuidedAnalysisView } from "@/app/calls/[ticker]/GuidedAnalysisView";
 import { callDetail, spansResponse } from "../utils/fixtures";
 import type { LearnAnnotationsResponse } from "@/components/transcript/types";
-
-/**
- * React 19's use() hook checks promise.status === "fulfilled" to return
- * synchronously without suspending. Pre-set these fields so the component
- * renders immediately in tests without needing a Suspense cycle.
- */
-function fulfilledPromise<T>(value: T): Promise<T> {
-  const p = Promise.resolve(value) as Promise<T> & {
-    status?: string;
-    value?: T;
-  };
-  p.status = "fulfilled";
-  p.value = value;
-  return p;
-}
 
 vi.mock("next/link", () => ({
   default: ({
@@ -40,6 +25,7 @@ vi.mock("next/link", () => ({
 vi.mock("@/lib/api", () => ({
   api: {
     get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -59,7 +45,9 @@ const emptyAnnotations: LearnAnnotationsResponse = {
   synthesis: null,
 };
 
-function setupApiResponses(overrides: Partial<{ annotations: LearnAnnotationsResponse }> = {}) {
+function setupApiResponses(
+  overrides: Partial<{ annotations: LearnAnnotationsResponse }> = {},
+) {
   mockGet.mockImplementation((path: string) => {
     if (path.includes("/learn-annotations")) {
       return Promise.resolve(overrides.annotations ?? emptyAnnotations);
@@ -67,46 +55,45 @@ function setupApiResponses(overrides: Partial<{ annotations: LearnAnnotationsRes
     if (path.includes("/spans")) {
       return Promise.resolve(spansResponse);
     }
-    // /api/calls/{ticker}
     return Promise.resolve(callDetail);
   });
 }
 
-function renderLearnPage(ticker = "aapl", topic?: string) {
+function renderGuided(topic?: string) {
   return render(
-    <Suspense fallback={<div>Loading...</div>}>
-      <LearnPage
-        params={fulfilledPromise({ ticker })}
-        searchParams={fulfilledPromise({ topic })}
-      />
-    </Suspense>,
+    <GuidedAnalysisView
+      call={callDetail}
+      adjacent={{ prev: null, next: null }}
+      initialTopic={topic}
+    />,
   );
 }
 
-describe("LearnPage", () => {
+describe("GuidedAnalysisView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupApiResponses();
   });
 
-  it("renders the heading with the uppercased ticker", async () => {
-    renderLearnPage("aapl");
-    expect(screen.getByRole("heading", { name: /Learn:/i })).toHaveTextContent(/AAPL/);
+  it("renders the Guided Analysis heading with the uppercased ticker", async () => {
+    renderGuided();
+    const heading = screen.getByRole("heading", { name: /AAPL/ });
+    expect(heading).toHaveTextContent(/AAPL/);
+    expect(heading).toHaveTextContent(/Guided Analysis/);
     await waitFor(() => expect(mockGet).toHaveBeenCalled());
   });
 
-  it("fetches learn-annotations, spans, and call detail on mount", async () => {
-    renderLearnPage("aapl");
+  it("fetches learn-annotations and spans on mount", async () => {
+    renderGuided();
     await waitFor(() => {
       const paths = mockGet.mock.calls.map(([p]) => p as string);
       expect(paths.some((p) => p.includes("/learn-annotations"))).toBe(true);
       expect(paths.some((p) => p.includes("/spans"))).toBe(true);
-      expect(paths.some((p) => p === "/api/calls/aapl")).toBe(true);
     });
   });
 
   it("renders all four annotation layer switches", async () => {
-    renderLearnPage("aapl");
+    renderGuided();
     await waitFor(() => {
       expect(screen.getByRole("switch", { name: /Guidance/i })).toBeInTheDocument();
       expect(screen.getByRole("switch", { name: /Evasion/i })).toBeInTheDocument();
@@ -115,17 +102,21 @@ describe("LearnPage", () => {
     });
   });
 
-  it("opens the chat panel when the Discuss button is clicked", async () => {
-    renderLearnPage("aapl");
+  it("opens the chat panel when 'Explore with Feynman' is clicked", async () => {
+    renderGuided();
     await waitFor(() => expect(mockGet).toHaveBeenCalled());
-    await userEvent.click(screen.getByRole("button", { name: /Discuss/i }));
-    expect(screen.getByRole("complementary", { name: /Learning chat/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Explore with Feynman/i }));
+    expect(
+      screen.getByRole("complementary", { name: /Learning chat/i }),
+    ).toBeInTheDocument();
   });
 
-  it("pre-opens the chat panel when a ?topic= search param is supplied", async () => {
-    renderLearnPage("aapl", "EBITDA");
+  it("pre-opens the chat panel when initialTopic is supplied", async () => {
+    renderGuided("EBITDA");
     await waitFor(() => {
-      expect(screen.getByRole("complementary", { name: /Learning chat/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("complementary", { name: /Learning chat/i }),
+      ).toBeInTheDocument();
     });
   });
 });

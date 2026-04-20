@@ -19,6 +19,7 @@ export function TermTooltip({ term, definition }: TermTooltipProps) {
       <PopoverTrigger
         data-slot="term-trigger"
         aria-label={`Definition of ${term}`}
+        nativeButton={false}
         render={
           <span
             tabIndex={0}
