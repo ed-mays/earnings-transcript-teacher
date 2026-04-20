@@ -846,6 +846,96 @@ class TestGetCallSynthesis:
         assert response.json()["synthesis"] is None
 
 
+class TestGetLearnAnnotations:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/learn-annotations")
+        assert response.status_code == 404
+
+    def test_returns_composed_annotations(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_learn_annotations_for_ticker.return_value = {
+                "terms": [
+                    {
+                        "term": "ARR",
+                        "definition": "Annual recurring revenue",
+                        "explanation": "Revenue from subscriptions normalized to one year.",
+                        "category": "financial",
+                    },
+                    {
+                        "term": "Data center GPU",
+                        "definition": "Specialized compute hardware",
+                        "explanation": "Used for AI workloads.",
+                        "category": "industry",
+                    },
+                ],
+                "evasion": [
+                    {
+                        "analyst_name": "Jane Doe",
+                        "question_topic": "Margins",
+                        "question_text": "Why did gross margin compress?",
+                        "answer_text": "We're investing in growth.",
+                        "analyst_concern": "Dodging margin question",
+                        "defensiveness_score": 7,
+                        "evasion_explanation": "Deflected to growth narrative.",
+                    }
+                ],
+                "takeaways": [
+                    {"takeaway": "Q4 revenue beat guidance", "why_it_matters": "Confirms demand."}
+                ],
+                "misconceptions": [
+                    {"fact": "CapEx rose 30%", "misinterpretation": "Growth slowing", "correction": "Scaling capacity."}
+                ],
+                "synthesis": {
+                    "overall_sentiment": "bullish",
+                    "executive_tone": "confident",
+                    "analyst_sentiment": "neutral",
+                },
+            }
+            response = api_client.get("/api/calls/NVDA/learn-annotations")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["terms"]) == 2
+        assert data["terms"][0]["term"] == "ARR"
+        assert data["terms"][0]["category"] == "financial"
+        assert len(data["evasion"]) == 1
+        assert data["evasion"][0]["defensiveness_score"] == 7
+        assert data["evasion"][0]["analyst_name"] == "Jane Doe"
+        assert len(data["takeaways"]) == 1
+        assert data["takeaways"][0]["takeaway"] == "Q4 revenue beat guidance"
+        assert len(data["misconceptions"]) == 1
+        assert data["misconceptions"][0]["fact"] == "CapEx rose 30%"
+        assert data["synthesis"]["overall_sentiment"] == "bullish"
+        assert data["synthesis"]["executive_tone"] == "confident"
+        assert data["synthesis"]["analyst_sentiment"] == "neutral"
+
+    def test_empty_state(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_learn_annotations_for_ticker.return_value = {
+                "terms": [],
+                "evasion": [],
+                "takeaways": [],
+                "misconceptions": [],
+                "synthesis": None,
+            }
+            response = api_client.get("/api/calls/EMPTY/learn-annotations")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["terms"] == []
+        assert data["evasion"] == []
+        assert data["takeaways"] == []
+        assert data["misconceptions"] == []
+        assert data["synthesis"] is None
+
+
 class TestGetCallSpeakers:
     def test_404_for_unknown_ticker(self, api_client):
         with patch("routes.calls._ticker_exists", return_value=False):

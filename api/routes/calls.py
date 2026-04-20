@@ -124,6 +124,31 @@ class CompetitorInfo(BaseModel):
     mentioned_in_transcript: bool
 
 
+class TermDefinition(BaseModel):
+    term: str
+    definition: str
+    explanation: str
+    category: str
+
+
+class QAEvasionItem(BaseModel):
+    analyst_name: str | None = None
+    question_topic: str | None = None
+    question_text: str | None = None
+    answer_text: str | None = None
+    analyst_concern: str
+    defensiveness_score: int
+    evasion_explanation: str
+
+
+class LearnAnnotationsResponse(BaseModel):
+    terms: list[TermDefinition] = []
+    evasion: list[QAEvasionItem] = []
+    takeaways: list[TakeawayItem] = []
+    misconceptions: list[MisconceptionItem] = []
+    synthesis: SynthesisInfo | None = None
+
+
 class CallDetail(BaseModel):
     ticker: str
     company_name: str | None = None
@@ -339,6 +364,27 @@ def get_call_synthesis(ticker: str, conn: DbDep, response: Response) -> Synthesi
     )
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return SynthesisResponse(synthesis=synthesis)
+
+
+@router.get("/{ticker}/learn-annotations", response_model=LearnAnnotationsResponse)
+def get_learn_annotations(ticker: str, conn: DbDep, response: Response) -> LearnAnnotationsResponse:
+    """Return composite annotation data for the learn page (terms, evasion, takeaways, misconceptions, synthesis)."""
+    logger.info("GET /api/calls/%s/learn-annotations", ticker)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    raw = analysis_repo.get_learn_annotations_for_ticker(ticker)
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return LearnAnnotationsResponse(
+        terms=[TermDefinition(**t) for t in raw["terms"]],
+        evasion=[QAEvasionItem(**e) for e in raw["evasion"]],
+        takeaways=[TakeawayItem(**t) for t in raw["takeaways"]],
+        misconceptions=[MisconceptionItem(**m) for m in raw["misconceptions"]],
+        synthesis=SynthesisInfo(**raw["synthesis"]) if raw["synthesis"] else None,
+    )
 
 
 @router.get("/{ticker}/speakers", response_model=SpeakersResponse)
