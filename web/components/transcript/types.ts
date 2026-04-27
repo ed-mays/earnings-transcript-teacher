@@ -140,6 +140,25 @@ export interface QAEvasionItem {
   analyst_concern: string;
   defensiveness_score: number;
   evasion_explanation: string;
+  evasion_type: string | null;
+}
+
+export interface QAForensicsExchange {
+  id: string;
+  analyst_name: string | null;
+  question_topic: string | null;
+  question_text: string | null;
+  answer_text: string | null;
+  analyst_concern: string;
+  defensiveness_score: number;
+  evasion_explanation: string;
+  evasion_type: string | null;
+}
+
+export interface QAForensicsResponse {
+  exchanges: QAForensicsExchange[];
+  total: number;
+  dominant_evasion_type: string | null;
 }
 
 export interface LearnAnnotationsResponse {
