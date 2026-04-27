@@ -12,7 +12,7 @@ export const DEFAULT_LAYERS: AnnotationLayers = {
 };
 
 export interface ChatContext {
-  type: "evasion" | "term" | "guidance";
+  type: "evasion" | "term" | "guidance" | "qa-forensics";
   text: string;
   metadata?: string;
 }

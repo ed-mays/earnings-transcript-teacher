@@ -138,7 +138,7 @@ export function GuidedAnalysisView({ call, adjacent, initialTopic }: GuidedAnaly
   const totalPages = spans ? Math.max(1, Math.ceil(spans.total / spans.page_size)) : 1;
 
   return (
-    <div className="flex h-[calc(100dvh-var(--nav-height))] w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       <section
         className={
           chatOpen

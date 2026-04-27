@@ -121,6 +121,10 @@ function contextToPrompt(context: ChatContext): string {
       return `Explain "${context.text}" in context${context.metadata ? `: ${context.metadata}` : ""}.`;
     case "guidance":
       return `What should I take away from this guidance point? ${context.text}`;
+    case "qa-forensics":
+      // Seed is fully constructed by QAForensicsClient — pass through verbatim
+      // so Stage 1 of the Feynman flow gets the user's own judgment as context.
+      return context.text;
     default:
       return context.text;
   }
