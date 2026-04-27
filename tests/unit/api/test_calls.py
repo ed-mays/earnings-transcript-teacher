@@ -660,8 +660,8 @@ class TestGetCallEvasion:
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
             MockAnalysisRepo.return_value.get_evasion_for_ticker.return_value = [
-                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith"),
-                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe"),
+                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith", "deflect_to_forward_looking"),
+                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe", "verbose_non_answer"),
             ]
             response = api_client.get("/api/calls/AAPL/evasion")
 

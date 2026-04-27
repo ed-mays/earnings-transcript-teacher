@@ -64,6 +64,7 @@ class EvasionItem(BaseModel):
     evasion_explanation: str
     question_topic: str | None = None
     analyst_name: str | None = None
+    evasion_type: str | None = None
 
 
 class StrategicShift(BaseModel):
@@ -139,6 +140,7 @@ class QAEvasionItem(BaseModel):
     analyst_concern: str
     defensiveness_score: int
     evasion_explanation: str
+    evasion_type: str | None = None
 
 
 class LearnAnnotationsResponse(BaseModel):
@@ -452,6 +454,7 @@ def get_call_evasion(ticker: str, conn: DbDep, response: Response) -> EvasionRes
             evasion_explanation=r[2],
             question_topic=r[3],
             analyst_name=r[4],
+            evasion_type=r[5],
         )
         for r in raw_evasion
     ]

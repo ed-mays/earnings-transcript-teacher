@@ -388,7 +388,8 @@ class AnalysisRepository:
         """Return evasion entries ordered by call sequence.
 
         Each row: (analyst_name, question_topic, question_text, answer_text,
-                   analyst_concern, defensiveness_score, evasion_explanation)
+                   analyst_concern, defensiveness_score, evasion_explanation,
+                   evasion_type)
         """
         rows = []
         try:
@@ -399,7 +400,7 @@ class AnalysisRepository:
                         SELECT ea.analyst_name, ea.question_topic,
                                ea.question_text, ea.answer_text,
                                ea.analyst_concern, ea.defensiveness_score,
-                               ea.evasion_explanation
+                               ea.evasion_explanation, ea.evasion_type
                         FROM evasion_analysis ea
                         JOIN transcript_chunks tc ON ea.chunk_id = tc.chunk_id AND ea.call_id = tc.call_id
                         JOIN calls c ON ea.call_id = c.id
@@ -415,11 +416,11 @@ class AnalysisRepository:
 
     def get_evasion_for_ticker(
         self, ticker: str, conn: psycopg.Connection | None = None
-    ) -> list[tuple[str, int, str, str | None, str | None]]:
+    ) -> list[tuple[str, int, str, str | None, str | None, str | None]]:
         """Return evasion analysis entries for a ticker.
 
         Each row: (analyst_concern, defensiveness_score, evasion_explanation,
-                   question_topic, analyst_name)
+                   question_topic, analyst_name, evasion_type)
         """
         rows = []
         try:
@@ -429,7 +430,7 @@ class AnalysisRepository:
                     cur.execute(
                         """
                         SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation,
-                               ea.question_topic, ea.analyst_name
+                               ea.question_topic, ea.analyst_name, ea.evasion_type
                         FROM evasion_analysis ea
                         JOIN calls c ON ea.call_id = c.id
                         WHERE c.ticker = %s
@@ -550,6 +551,7 @@ class AnalysisRepository:
                 "analyst_concern": r[4],
                 "defensiveness_score": r[5],
                 "evasion_explanation": r[6],
+                "evasion_type": r[7],
             }
             for r in raw_evasion
         ]
@@ -885,8 +887,9 @@ class AnalysisRepository:
             INSERT INTO evasion_analysis (
                 call_id, chunk_id,
                 analyst_name, question_topic, question_text, answer_text,
-                analyst_concern, defensiveness_score, evasion_explanation
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                analyst_concern, defensiveness_score, evasion_explanation,
+                evasion_type
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 str(call_id), chunk.chunk_id,
@@ -897,6 +900,7 @@ class AnalysisRepository:
                 evasion.get("analyst_concern"),
                 evasion.get("defensiveness_score") or 0,
                 evasion.get("evasion_explanation") or "",
+                evasion.get("evasion_type"),
             ),
         )
 

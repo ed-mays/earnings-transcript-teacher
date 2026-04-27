@@ -71,7 +71,7 @@ Respond ONLY with valid JSON matching this schema:
 }
 """
 
-TIER_2_SYSTEM_PROMPT = """You are an expert financial educator. 
+TIER_2_SYSTEM_PROMPT = """You are an expert financial educator.
 Your goal is to help a beginner understand the nuances, themes, and subtext of an earnings call.
 You are given a chunk of an earnings transcript that has been flagged as strategically important.
 
@@ -84,8 +84,21 @@ Follow these instructions depending on whether the chunk is from Prepared Remark
    - answer_text: the executive's verbatim response from the transcript
    - analyst_concern: the analyst's underlying concern or worry in 1-2 sentences
    - defensiveness_score: 1-10 score of how much the executive evaded or deflected
-   - evasion_explanation: explain why the response was or was not evasive
+   - evasion_type: the dominant evasion pattern from the Evasion Taxonomy below. Pick exactly one. Use "none" when the executive answered the question directly.
+   - evasion_explanation: explain why the response was or was not evasive, naming the specific pivot, omission, or substitution that earned the evasion_type.
 3. **Misconceptions ("Gotchas")**: Identify any counter-intuitive business logic that a student might misunderstand from this text. (e.g., {"fact": "Revenue dropped", "misinterpretation": "They lost customers", "correction": "They changed billing cycles"}).
+
+## Evasion Taxonomy
+
+Use one of these values for evasion_type. Pick the single most prominent pattern when more than one applies. Default to "none" when the answer addresses the question on its merits — typically when defensiveness_score is 1–4.
+
+- deflect_to_forward_looking: the analyst asked about a current or recent metric/event; the executive pivots to future guidance, optimism about next year, or long-term strategy. Example: asked why this quarter's gross margin compressed, the CFO talks about confidence in their long-term margin trajectory.
+- reframe: the executive accepts the topic but recasts the question into a different one they prefer to answer. Example: asked specifically about China revenue, the executive answers about "international markets overall."
+- verbose_non_answer: the executive talks at length, repeats prepared-remark talking points, and never lands on the specific number or judgment that was asked for. Length without substance.
+- redirect_to_different_metric: the analyst asked about metric A; the executive answers using metric B that paints a more favorable picture. Example: asked about unit volume decline, the executive cites revenue growth driven by price.
+- partial_answer: the executive answers part of a multi-part question and leaves the harder or more sensitive part untouched.
+- run_out_clock: the executive thanks the analyst, defers ("we'll cover that at the upcoming investor day", "we don't break that out"), and moves on without engaging.
+- none: the executive answered the question directly with the requested data, judgment, or admission.
 
 Respond ONLY with valid JSON matching this schema:
 {
@@ -100,6 +113,7 @@ Respond ONLY with valid JSON matching this schema:
     "answer_text": "string",
     "analyst_concern": "string",
     "defensiveness_score": 5,
+    "evasion_type": "deflect_to_forward_looking",
     "evasion_explanation": "string"
   },
   "misconceptions": [
