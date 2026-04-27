@@ -3,6 +3,7 @@
 import logging
 import os
 import time
+from collections import Counter
 from contextlib import nullcontext
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,19 @@ def _ticker_exists(ticker: str, conn: psycopg.Connection | None = None) -> bool:
         with c.cursor() as cur:
             cur.execute("SELECT 1 FROM calls WHERE ticker = %s LIMIT 1", (ticker,))
             return cur.fetchone() is not None
+
+
+def _dominant_evasion_type(types: list[str | None]) -> str | None:
+    """Return the most common evasion_type across exchanges, ignoring 'none' and null.
+
+    Used by /qa-forensics to seed the wrap-up screen ("the dominant pattern in this
+    call was X — watch for it next call"). Returns None when every exchange was
+    'none' or unclassified.
+    """
+    filtered = [t for t in types if t and t != "none"]
+    if not filtered:
+        return None
+    return Counter(filtered).most_common(1)[0][0]
 
 
 # --- Response models ---
@@ -182,6 +196,26 @@ class TopicsResponse(BaseModel):
 class EvasionResponse(BaseModel):
     evasion_analyses: list[EvasionItem] = []
     evasion_level: str | None = None
+
+
+class QAForensicsExchange(BaseModel):
+    """One Q&A exchange surfaced for the dedicated forensics learning mode."""
+
+    id: str
+    analyst_name: str | None = None
+    question_topic: str | None = None
+    question_text: str | None = None
+    answer_text: str | None = None
+    analyst_concern: str
+    defensiveness_score: int
+    evasion_explanation: str
+    evasion_type: str | None = None
+
+
+class QAForensicsResponse(BaseModel):
+    exchanges: list[QAForensicsExchange] = []
+    total: int = 0
+    dominant_evasion_type: str | None = None
 
 
 class StrategicShiftsResponse(BaseModel):
@@ -464,6 +498,50 @@ def get_call_evasion(ticker: str, conn: DbDep, response: Response) -> EvasionRes
         evasion_level = "high" if avg_score > 6 else ("medium" if avg_score > 3 else "low")
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return EvasionResponse(evasion_analyses=evasion_analyses, evasion_level=evasion_level)
+
+
+@router.get("/{ticker}/qa-forensics", response_model=QAForensicsResponse)
+def get_qa_forensics(
+    ticker: str,
+    conn: DbDep,
+    response: Response,
+    min_score: int = Query(5, ge=1, le=10),
+) -> QAForensicsResponse:
+    """Return Q&A evasion exchanges for the dedicated forensics learning mode.
+
+    Filters to defensiveness_score >= min_score and orders by score DESC then
+    chronological sequence. Computes the dominant evasion_type across the
+    returned exchanges (excluding 'none') for the wrap-up screen.
+    """
+    logger.info("GET /api/calls/%s/qa-forensics min_score=%d", ticker, min_score)
+    if not _ticker_exists(ticker, conn):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No call found for ticker {ticker!r}",
+        )
+    analysis_repo = AnalysisRepository(_db_url())
+    rows = analysis_repo.get_qa_forensics_for_ticker(ticker, min_score=min_score)
+    exchanges = [
+        QAForensicsExchange(
+            id=str(r[0]),
+            analyst_name=r[1],
+            question_topic=r[2],
+            question_text=r[3],
+            answer_text=r[4],
+            analyst_concern=r[5],
+            defensiveness_score=r[6],
+            evasion_explanation=r[7],
+            evasion_type=r[8],
+        )
+        for r in rows
+    ]
+    dominant = _dominant_evasion_type([e.evasion_type for e in exchanges])
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    return QAForensicsResponse(
+        exchanges=exchanges,
+        total=len(exchanges),
+        dominant_evasion_type=dominant,
+    )
 
 
 @router.get("/{ticker}/strategic-shifts", response_model=StrategicShiftsResponse)
