@@ -685,6 +685,114 @@ class TestGetCallEvasion:
         assert data["evasion_level"] is None
 
 
+class TestGetQAForensics:
+    def test_404_for_unknown_ticker(self, api_client):
+        with patch("routes.calls._ticker_exists", return_value=False):
+            response = api_client.get("/api/calls/UNKNOWN/qa-forensics")
+        assert response.status_code == 404
+
+    def test_returns_exchanges_and_dominant_type(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
+                (
+                    "exch-1", "John Smith", "margin guidance",
+                    "Why did gross margin compress?", "We feel great about long-term trajectory.",
+                    "Dodging margin question", 8,
+                    "Pivoted to long-term narrative.", "deflect_to_forward_looking",
+                ),
+                (
+                    "exch-2", "Jane Doe", "China revenue",
+                    "Can you break out China specifically?", "International overall is strong.",
+                    "Avoiding regional disclosure", 7,
+                    "Reframed China as international.", "reframe",
+                ),
+                (
+                    "exch-3", "Mike Lee", "capex outlook",
+                    "What's Q4 capex?", "We're investing for the future.",
+                    "Vague capex framing", 7,
+                    "Repeated talking points without numbers.", "deflect_to_forward_looking",
+                ),
+            ]
+            response = api_client.get("/api/calls/AAPL/qa-forensics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 3
+        assert len(data["exchanges"]) == 3
+        assert data["exchanges"][0]["id"] == "exch-1"
+        assert data["exchanges"][0]["evasion_type"] == "deflect_to_forward_looking"
+        assert data["dominant_evasion_type"] == "deflect_to_forward_looking"
+
+    def test_empty_state(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/qa-forensics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["exchanges"] == []
+        assert data["total"] == 0
+        assert data["dominant_evasion_type"] is None
+
+    def test_min_score_param_passed_through(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = []
+            response = api_client.get("/api/calls/AAPL/qa-forensics?min_score=8")
+
+        assert response.status_code == 200
+        MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.assert_called_once_with(
+            "AAPL", min_score=8
+        )
+
+    def test_min_score_out_of_range_rejected(self, api_client):
+        # Query(ge=1, le=10) should reject 0 and 11.
+        with patch("routes.calls._ticker_exists", return_value=True):
+            response = api_client.get("/api/calls/AAPL/qa-forensics?min_score=0")
+        assert response.status_code == 422
+
+    def test_dominant_excludes_none_type(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            # Three exchanges with 'none', one with 'reframe' — reframe should win
+            # because 'none' is filtered out before the count.
+            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
+                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none"),
+                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", "none"),
+                ("e3", "C", "t3", "q3", "a3", "concern3", 5, "expl3", "none"),
+                ("e4", "D", "t4", "q4", "a4", "concern4", 5, "expl4", "reframe"),
+            ]
+            response = api_client.get("/api/calls/AAPL/qa-forensics")
+
+        assert response.status_code == 200
+        assert response.json()["dominant_evasion_type"] == "reframe"
+
+    def test_dominant_null_when_all_unclassified(self, api_client):
+        with (
+            patch("routes.calls._ticker_exists", return_value=True),
+            patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
+        ):
+            # All rows have 'none' or null evasion_type — backfill scenario.
+            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
+                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none"),
+                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", None),
+            ]
+            response = api_client.get("/api/calls/AAPL/qa-forensics")
+
+        assert response.status_code == 200
+        assert response.json()["dominant_evasion_type"] is None
+
+
 class TestGetCallStrategicShifts:
     def test_404_for_unknown_ticker(self, api_client):
         with patch("routes.calls._ticker_exists", return_value=False):

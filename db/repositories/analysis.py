@@ -443,6 +443,46 @@ class AnalysisRepository:
             logger.warning(f"Could not fetch evasion analysis for {ticker}: {e}")
         return rows
 
+    def get_qa_forensics_for_ticker(
+        self, ticker: str, min_score: int = 5
+    ) -> list[tuple]:
+        """Return Q&A evasion exchanges for the dedicated forensics learning mode.
+
+        Filters to defensiveness_score >= min_score and excludes rows missing
+        both question_text and answer_text (unusable as a teaching surface).
+        Ordered by defensiveness_score DESC, then chronological sequence —
+        most-evasive first, ties broken by call order.
+
+        Each row: (id, analyst_name, question_topic, question_text, answer_text,
+                   analyst_concern, defensiveness_score, evasion_explanation,
+                   evasion_type)
+        """
+        rows = []
+        try:
+            with psycopg.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT ea.id, ea.analyst_name, ea.question_topic,
+                               ea.question_text, ea.answer_text,
+                               ea.analyst_concern, ea.defensiveness_score,
+                               ea.evasion_explanation, ea.evasion_type
+                        FROM evasion_analysis ea
+                        JOIN transcript_chunks tc
+                            ON ea.chunk_id = tc.chunk_id AND ea.call_id = tc.call_id
+                        JOIN calls c ON ea.call_id = c.id
+                        WHERE c.ticker = %s
+                          AND ea.defensiveness_score >= %s
+                          AND (ea.question_text IS NOT NULL OR ea.answer_text IS NOT NULL)
+                        ORDER BY ea.defensiveness_score DESC, tc.sequence_order ASC
+                        """,
+                        (ticker, min_score),
+                    )
+                    rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"Could not fetch Q&A forensics for {ticker}: {e}")
+        return rows
+
     def get_misconceptions_for_ticker(self, ticker: str) -> list[tuple[str, str, str]]:
         """Return misconception entries for a ticker as (fact, misinterpretation, correction)."""
         rows = []
