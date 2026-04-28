@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -13,17 +13,25 @@ interface ChatPanelProps {
   ticker: string;
   context: ChatContext | null;
   onClose: () => void;
+  /** When true and a context seed is present, send the seeded message
+   *  immediately on mount instead of pre-filling the input. Used by
+   *  Q&A Forensics chip clicks where the chip text IS the message. */
+  autoSend?: boolean;
 }
 
 /** Right-side chat panel wired to the streaming Feynman chat endpoint. */
-export function ChatPanel({ ticker, context, onClose }: ChatPanelProps) {
+export function ChatPanel({ ticker, context, onClose, autoSend = false }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const hasAutoSentRef = useRef(false);
 
-  const initialValue = context ? contextToPrompt(context) : "";
+  const seedValue = context ? contextToPrompt(context) : "";
+  // When auto-sending, we fire the seed via the effect below — keep the
+  // visible input empty so the textarea is a clean slate for follow-ups.
+  const inputInitialValue = autoSend ? "" : seedValue;
 
   async function handleSend(message: string) {
     const controller = new AbortController();
@@ -74,6 +82,16 @@ export function ChatPanel({ ticker, context, onClose }: ChatPanelProps) {
     setIsStreaming(false);
   }
 
+  useEffect(() => {
+    if (autoSend && seedValue && !hasAutoSentRef.current) {
+      hasAutoSentRef.current = true;
+      handleSend(seedValue);
+    }
+    // handleSend is intentionally not in deps — it's recreated each render
+    // and the ref guard ensures we only fire once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSend, seedValue]);
+
   return (
     <aside
       className={cn(
@@ -106,7 +124,7 @@ export function ChatPanel({ ticker, context, onClose }: ChatPanelProps) {
           onSend={handleSend}
           onAbort={handleAbort}
           isStreaming={isStreaming}
-          initialValue={initialValue}
+          initialValue={inputInitialValue}
         />
       </div>
     </aside>

@@ -3,25 +3,18 @@ import type { QAForensicsExchange } from "./types";
 
 interface QAExchangeCardProps {
   exchange: QAForensicsExchange;
-  index: number;
-  total: number;
 }
 
-/** STAKES → QUESTION → ANSWER blocks. The exchange itself, no verdict shown yet. */
-export function QAExchangeCard({ exchange, index, total }: QAExchangeCardProps) {
+/** STAKES → QUESTION → ANSWER blocks. The exchange itself, no verdict shown.
+ *  Used inside the Q&A Forensics detail view. The detail view supplies its own
+ *  back-nav and verdict strip — this component is just the raw exchange. */
+export function QAExchangeCard({ exchange }: QAExchangeCardProps) {
   const analystLabel = [exchange.analyst_name, exchange.question_topic]
     .filter(Boolean)
     .join(" · ");
 
   return (
     <Card className="space-y-5 px-5 py-5">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="uppercase tracking-wide">Q&amp;A Forensics</span>
-        <span>
-          Exchange {index + 1} of {total}
-        </span>
-      </div>
-
       <section aria-label="Stakes">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Stakes

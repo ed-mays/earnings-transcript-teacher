@@ -1,20 +1,6 @@
-/** Local types for the Q&A Forensics learning mode. */
+/** Local types and helpers for the Q&A Forensics learning mode. */
 
 import type { QAForensicsExchange } from "@/components/transcript/types";
-
-export type JudgmentChoice = "yes" | "partial" | "no";
-
-export interface Judgment {
-  choice: JudgmentChoice | null;
-  text: string;
-  revealed: boolean;
-}
-
-export const JUDGMENT_LABELS: Record<JudgmentChoice, string> = {
-  yes: "Yes, fully",
-  partial: "Partially",
-  no: "No, they avoided it",
-};
 
 export const EVASION_TYPE_LABELS: Record<string, string> = {
   deflect_to_forward_looking: "Deflect to forward-looking",
