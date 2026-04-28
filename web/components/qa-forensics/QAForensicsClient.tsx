@@ -57,6 +57,11 @@ export function QAForensicsClient({ ticker, data }: QAForensicsClientProps) {
   }, [currentExchange, currentJudgment, updateJudgment]);
 
   const handleNext = useCallback(() => {
+    // Close chat when moving on so the previous exchange's discussion doesn't
+    // bleed into the next one. The `key` on <ChatPanel /> below resets internal
+    // state on remount as a belt-and-suspenders.
+    setChatOpen(false);
+    setChatContext(null);
     setCurrentIndex((i) => i + 1);
   }, []);
 
@@ -163,7 +168,12 @@ export function QAForensicsClient({ ticker, data }: QAForensicsClientProps) {
             className="flex-1 bg-black/30 lg:hidden"
           />
           <div className="h-full w-full bg-background lg:w-[400px] lg:border-l">
-            <ChatPanel ticker={ticker} context={chatContext} onClose={handleCloseChat} />
+            <ChatPanel
+              key={currentExchange?.id ?? "no-exchange"}
+              ticker={ticker}
+              context={chatContext}
+              onClose={handleCloseChat}
+            />
           </div>
         </div>
       ) : null}
