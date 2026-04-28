@@ -82,10 +82,12 @@ Follow these instructions depending on whether the chunk is from Prepared Remark
    - question_topic: a short 3-8 word phrase describing what was asked (e.g. "memory chip supply and gross margins")
    - question_text: the analyst's verbatim question(s) from the transcript
    - answer_text: the executive's verbatim response from the transcript
+   - executive_name: the name of the executive who provided the response (the primary respondent if multiple speak; e.g. "Tim Cook" or "Luca Maestri"). If the speaker isn't identifiable, leave empty string.
    - analyst_concern: the analyst's underlying concern or worry in 1-2 sentences
    - defensiveness_score: 1-10 score of how much the executive evaded or deflected
    - evasion_type: the dominant evasion pattern from the Evasion Taxonomy below. Pick exactly one. Use "none" when the executive answered the question directly.
    - evasion_explanation: explain why the response was or was not evasive, naming the specific pivot, omission, or substitution that earned the evasion_type.
+   - suggested_probes: 3-4 short, exchange-specific exploration questions a beginner could click to discuss this Q&A with a tutor. See the Suggested Probes guidance below.
 3. **Misconceptions ("Gotchas")**: Identify any counter-intuitive business logic that a student might misunderstand from this text. (e.g., {"fact": "Revenue dropped", "misinterpretation": "They lost customers", "correction": "They changed billing cycles"}).
 
 ## Evasion Taxonomy
@@ -100,6 +102,26 @@ Use one of these values for evasion_type. Pick the single most prominent pattern
 - run_out_clock: the executive thanks the analyst, defers ("we'll cover that at the upcoming investor day", "we don't break that out"), and moves on without engaging.
 - none: the executive answered the question directly with the requested data, judgment, or admission.
 
+## Suggested Probes (Q&A only)
+
+Generate 3-4 short exploration questions a beginner could click to start a tutoring conversation about this specific exchange. The probes are the user's first message to the tutor — they should sound like real questions a curious learner would ask, not survey items.
+
+Hard requirements:
+- Reference specific content from THIS exchange — the analyst's actual concern, the executive's specific dodge or substitution, the metric or topic at hand. Do not produce generic questions that could apply to any exchange.
+- Be open-ended and curious — never yes/no questions.
+- Each probe is 8-18 words.
+- Mix angles: at least one probe should explore *why the executive answered this way*, and at least one should explore *what an honest or clearer answer would have revealed*. Other useful angles: why an analyst would have asked, what the answer signals to investors, how this connects to broader strategy.
+- Plain English, no jargon the student wouldn't know without context.
+
+Bad examples (too generic):
+- "Why might they have pivoted this way?" (could apply to any deflection)
+- "What would an honest answer look like?" (boilerplate)
+
+Good examples (exchange-specific):
+- "What does the CFO's confidence-without-numbers signal about Q4 gross margin?"
+- "Why might breaking out the segment-level margins be uncomfortable for them right now?"
+- "What would a clearer answer about China demand have to acknowledge?"
+
 Respond ONLY with valid JSON matching this schema:
 {
   "takeaways": [
@@ -111,10 +133,12 @@ Respond ONLY with valid JSON matching this schema:
     "question_topic": "string",
     "question_text": "string",
     "answer_text": "string",
+    "executive_name": "string",
     "analyst_concern": "string",
     "defensiveness_score": 5,
     "evasion_type": "deflect_to_forward_looking",
-    "evasion_explanation": "string"
+    "evasion_explanation": "string",
+    "suggested_probes": ["string", "string", "string"]
   },
   "misconceptions": [
     {"fact": "string", "misinterpretation": "string", "correction": "string"}

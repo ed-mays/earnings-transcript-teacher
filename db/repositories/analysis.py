@@ -389,7 +389,7 @@ class AnalysisRepository:
 
         Each row: (analyst_name, question_topic, question_text, answer_text,
                    analyst_concern, defensiveness_score, evasion_explanation,
-                   evasion_type)
+                   evasion_type, executive_name, suggested_probes)
         """
         rows = []
         try:
@@ -400,7 +400,8 @@ class AnalysisRepository:
                         SELECT ea.analyst_name, ea.question_topic,
                                ea.question_text, ea.answer_text,
                                ea.analyst_concern, ea.defensiveness_score,
-                               ea.evasion_explanation, ea.evasion_type
+                               ea.evasion_explanation, ea.evasion_type,
+                               ea.executive_name, ea.suggested_probes
                         FROM evasion_analysis ea
                         JOIN transcript_chunks tc ON ea.chunk_id = tc.chunk_id AND ea.call_id = tc.call_id
                         JOIN calls c ON ea.call_id = c.id
@@ -416,11 +417,11 @@ class AnalysisRepository:
 
     def get_evasion_for_ticker(
         self, ticker: str, conn: psycopg.Connection | None = None
-    ) -> list[tuple[str, int, str, str | None, str | None, str | None]]:
+    ) -> list[tuple[str, int, str, str | None, str | None, str | None, str | None]]:
         """Return evasion analysis entries for a ticker.
 
         Each row: (analyst_concern, defensiveness_score, evasion_explanation,
-                   question_topic, analyst_name, evasion_type)
+                   question_topic, analyst_name, evasion_type, executive_name)
         """
         rows = []
         try:
@@ -430,7 +431,8 @@ class AnalysisRepository:
                     cur.execute(
                         """
                         SELECT ea.analyst_concern, ea.defensiveness_score, ea.evasion_explanation,
-                               ea.question_topic, ea.analyst_name, ea.evasion_type
+                               ea.question_topic, ea.analyst_name, ea.evasion_type,
+                               ea.executive_name
                         FROM evasion_analysis ea
                         JOIN calls c ON ea.call_id = c.id
                         WHERE c.ticker = %s
@@ -455,7 +457,7 @@ class AnalysisRepository:
 
         Each row: (id, analyst_name, question_topic, question_text, answer_text,
                    analyst_concern, defensiveness_score, evasion_explanation,
-                   evasion_type)
+                   evasion_type, executive_name, suggested_probes)
         """
         rows = []
         try:
@@ -466,7 +468,8 @@ class AnalysisRepository:
                         SELECT ea.id, ea.analyst_name, ea.question_topic,
                                ea.question_text, ea.answer_text,
                                ea.analyst_concern, ea.defensiveness_score,
-                               ea.evasion_explanation, ea.evasion_type
+                               ea.evasion_explanation, ea.evasion_type,
+                               ea.executive_name, ea.suggested_probes
                         FROM evasion_analysis ea
                         JOIN transcript_chunks tc
                             ON ea.chunk_id = tc.chunk_id AND ea.call_id = tc.call_id
@@ -592,6 +595,8 @@ class AnalysisRepository:
                 "defensiveness_score": r[5],
                 "evasion_explanation": r[6],
                 "evasion_type": r[7],
+                "executive_name": r[8],
+                "suggested_probes": r[9],
             }
             for r in raw_evasion
         ]
@@ -922,14 +927,16 @@ class AnalysisRepository:
         evasion = chunk.evasion_analysis
         if not evasion or not evasion.get("analyst_concern"):
             return
+        from psycopg.types.json import Jsonb
+        suggested_probes = evasion.get("suggested_probes")
         cur.execute(
             """
             INSERT INTO evasion_analysis (
                 call_id, chunk_id,
                 analyst_name, question_topic, question_text, answer_text,
                 analyst_concern, defensiveness_score, evasion_explanation,
-                evasion_type
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                evasion_type, executive_name, suggested_probes
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 str(call_id), chunk.chunk_id,
@@ -941,6 +948,8 @@ class AnalysisRepository:
                 evasion.get("defensiveness_score") or 0,
                 evasion.get("evasion_explanation") or "",
                 evasion.get("evasion_type"),
+                evasion.get("executive_name") or None,
+                Jsonb(suggested_probes) if suggested_probes else None,
             ),
         )
 

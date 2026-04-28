@@ -660,8 +660,8 @@ class TestGetCallEvasion:
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
             MockAnalysisRepo.return_value.get_evasion_for_ticker.return_value = [
-                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith", "deflect_to_forward_looking"),
-                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe", "verbose_non_answer"),
+                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith", "deflect_to_forward_looking", "Tim Cook"),
+                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe", "verbose_non_answer", "Luca Maestri"),
             ]
             response = api_client.get("/api/calls/AAPL/evasion")
 
@@ -702,18 +702,21 @@ class TestGetQAForensics:
                     "Why did gross margin compress?", "We feel great about long-term trajectory.",
                     "Dodging margin question", 8,
                     "Pivoted to long-term narrative.", "deflect_to_forward_looking",
+                    "Tim Cook", ["What does the confidence-without-numbers signal?"],
                 ),
                 (
                     "exch-2", "Jane Doe", "China revenue",
                     "Can you break out China specifically?", "International overall is strong.",
                     "Avoiding regional disclosure", 7,
                     "Reframed China as international.", "reframe",
+                    "Luca Maestri", None,
                 ),
                 (
                     "exch-3", "Mike Lee", "capex outlook",
                     "What's Q4 capex?", "We're investing for the future.",
                     "Vague capex framing", 7,
                     "Repeated talking points without numbers.", "deflect_to_forward_looking",
+                    None, None,
                 ),
             ]
             response = api_client.get("/api/calls/AAPL/qa-forensics")
@@ -767,10 +770,10 @@ class TestGetQAForensics:
             # Three exchanges with 'none', one with 'reframe' — reframe should win
             # because 'none' is filtered out before the count.
             MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
-                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none"),
-                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", "none"),
-                ("e3", "C", "t3", "q3", "a3", "concern3", 5, "expl3", "none"),
-                ("e4", "D", "t4", "q4", "a4", "concern4", 5, "expl4", "reframe"),
+                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none", None, None),
+                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", "none", None, None),
+                ("e3", "C", "t3", "q3", "a3", "concern3", 5, "expl3", "none", None, None),
+                ("e4", "D", "t4", "q4", "a4", "concern4", 5, "expl4", "reframe", None, None),
             ]
             response = api_client.get("/api/calls/AAPL/qa-forensics")
 
@@ -784,8 +787,8 @@ class TestGetQAForensics:
         ):
             # All rows have 'none' or null evasion_type — backfill scenario.
             MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
-                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none"),
-                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", None),
+                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none", None, None),
+                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", None, None, None),
             ]
             response = api_client.get("/api/calls/AAPL/qa-forensics")
 

@@ -79,6 +79,7 @@ class EvasionItem(BaseModel):
     question_topic: str | None = None
     analyst_name: str | None = None
     evasion_type: str | None = None
+    executive_name: str | None = None
 
 
 class StrategicShift(BaseModel):
@@ -155,6 +156,8 @@ class QAEvasionItem(BaseModel):
     defensiveness_score: int
     evasion_explanation: str
     evasion_type: str | None = None
+    executive_name: str | None = None
+    suggested_probes: list[str] | None = None
 
 
 class LearnAnnotationsResponse(BaseModel):
@@ -210,6 +213,8 @@ class QAForensicsExchange(BaseModel):
     defensiveness_score: int
     evasion_explanation: str
     evasion_type: str | None = None
+    executive_name: str | None = None
+    suggested_probes: list[str] | None = None
 
 
 class QAForensicsResponse(BaseModel):
@@ -489,6 +494,7 @@ def get_call_evasion(ticker: str, conn: DbDep, response: Response) -> EvasionRes
             question_topic=r[3],
             analyst_name=r[4],
             evasion_type=r[5],
+            executive_name=r[6],
         )
         for r in raw_evasion
     ]
@@ -532,6 +538,8 @@ def get_qa_forensics(
             defensiveness_score=r[6],
             evasion_explanation=r[7],
             evasion_type=r[8],
+            executive_name=r[9],
+            suggested_probes=r[10],
         )
         for r in rows
     ]

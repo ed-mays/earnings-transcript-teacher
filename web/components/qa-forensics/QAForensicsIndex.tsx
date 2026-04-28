@@ -132,7 +132,7 @@ function ExchangeIndexCard({ exchange, discussed, onClick }: ExchangeIndexCardPr
         </div>
 
         {exchange.analyst_concern ? (
-          <p className="line-clamp-2 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {exchange.analyst_concern}
           </p>
         ) : null}

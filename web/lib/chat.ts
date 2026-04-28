@@ -19,13 +19,17 @@ interface StreamChatCallbacks {
 
 /** Stream a Feynman chat response via SSE. Uses fetch + ReadableStream because EventSource cannot POST.
  *  Pass an AbortSignal to cancel the in-flight stream when the caller unmounts or navigates away.
+ *  Pass `learningContext` to inject a pre-formatted background paragraph into the system prompt
+ *  for every turn of the session — used by Q&A Forensics to anchor the chat to a specific exchange
+ *  without sending the context wall as a user message.
  */
 export async function streamChat(
   ticker: string,
   message: string,
   sessionId: string | null,
   callbacks: StreamChatCallbacks,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  learningContext?: string,
 ): Promise<void> {
   const supabase = createSupabaseBrowserClient();
   const {
@@ -43,7 +47,11 @@ export async function streamChat(
   const response = await fetch(`${API_URL}/api/calls/${ticker}/chat`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ message, session_id: sessionId }),
+    body: JSON.stringify({
+      message,
+      session_id: sessionId,
+      ...(learningContext ? { learning_context: learningContext } : {}),
+    }),
     signal,
   });
 

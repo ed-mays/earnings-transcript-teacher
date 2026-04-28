@@ -17,10 +17,20 @@ interface ChatPanelProps {
    *  immediately on mount instead of pre-filling the input. Used by
    *  Q&A Forensics chip clicks where the chip text IS the message. */
   autoSend?: boolean;
+  /** Optional pre-formatted background paragraph injected into the
+   *  system prompt for every turn. Used by Q&A Forensics so the chat
+   *  thread shows only the user's question, not a context wall. */
+  learningContext?: string;
 }
 
 /** Right-side chat panel wired to the streaming Feynman chat endpoint. */
-export function ChatPanel({ ticker, context, onClose, autoSend = false }: ChatPanelProps) {
+export function ChatPanel({
+  ticker,
+  context,
+  onClose,
+  autoSend = false,
+  learningContext,
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -63,6 +73,7 @@ export function ChatPanel({ ticker, context, onClose, autoSend = false }: ChatPa
           },
         },
         controller.signal,
+        learningContext,
       );
     } catch {
       setIsStreaming(false);

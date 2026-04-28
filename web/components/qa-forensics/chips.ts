@@ -1,6 +1,13 @@
-/** Pure helper that turns an exchange into a set of suggestion chips for
- *  the Q&A Forensics detail view. The chips become the user's first chat
- *  message — auto-sent when clicked. */
+/** Pure helper that turns an exchange into a set of suggestion chips for the
+ *  Q&A Forensics detail view. Each chip becomes the user's first chat
+ *  message — auto-sent when clicked.
+ *
+ *  Preference order:
+ *    1. LLM-generated `suggested_probes` from ingestion (Tier 2 prompt) —
+ *       genuinely exchange-specific, references real content.
+ *    2. Templated fallback that interpolates analyst name and question topic
+ *       — used for older calls that haven't been re-ingested with the new
+ *       Tier 2 schema. Still better than purely generic boilerplate. */
 
 import type { QAForensicsExchange } from "@/components/transcript/types";
 
@@ -9,45 +16,51 @@ export interface Chip {
   text: string;
 }
 
-const GENERIC_CHIPS: readonly Chip[] = [
-  { id: "why-pivot", text: "Why might they have pivoted this way?" },
-  { id: "honest-answer", text: "What would an honest answer look like?" },
-  { id: "investor-confidence", text: "How does this affect investor confidence?" },
-];
-
-const TYPE_SPECIFIC_CHIPS: Record<string, Chip> = {
-  deflect_to_forward_looking: {
-    id: "forward-risk",
-    text: "What's the risk of these forward-looking commitments?",
-  },
-  reframe: {
-    id: "reframe-why",
-    text: "Why did they want to redefine the question?",
-  },
-  verbose_non_answer: {
-    id: "wordiness",
-    text: "What does the wordiness signal?",
-  },
-  redirect_to_different_metric: {
-    id: "metric-substitution",
-    text: "Why might the metric they avoided be unflattering?",
-  },
-  partial_answer: {
-    id: "untouched",
-    text: "What did they leave untouched?",
-  },
-  run_out_clock: {
-    id: "investor-day",
-    text: "What might they reveal at the upcoming investor day?",
-  },
-};
-
-/** Returns 3 generic chips plus 1 type-specific chip when evasion_type is
- *  set to a known category (and isn't 'none'). Order: generic first, then
- *  the type-specific one as the last/most-targeted choice. */
+/** Builds chips for one exchange. Returns 3-5 chips. */
 export function generateChips(exchange: QAForensicsExchange): Chip[] {
-  const type = exchange.evasion_type;
-  const specific =
-    type && type !== "none" ? TYPE_SPECIFIC_CHIPS[type] ?? null : null;
-  return specific ? [...GENERIC_CHIPS, specific] : [...GENERIC_CHIPS];
+  const probes = exchange.suggested_probes;
+  if (probes && probes.length > 0) {
+    return probes.map((text, i) => ({ id: `probe-${i}`, text }));
+  }
+  return templatedFallback(exchange);
+}
+
+function templatedFallback(exchange: QAForensicsExchange): Chip[] {
+  const analyst = exchange.analyst_name?.trim();
+  const topic = exchange.question_topic?.trim();
+
+  const chips: Chip[] = [];
+
+  if (analyst && topic) {
+    chips.push({
+      id: "analyst-concern",
+      text: `Why is ${analyst} worried about ${topic}?`,
+    });
+  } else if (topic) {
+    chips.push({
+      id: "topic-concern",
+      text: `Why might an analyst be worried about ${topic}?`,
+    });
+  }
+
+  chips.push({
+    id: "why-ask",
+    text: topic
+      ? `Why might an analyst ask about ${topic}?`
+      : "Why might an analyst ask this question?",
+  });
+
+  chips.push({
+    id: "honest-answer",
+    text: topic
+      ? `What would a clearer answer about ${topic} have to acknowledge?`
+      : "What would a clearer answer have to acknowledge?",
+  });
+
+  chips.push({
+    id: "investor-signal",
+    text: "What does this answer signal to investors?",
+  });
+
+  return chips;
 }
