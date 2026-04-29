@@ -660,8 +660,8 @@ class TestGetCallEvasion:
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
             MockAnalysisRepo.return_value.get_evasion_for_ticker.return_value = [
-                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith", "deflect_to_forward_looking"),
-                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe", "verbose_non_answer"),
+                ("margin guidance", 7, "Deflected to top-line", "margins", "John Smith", "deflect_to_forward_looking", "Tim Cook"),
+                ("capex outlook", 8, "Vague non-answer", "capex", "Jane Doe", "verbose_non_answer", "Luca Maestri"),
             ]
             response = api_client.get("/api/calls/AAPL/evasion")
 
@@ -696,26 +696,32 @@ class TestGetQAForensics:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
-            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
+            repo = MockAnalysisRepo.return_value
+            repo.get_qa_forensics_for_ticker.return_value = [
                 (
                     "exch-1", "John Smith", "margin guidance",
                     "Why did gross margin compress?", "We feel great about long-term trajectory.",
                     "Dodging margin question", 8,
                     "Pivoted to long-term narrative.", "deflect_to_forward_looking",
+                    "Tim Cook", ["What does the confidence-without-numbers signal?"],
                 ),
                 (
                     "exch-2", "Jane Doe", "China revenue",
                     "Can you break out China specifically?", "International overall is strong.",
                     "Avoiding regional disclosure", 7,
                     "Reframed China as international.", "reframe",
+                    "Luca Maestri", None,
                 ),
                 (
                     "exch-3", "Mike Lee", "capex outlook",
                     "What's Q4 capex?", "We're investing for the future.",
                     "Vague capex framing", 7,
                     "Repeated talking points without numbers.", "deflect_to_forward_looking",
+                    None, None,
                 ),
             ]
+            repo.get_synthesis_for_ticker.return_value = ("bullish", "confident", "neutral")
+            repo.get_signal_strip_flags_for_ticker.return_value = ("high", True)
             response = api_client.get("/api/calls/AAPL/qa-forensics")
 
         assert response.status_code == 200
@@ -725,13 +731,21 @@ class TestGetQAForensics:
         assert data["exchanges"][0]["id"] == "exch-1"
         assert data["exchanges"][0]["evasion_type"] == "deflect_to_forward_looking"
         assert data["dominant_evasion_type"] == "deflect_to_forward_looking"
+        assert data["signal_strip"]["overall_sentiment"] == "bullish"
+        assert data["signal_strip"]["executive_sentiment"] == "confident"
+        assert data["signal_strip"]["analyst_sentiment"] == "neutral"
+        assert data["signal_strip"]["evasion_level"] == "high"
+        assert data["signal_strip"]["strategic_shift_flagged"] is True
 
     def test_empty_state(self, api_client):
         with (
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
-            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = []
+            repo = MockAnalysisRepo.return_value
+            repo.get_qa_forensics_for_ticker.return_value = []
+            repo.get_synthesis_for_ticker.return_value = None
+            repo.get_signal_strip_flags_for_ticker.return_value = (None, False)
             response = api_client.get("/api/calls/AAPL/qa-forensics")
 
         assert response.status_code == 200
@@ -739,19 +753,22 @@ class TestGetQAForensics:
         assert data["exchanges"] == []
         assert data["total"] == 0
         assert data["dominant_evasion_type"] is None
+        assert data["signal_strip"]["overall_sentiment"] is None
+        assert data["signal_strip"]["evasion_level"] is None
 
     def test_min_score_param_passed_through(self, api_client):
         with (
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
-            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = []
+            repo = MockAnalysisRepo.return_value
+            repo.get_qa_forensics_for_ticker.return_value = []
+            repo.get_synthesis_for_ticker.return_value = None
+            repo.get_signal_strip_flags_for_ticker.return_value = (None, False)
             response = api_client.get("/api/calls/AAPL/qa-forensics?min_score=8")
 
         assert response.status_code == 200
-        MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.assert_called_once_with(
-            "AAPL", min_score=8
-        )
+        repo.get_qa_forensics_for_ticker.assert_called_once_with("AAPL", min_score=8)
 
     def test_min_score_out_of_range_rejected(self, api_client):
         # Query(ge=1, le=10) should reject 0 and 11.
@@ -764,14 +781,17 @@ class TestGetQAForensics:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
+            repo = MockAnalysisRepo.return_value
             # Three exchanges with 'none', one with 'reframe' — reframe should win
             # because 'none' is filtered out before the count.
-            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
-                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none"),
-                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", "none"),
-                ("e3", "C", "t3", "q3", "a3", "concern3", 5, "expl3", "none"),
-                ("e4", "D", "t4", "q4", "a4", "concern4", 5, "expl4", "reframe"),
+            repo.get_qa_forensics_for_ticker.return_value = [
+                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none", None, None),
+                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", "none", None, None),
+                ("e3", "C", "t3", "q3", "a3", "concern3", 5, "expl3", "none", None, None),
+                ("e4", "D", "t4", "q4", "a4", "concern4", 5, "expl4", "reframe", None, None),
             ]
+            repo.get_synthesis_for_ticker.return_value = None
+            repo.get_signal_strip_flags_for_ticker.return_value = (None, False)
             response = api_client.get("/api/calls/AAPL/qa-forensics")
 
         assert response.status_code == 200
@@ -782,11 +802,14 @@ class TestGetQAForensics:
             patch("routes.calls._ticker_exists", return_value=True),
             patch("routes.calls.AnalysisRepository") as MockAnalysisRepo,
         ):
+            repo = MockAnalysisRepo.return_value
             # All rows have 'none' or null evasion_type — backfill scenario.
-            MockAnalysisRepo.return_value.get_qa_forensics_for_ticker.return_value = [
-                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none"),
-                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", None),
+            repo.get_qa_forensics_for_ticker.return_value = [
+                ("e1", "A", "t1", "q1", "a1", "concern1", 5, "expl1", "none", None, None),
+                ("e2", "B", "t2", "q2", "a2", "concern2", 5, "expl2", None, None, None),
             ]
+            repo.get_synthesis_for_ticker.return_value = None
+            repo.get_signal_strip_flags_for_ticker.return_value = (None, False)
             response = api_client.get("/api/calls/AAPL/qa-forensics")
 
         assert response.status_code == 200

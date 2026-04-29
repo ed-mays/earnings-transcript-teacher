@@ -82,10 +82,12 @@ Follow these instructions depending on whether the chunk is from Prepared Remark
    - question_topic: a short 3-8 word phrase describing what was asked (e.g. "memory chip supply and gross margins")
    - question_text: the analyst's verbatim question(s) from the transcript
    - answer_text: the executive's verbatim response from the transcript
+   - executive_name: the name of the executive who provided the response (the primary respondent if multiple speak; e.g. "Tim Cook" or "Luca Maestri"). If the speaker isn't identifiable, leave empty string.
    - analyst_concern: the analyst's underlying concern or worry in 1-2 sentences
    - defensiveness_score: 1-10 score of how much the executive evaded or deflected
    - evasion_type: the dominant evasion pattern from the Evasion Taxonomy below. Pick exactly one. Use "none" when the executive answered the question directly.
    - evasion_explanation: explain why the response was or was not evasive, naming the specific pivot, omission, or substitution that earned the evasion_type.
+   - suggested_probes: 3-4 short, exchange-specific exploration questions a beginner could click to discuss this Q&A with a tutor. See the Suggested Probes guidance below.
 3. **Misconceptions ("Gotchas")**: Identify any counter-intuitive business logic that a student might misunderstand from this text. (e.g., {"fact": "Revenue dropped", "misinterpretation": "They lost customers", "correction": "They changed billing cycles"}).
 
 ## Evasion Taxonomy
@@ -100,6 +102,42 @@ Use one of these values for evasion_type. Pick the single most prominent pattern
 - run_out_clock: the executive thanks the analyst, defers ("we'll cover that at the upcoming investor day", "we don't break that out"), and moves on without engaging.
 - none: the executive answered the question directly with the requested data, judgment, or admission.
 
+## Suggested Probes (Q&A only)
+
+Generate 3-4 chip-style exploration prompts a beginner could click to start a tutoring conversation about this specific exchange. Each chip is the user's literal first message to the tutor — read it back to yourself and make sure it sounds like a curious learner inviting discussion, not a quiz prompt.
+
+Hard requirements:
+
+- **Each probe must explore a DIFFERENT angle.** Two probes that ask "why is X worried about Y" and "why would an analyst be worried about Y" are duplicates — only one of them belongs. The angles below are mutually exclusive choices; pick a different one for each probe.
+- **Reference specific content from THIS exchange** — the analyst's actual concern, the executive's specific pivot or substitution, the metric or topic at hand. No probe should be reusable on a different exchange.
+- **Open the chip with an action verb that reads as a CTA.** Use "Explore why…", "Examine how…", "Dig into what…", "Unpack the…", "Walk through why…", "Pressure-test the…". Do NOT open with bare "Why" / "What" / "How" — those feel like Trivia questions, not invitations.
+- **Use hedged, hypothesis-style framing inside the question.** Prefer "might / could / may / what would". Avoid definitive-sounding phrasing like "what does this signal" — use "what might this signal". The tutor isn't a quiz master; the chip shouldn't presuppose a right answer.
+- **Open-ended only.** Never yes/no.
+- **8-18 words each.**
+- **Plain English.** No jargon the student wouldn't know without context.
+
+Angle taxonomy (pick a different one for each probe):
+
+1. **Executive's motivation** — why this specific person answered this specific way.
+2. **Counterfactual** — what a clearer / more direct / more uncomfortable answer would have to acknowledge.
+3. **Investor signal** — what the form of the answer (not its content) tells the market.
+4. **Analyst's underlying worry** — what the questioner is *really* trying to surface.
+5. **Strategic connection** — how this exchange ties to a broader theme, prior guidance, or the company's competitive position.
+
+Bad examples:
+
+- "Why is Adam Levine worried about supply constraint?" + "Why would an analyst be worried about supply constraint?" (these are duplicates — both angle #4)
+- "Why might they have pivoted this way?" (generic — reusable on any deflection)
+- "What does this answer signal to investors?" (definitive framing; should be "what might"; also no CTA verb)
+- "What would an honest answer look like?" (boilerplate)
+
+Good examples (CTA verb + hedged + exchange-specific + distinct angles):
+
+- "Explore why Tim Cook might have leaned on supply rhetoric instead of giving a unit number."  *(angle #1)*
+- "Examine what a clearer answer about China demand would have had to admit."  *(angle #2)*
+- "Dig into what the CFO's confidence-without-numbers might be signaling to the market."  *(angle #3)*
+- "Unpack why Adam Levine might have been pressing on memory chip pricing right now."  *(angle #4)*
+
 Respond ONLY with valid JSON matching this schema:
 {
   "takeaways": [
@@ -111,10 +149,12 @@ Respond ONLY with valid JSON matching this schema:
     "question_topic": "string",
     "question_text": "string",
     "answer_text": "string",
+    "executive_name": "string",
     "analyst_concern": "string",
     "defensiveness_score": 5,
     "evasion_type": "deflect_to_forward_looking",
-    "evasion_explanation": "string"
+    "evasion_explanation": "string",
+    "suggested_probes": ["string", "string", "string"]
   },
   "misconceptions": [
     {"fact": "string", "misinterpretation": "string", "correction": "string"}

@@ -141,6 +141,8 @@ export interface QAEvasionItem {
   defensiveness_score: number;
   evasion_explanation: string;
   evasion_type: string | null;
+  executive_name: string | null;
+  suggested_probes: string[] | null;
 }
 
 export interface QAForensicsExchange {
@@ -153,12 +155,15 @@ export interface QAForensicsExchange {
   defensiveness_score: number;
   evasion_explanation: string;
   evasion_type: string | null;
+  executive_name: string | null;
+  suggested_probes: string[] | null;
 }
 
 export interface QAForensicsResponse {
   exchanges: QAForensicsExchange[];
   total: number;
   dominant_evasion_type: string | null;
+  signal_strip: SignalStrip | null;
 }
 
 export interface LearnAnnotationsResponse {

@@ -79,6 +79,7 @@ class EvasionItem(BaseModel):
     question_topic: str | None = None
     analyst_name: str | None = None
     evasion_type: str | None = None
+    executive_name: str | None = None
 
 
 class StrategicShift(BaseModel):
@@ -155,6 +156,8 @@ class QAEvasionItem(BaseModel):
     defensiveness_score: int
     evasion_explanation: str
     evasion_type: str | None = None
+    executive_name: str | None = None
+    suggested_probes: list[str] | None = None
 
 
 class LearnAnnotationsResponse(BaseModel):
@@ -210,12 +213,18 @@ class QAForensicsExchange(BaseModel):
     defensiveness_score: int
     evasion_explanation: str
     evasion_type: str | None = None
+    executive_name: str | None = None
+    suggested_probes: list[str] | None = None
 
 
 class QAForensicsResponse(BaseModel):
     exchanges: list[QAForensicsExchange] = []
     total: int = 0
     dominant_evasion_type: str | None = None
+    # Call-level signals so the Q&A Forensics index page can surface the same
+    # dimensions the Analyst Framework's MetadataPanel does — overall sentiment,
+    # executive tone, analyst sentiment, and the aggregate evasion level.
+    signal_strip: SignalStrip | None = None
 
 
 class StrategicShiftsResponse(BaseModel):
@@ -489,6 +498,7 @@ def get_call_evasion(ticker: str, conn: DbDep, response: Response) -> EvasionRes
             question_topic=r[3],
             analyst_name=r[4],
             evasion_type=r[5],
+            executive_name=r[6],
         )
         for r in raw_evasion
     ]
@@ -532,15 +542,32 @@ def get_qa_forensics(
             defensiveness_score=r[6],
             evasion_explanation=r[7],
             evasion_type=r[8],
+            executive_name=r[9],
+            suggested_probes=r[10],
         )
         for r in rows
     ]
     dominant = _dominant_evasion_type([e.evasion_type for e in exchanges])
+
+    # Call-level signals — same data the Analyst Framework surfaces.
+    raw_synthesis = analysis_repo.get_synthesis_for_ticker(ticker, conn=conn)
+    evasion_level, strategic_shift_flagged = analysis_repo.get_signal_strip_flags_for_ticker(
+        ticker, conn=conn
+    )
+    signal_strip = SignalStrip(
+        overall_sentiment=raw_synthesis[0] if raw_synthesis else None,
+        executive_sentiment=raw_synthesis[1] if raw_synthesis else None,
+        analyst_sentiment=raw_synthesis[2] if raw_synthesis else None,
+        evasion_level=evasion_level,
+        strategic_shift_flagged=strategic_shift_flagged,
+    )
+
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return QAForensicsResponse(
         exchanges=exchanges,
         total=len(exchanges),
         dominant_evasion_type=dominant,
+        signal_strip=signal_strip,
     )
 
 

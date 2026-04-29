@@ -154,6 +154,12 @@ class ChatRequest(BaseModel):
     message: str = Field(max_length=CHAT_MESSAGE_MAX_LENGTH)
     session_id: str | None = None
     stage: int = 1  # only applied when creating a new session; 1–5
+    # Optional pre-formatted background paragraph that the caller wants injected
+    # into the system prompt for every turn of this session. Used by the Q&A
+    # Forensics mode to anchor the conversation to a specific exchange without
+    # the user's first message having to carry the full context wall. Capped to
+    # avoid runaway payloads.
+    learning_context: str | None = Field(default=None, max_length=4000)
 
 
 # --- Endpoint ---
@@ -218,6 +224,13 @@ def chat(
         track("session_start", session_id=session_id, properties={"ticker": ticker, "stage": stage})
 
     system_prompt = _load_prompt(stage)
+    if body.learning_context:
+        system_prompt = (
+            "<exchange_context>\n"
+            f"{body.learning_context}\n"
+            "</exchange_context>\n\n"
+            f"{system_prompt}"
+        )
     messages = history + [{"role": "user", "content": body.message}]
 
     return StreamingResponse(
