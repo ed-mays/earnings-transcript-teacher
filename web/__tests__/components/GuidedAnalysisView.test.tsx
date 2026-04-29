@@ -92,13 +92,14 @@ describe("GuidedAnalysisView", () => {
     });
   });
 
-  it("renders all four annotation layer switches", async () => {
+  it("renders the three annotation layer switches", async () => {
+    // Evasion was retired in PR #421 — Q&A Forensics now owns that surface.
     renderGuided();
     await waitFor(() => {
       expect(screen.getByRole("switch", { name: /Guidance/i })).toBeInTheDocument();
-      expect(screen.getByRole("switch", { name: /Evasion/i })).toBeInTheDocument();
       expect(screen.getByRole("switch", { name: /Sentiment/i })).toBeInTheDocument();
       expect(screen.getByRole("switch", { name: /Terms/i })).toBeInTheDocument();
+      expect(screen.queryByRole("switch", { name: /Evasion/i })).not.toBeInTheDocument();
     });
   });
 

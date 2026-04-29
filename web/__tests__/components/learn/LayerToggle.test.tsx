@@ -5,18 +5,19 @@ import { LayerToggle } from "@/components/learn/LayerToggle";
 import { DEFAULT_LAYERS } from "@/components/learn/types";
 
 describe("LayerToggle", () => {
-  it("renders a pill for each of the four layers", () => {
+  it("renders a pill for each of the three layers", () => {
+    // Evasion was retired in PR #421 — Q&A Forensics owns that surface now.
     render(<LayerToggle layers={DEFAULT_LAYERS} onChange={() => {}} />);
     expect(screen.getByRole("switch", { name: /Guidance/i })).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: /Evasion/i })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: /Sentiment/i })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: /Terms/i })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: /Evasion/i })).not.toBeInTheDocument();
   });
 
   it("reflects active state via aria-checked", () => {
     render(
       <LayerToggle
-        layers={{ guidance: true, evasion: false, sentiment: true, terms: false }}
+        layers={{ guidance: true, sentiment: false, terms: true }}
         onChange={() => {}}
       />,
     );
@@ -24,7 +25,7 @@ describe("LayerToggle", () => {
       "aria-checked",
       "true",
     );
-    expect(screen.getByRole("switch", { name: /Evasion/i })).toHaveAttribute(
+    expect(screen.getByRole("switch", { name: /Sentiment/i })).toHaveAttribute(
       "aria-checked",
       "false",
     );
@@ -33,7 +34,7 @@ describe("LayerToggle", () => {
   it("calls onChange with the layer key when a pill is clicked", async () => {
     const onChange = vi.fn();
     render(<LayerToggle layers={DEFAULT_LAYERS} onChange={onChange} />);
-    await userEvent.click(screen.getByRole("switch", { name: /Evasion/i }));
-    expect(onChange).toHaveBeenCalledWith("evasion");
+    await userEvent.click(screen.getByRole("switch", { name: /Sentiment/i }));
+    expect(onChange).toHaveBeenCalledWith("sentiment");
   });
 });
