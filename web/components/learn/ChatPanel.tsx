@@ -144,8 +144,6 @@ export function ChatPanel({
 
 function contextToPrompt(context: ChatContext): string {
   switch (context.type) {
-    case "evasion":
-      return `Help me understand this evasion: ${context.metadata ?? ""}\n\n${context.text}`.trim();
     case "term":
       return `Explain "${context.text}" in context${context.metadata ? `: ${context.metadata}` : ""}.`;
     case "guidance":

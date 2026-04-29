@@ -1,10 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { AnnotatedSpanBlock } from "@/components/learn/AnnotatedSpanBlock";
 import { buildTermRegex } from "@/lib/highlight";
 import type { SpanItem, TermDefinition } from "@/components/transcript/types";
-import { DEFAULT_LAYERS, type ChatContext } from "@/components/learn/types";
+import { DEFAULT_LAYERS } from "@/components/learn/types";
 
 const SPAN: SpanItem = {
   speaker: "Jensen Huang",
@@ -31,7 +30,6 @@ describe("AnnotatedSpanBlock", () => {
         layers={{ ...DEFAULT_LAYERS, terms: false }}
         termRegex={null}
         termMap={new Map()}
-        onChatClick={() => {}}
       />,
     );
     expect(screen.getByText("Jensen Huang")).toBeInTheDocument();
@@ -45,7 +43,6 @@ describe("AnnotatedSpanBlock", () => {
         layers={DEFAULT_LAYERS}
         termRegex={TERM_REGEX}
         termMap={TERM_MAP}
-        onChatClick={() => {}}
       />,
     );
     const trigger = screen
@@ -56,22 +53,5 @@ describe("AnnotatedSpanBlock", () => {
     // confirms the green highlight wraps the term text.
     expect(trigger!.className).toMatch(/bg-green/);
     expect(trigger!.className).toMatch(/underline/);
-  });
-
-  it("renders an evasion chat icon when evasionContext is provided and fires onChatClick", async () => {
-    const onChatClick = vi.fn();
-    const context: ChatContext = { type: "evasion", text: "foo", metadata: "bar" };
-    render(
-      <AnnotatedSpanBlock
-        span={SPAN}
-        layers={DEFAULT_LAYERS}
-        termRegex={null}
-        termMap={new Map()}
-        evasionContext={context}
-        onChatClick={onChatClick}
-      />,
-    );
-    await userEvent.click(screen.getByRole("button", { name: /Discuss this passage/i }));
-    expect(onChatClick).toHaveBeenCalledWith(context);
   });
 });

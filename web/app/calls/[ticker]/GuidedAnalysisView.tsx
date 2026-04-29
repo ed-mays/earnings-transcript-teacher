@@ -7,11 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
 import { useFlag } from "@/lib/useFlag";
-import { findEvasionSpanIndex } from "@/lib/highlight";
 import { useAnnotations } from "@/hooks/useAnnotations";
 import { AnnotatedSpanBlock } from "@/components/learn/AnnotatedSpanBlock";
 import { ChatPanel } from "@/components/learn/ChatPanel";
-import { EvasionCard } from "@/components/learn/EvasionCard";
 import { LayerToggle } from "@/components/learn/LayerToggle";
 import { SectionCheckpoint } from "@/components/learn/SectionCheckpoint";
 import { SentimentBar } from "@/components/learn/SentimentBar";
@@ -25,7 +23,6 @@ import {
 } from "@/components/learn/types";
 import type {
   CallDetail,
-  QAEvasionItem,
   SpansResponse,
 } from "@/components/transcript/types";
 
@@ -86,19 +83,6 @@ export function GuidedAnalysisView({ call, adjacent, initialTopic }: GuidedAnaly
         setSpansError(err instanceof Error ? err.message : "Failed to load transcript");
       });
   }, [ticker, page]);
-
-  const evasionBySpanIndex = useMemo(() => {
-    const map = new Map<number, QAEvasionItem>();
-    if (!annotations || !spans) return map;
-    for (const item of annotations.evasion) {
-      if (!item.answer_text) continue;
-      const idx = findEvasionSpanIndex(item.answer_text, spans.spans);
-      if (idx !== null && !map.has(idx)) {
-        map.set(idx, item);
-      }
-    }
-    return map;
-  }, [annotations, spans]);
 
   const preparedToQaBoundary = useMemo(() => {
     if (!spans) return -1;
@@ -257,29 +241,8 @@ export function GuidedAnalysisView({ call, adjacent, initialTopic }: GuidedAnaly
                       layers={layers}
                       termRegex={layers.terms ? termRegex : null}
                       termMap={termMap}
-                      evasionContext={
-                        layers.evasion && evasionBySpanIndex.has(index)
-                          ? {
-                              type: "evasion",
-                              text: span.text,
-                              metadata:
-                                evasionBySpanIndex.get(index)?.analyst_concern,
-                            }
-                          : undefined
-                      }
-                      onChatClick={handleChatClick}
                     />,
                   );
-
-                  if (layers.evasion && evasionBySpanIndex.has(index)) {
-                    elements.push(
-                      <EvasionCard
-                        key={`evasion-${span.sequence_order}`}
-                        item={evasionBySpanIndex.get(index)!}
-                        onChatClick={handleChatClick}
-                      />,
-                    );
-                  }
 
                   return <div key={span.sequence_order}>{elements}</div>;
                 })}
