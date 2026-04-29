@@ -4,13 +4,18 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { evasionScoreToLevel, getEvasionStyle } from "@/lib/signal-colors";
-import type { QAForensicsExchange } from "@/components/transcript/types";
+import type {
+  QAForensicsExchange,
+  SignalStrip,
+} from "@/components/transcript/types";
+import { QASignalBadges } from "./QASignalBadges";
 import { evasionTypeLabel } from "./types";
 
 interface QAForensicsIndexProps {
   ticker: string;
   exchanges: QAForensicsExchange[];
   dominantEvasionType: string | null;
+  signalStrip: SignalStrip | null;
   discussedSet: Set<string>;
   onSelectExchange: (id: string) => void;
 }
@@ -22,6 +27,7 @@ export function QAForensicsIndex({
   ticker,
   exchanges,
   dominantEvasionType,
+  signalStrip,
   discussedSet,
   onSelectExchange,
 }: QAForensicsIndexProps) {
@@ -56,8 +62,7 @@ export function QAForensicsIndex({
           Q&amp;A Forensics — <span className="uppercase">{ticker}</span>
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {exchanges.length} {exchanges.length === 1 ? "exchange" : "exchanges"} worth
-          studying. Pick whichever interests you — there&apos;s no required order.
+          {`${exchanges.length} ${exchanges.length === 1 ? "exchange" : "exchanges"} worth studying. Pick whichever interests you — there's no required order.`}
           {dominantEvasionType ? (
             <>
               {" "}Dominant pattern in this call:{" "}
@@ -68,6 +73,7 @@ export function QAForensicsIndex({
             </>
           ) : null}
         </p>
+        {signalStrip ? <QASignalBadges signals={signalStrip} /> : null}
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

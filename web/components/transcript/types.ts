@@ -163,6 +163,7 @@ export interface QAForensicsResponse {
   exchanges: QAForensicsExchange[];
   total: number;
   dominant_evasion_type: string | null;
+  signal_strip: SignalStrip | null;
 }
 
 export interface LearnAnnotationsResponse {

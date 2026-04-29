@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChatPanel } from "@/components/learn/ChatPanel";
 import { useFlag } from "@/lib/useFlag";
 import type { ChatContext } from "@/components/learn/types";
@@ -25,11 +25,48 @@ type View =
  *  only — view changes don't update the URL. From the detail view, picking a
  *  chip OR submitting freetext opens the Feynman ChatPanel and auto-sends the
  *  composed seed message as the first user turn. */
+const DISCUSSED_STORAGE_KEY_PREFIX = "qa-forensics-discussed:";
+
+function loadDiscussed(ticker: string): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(`${DISCUSSED_STORAGE_KEY_PREFIX}${ticker}`);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((v): v is string => typeof v === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDiscussed(ticker: string, set: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      `${DISCUSSED_STORAGE_KEY_PREFIX}${ticker}`,
+      JSON.stringify(Array.from(set)),
+    );
+  } catch {
+    // Quota exceeded or storage disabled — silently drop persistence.
+  }
+}
+
 export function QAForensicsClient({ ticker, data }: QAForensicsClientProps) {
   const chatEnabled = useFlag("chat_enabled", true);
 
   const [view, setView] = useState<View>({ type: "index" });
+  // Initialize empty for SSR consistency; hydrate from localStorage on mount.
   const [discussedSet, setDiscussedSet] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setDiscussedSet(loadDiscussed(ticker));
+  }, [ticker]);
+
+  useEffect(() => {
+    saveDiscussed(ticker, discussedSet);
+  }, [ticker, discussedSet]);
+
   const [chatContext, setChatContext] = useState<ChatContext | null>(null);
   const [chatLearningContext, setChatLearningContext] = useState<string | undefined>(
     undefined,
@@ -93,6 +130,7 @@ export function QAForensicsClient({ ticker, data }: QAForensicsClientProps) {
         ticker={ticker}
         exchanges={data.exchanges}
         dominantEvasionType={data.dominant_evasion_type}
+        signalStrip={data.signal_strip}
         discussedSet={discussedSet}
         onSelectExchange={handleSelectExchange}
       />

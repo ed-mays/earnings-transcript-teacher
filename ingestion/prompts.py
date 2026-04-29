@@ -104,23 +104,39 @@ Use one of these values for evasion_type. Pick the single most prominent pattern
 
 ## Suggested Probes (Q&A only)
 
-Generate 3-4 short exploration questions a beginner could click to start a tutoring conversation about this specific exchange. The probes are the user's first message to the tutor — they should sound like real questions a curious learner would ask, not survey items.
+Generate 3-4 chip-style exploration prompts a beginner could click to start a tutoring conversation about this specific exchange. Each chip is the user's literal first message to the tutor — read it back to yourself and make sure it sounds like a curious learner inviting discussion, not a quiz prompt.
 
 Hard requirements:
-- Reference specific content from THIS exchange — the analyst's actual concern, the executive's specific dodge or substitution, the metric or topic at hand. Do not produce generic questions that could apply to any exchange.
-- Be open-ended and curious — never yes/no questions.
-- Each probe is 8-18 words.
-- Mix angles: at least one probe should explore *why the executive answered this way*, and at least one should explore *what an honest or clearer answer would have revealed*. Other useful angles: why an analyst would have asked, what the answer signals to investors, how this connects to broader strategy.
-- Plain English, no jargon the student wouldn't know without context.
 
-Bad examples (too generic):
-- "Why might they have pivoted this way?" (could apply to any deflection)
+- **Each probe must explore a DIFFERENT angle.** Two probes that ask "why is X worried about Y" and "why would an analyst be worried about Y" are duplicates — only one of them belongs. The angles below are mutually exclusive choices; pick a different one for each probe.
+- **Reference specific content from THIS exchange** — the analyst's actual concern, the executive's specific pivot or substitution, the metric or topic at hand. No probe should be reusable on a different exchange.
+- **Open the chip with an action verb that reads as a CTA.** Use "Explore why…", "Examine how…", "Dig into what…", "Unpack the…", "Walk through why…", "Pressure-test the…". Do NOT open with bare "Why" / "What" / "How" — those feel like Trivia questions, not invitations.
+- **Use hedged, hypothesis-style framing inside the question.** Prefer "might / could / may / what would". Avoid definitive-sounding phrasing like "what does this signal" — use "what might this signal". The tutor isn't a quiz master; the chip shouldn't presuppose a right answer.
+- **Open-ended only.** Never yes/no.
+- **8-18 words each.**
+- **Plain English.** No jargon the student wouldn't know without context.
+
+Angle taxonomy (pick a different one for each probe):
+
+1. **Executive's motivation** — why this specific person answered this specific way.
+2. **Counterfactual** — what a clearer / more direct / more uncomfortable answer would have to acknowledge.
+3. **Investor signal** — what the form of the answer (not its content) tells the market.
+4. **Analyst's underlying worry** — what the questioner is *really* trying to surface.
+5. **Strategic connection** — how this exchange ties to a broader theme, prior guidance, or the company's competitive position.
+
+Bad examples:
+
+- "Why is Adam Levine worried about supply constraint?" + "Why would an analyst be worried about supply constraint?" (these are duplicates — both angle #4)
+- "Why might they have pivoted this way?" (generic — reusable on any deflection)
+- "What does this answer signal to investors?" (definitive framing; should be "what might"; also no CTA verb)
 - "What would an honest answer look like?" (boilerplate)
 
-Good examples (exchange-specific):
-- "What does the CFO's confidence-without-numbers signal about Q4 gross margin?"
-- "Why might breaking out the segment-level margins be uncomfortable for them right now?"
-- "What would a clearer answer about China demand have to acknowledge?"
+Good examples (CTA verb + hedged + exchange-specific + distinct angles):
+
+- "Explore why Tim Cook might have leaned on supply rhetoric instead of giving a unit number."  *(angle #1)*
+- "Examine what a clearer answer about China demand would have had to admit."  *(angle #2)*
+- "Dig into what the CFO's confidence-without-numbers might be signaling to the market."  *(angle #3)*
+- "Unpack why Adam Levine might have been pressing on memory chip pricing right now."  *(angle #4)*
 
 Respond ONLY with valid JSON matching this schema:
 {

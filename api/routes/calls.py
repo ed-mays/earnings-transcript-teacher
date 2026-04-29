@@ -221,6 +221,10 @@ class QAForensicsResponse(BaseModel):
     exchanges: list[QAForensicsExchange] = []
     total: int = 0
     dominant_evasion_type: str | None = None
+    # Call-level signals so the Q&A Forensics index page can surface the same
+    # dimensions the Analyst Framework's MetadataPanel does — overall sentiment,
+    # executive tone, analyst sentiment, and the aggregate evasion level.
+    signal_strip: SignalStrip | None = None
 
 
 class StrategicShiftsResponse(BaseModel):
@@ -544,11 +548,26 @@ def get_qa_forensics(
         for r in rows
     ]
     dominant = _dominant_evasion_type([e.evasion_type for e in exchanges])
+
+    # Call-level signals — same data the Analyst Framework surfaces.
+    raw_synthesis = analysis_repo.get_synthesis_for_ticker(ticker, conn=conn)
+    evasion_level, strategic_shift_flagged = analysis_repo.get_signal_strip_flags_for_ticker(
+        ticker, conn=conn
+    )
+    signal_strip = SignalStrip(
+        overall_sentiment=raw_synthesis[0] if raw_synthesis else None,
+        executive_sentiment=raw_synthesis[1] if raw_synthesis else None,
+        analyst_sentiment=raw_synthesis[2] if raw_synthesis else None,
+        evasion_level=evasion_level,
+        strategic_shift_flagged=strategic_shift_flagged,
+    )
+
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     return QAForensicsResponse(
         exchanges=exchanges,
         total=len(exchanges),
         dominant_evasion_type=dominant,
+        signal_strip=signal_strip,
     )
 
 

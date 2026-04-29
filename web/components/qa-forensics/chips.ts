@@ -26,41 +26,60 @@ export function generateChips(exchange: QAForensicsExchange): Chip[] {
 }
 
 function templatedFallback(exchange: QAForensicsExchange): Chip[] {
+  // Mirror the LLM probe style: CTA verb + hedged framing + distinct angles.
+  // Each chip targets a different angle from the prompt's taxonomy so we
+  // don't ship duplicates even in the fallback path.
   const analyst = exchange.analyst_name?.trim();
+  const executive = exchange.executive_name?.trim();
   const topic = exchange.question_topic?.trim();
+  const topicClause = topic ? `about ${topic}` : "in this exchange";
 
   const chips: Chip[] = [];
 
-  if (analyst && topic) {
+  // Angle #1 — executive's motivation
+  if (executive) {
     chips.push({
-      id: "analyst-concern",
-      text: `Why is ${analyst} worried about ${topic}?`,
+      id: "exec-motivation",
+      text: `Explore why ${executive} might have answered ${topicClause} the way they did.`,
     });
-  } else if (topic) {
+  } else {
     chips.push({
-      id: "topic-concern",
-      text: `Why might an analyst be worried about ${topic}?`,
+      id: "exec-motivation",
+      text: `Explore why the executive might have answered ${topicClause} the way they did.`,
     });
   }
 
+  // Angle #2 — counterfactual
   chips.push({
-    id: "why-ask",
+    id: "counterfactual",
     text: topic
-      ? `Why might an analyst ask about ${topic}?`
-      : "Why might an analyst ask this question?",
+      ? `Examine what a clearer answer about ${topic} would have had to acknowledge.`
+      : "Examine what a clearer answer would have had to acknowledge.",
   });
 
-  chips.push({
-    id: "honest-answer",
-    text: topic
-      ? `What would a clearer answer about ${topic} have to acknowledge?`
-      : "What would a clearer answer have to acknowledge?",
-  });
-
+  // Angle #3 — investor signal
   chips.push({
     id: "investor-signal",
-    text: "What does this answer signal to investors?",
+    text: "Dig into what the form of this answer might be signaling to investors.",
   });
+
+  // Angle #4 — analyst's underlying worry
+  if (analyst && topic) {
+    chips.push({
+      id: "analyst-worry",
+      text: `Unpack why ${analyst} might have been pressing on ${topic} right now.`,
+    });
+  } else if (topic) {
+    chips.push({
+      id: "analyst-worry",
+      text: `Unpack why an analyst might have been pressing on ${topic} right now.`,
+    });
+  } else {
+    chips.push({
+      id: "analyst-worry",
+      text: "Unpack what the analyst might have really been trying to surface.",
+    });
+  }
 
   return chips;
 }
