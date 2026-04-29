@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   buildTermRegex,
-  findEvasionSpanIndex,
   highlightTerms,
   normalizeForMatch,
-  type SpanItem,
   type TermDefinition,
 } from "@/lib/highlight";
 
@@ -86,29 +84,3 @@ describe("highlightTerms", () => {
   });
 });
 
-describe("findEvasionSpanIndex", () => {
-  it("returns the index of the span containing the normalized answer", () => {
-    const spans: SpanItem[] = [
-      { speaker: "CEO", section: "qa", text: "We are investing in growth.", sequence_order: 1 },
-      {
-        speaker: "CEO",
-        section: "qa",
-        text: "  Gross margin compression reflects capacity ramp during this period.",
-        sequence_order: 2,
-      },
-    ];
-    const answer = "Gross margin compression reflects capacity ramp during this period.";
-    expect(findEvasionSpanIndex(answer, spans)).toBe(1);
-  });
-
-  it("returns null when no span matches", () => {
-    const spans: SpanItem[] = [
-      { speaker: "CEO", section: "qa", text: "Totally unrelated answer.", sequence_order: 1 },
-    ];
-    expect(findEvasionSpanIndex("we expect higher guidance next quarter", spans)).toBeNull();
-  });
-
-  it("returns null for empty answer", () => {
-    expect(findEvasionSpanIndex("", [])).toBeNull();
-  });
-});

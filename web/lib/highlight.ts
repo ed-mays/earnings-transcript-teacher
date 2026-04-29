@@ -71,19 +71,3 @@ export function highlightTerms(
   return nodes.length > 0 ? nodes : [text];
 }
 
-export function findEvasionSpanIndex(
-  answerText: string,
-  spans: readonly SpanItem[],
-): number | null {
-  const normalized = normalizeForMatch(answerText);
-  if (normalized.length === 0) return null;
-  const needle = normalized.slice(0, 80);
-
-  for (let i = 0; i < spans.length; i += 1) {
-    if (normalizeForMatch(spans[i].text).includes(needle)) {
-      return i;
-    }
-  }
-  return null;
-}
-

@@ -11,7 +11,6 @@ interface LayerConfig {
 
 const LAYER_CONFIG: readonly LayerConfig[] = [
   { key: "guidance", label: "Guidance", dotClass: "bg-blue-500" },
-  { key: "evasion", label: "Evasion", dotClass: "bg-amber-500" },
   { key: "sentiment", label: "Sentiment", dotClass: "bg-purple-500" },
   { key: "terms", label: "Terms", dotClass: "bg-green-500" },
 ];
