@@ -30,7 +30,7 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via typer
-coverage==7.13.5
+coverage[toml]==7.13.5
     # via pytest-cov
 distro==1.9.0
     # via
@@ -84,7 +84,7 @@ langchain-core==1.2.23
     # via langchain-text-splitters
 langchain-text-splitters==1.1.1
     # via voyageai
-langsmith==0.7.22
+langsmith==0.8.18
     # via langchain-core
 markdown-it-py==4.0.0
     # via rich
@@ -122,7 +122,7 @@ propcache==0.4.1
     # via
     #   aiohttp
     #   yarl
-psycopg==3.3.3
+psycopg[binary]==3.3.3
     # via -r requirements.in
 psycopg-binary==3.3.3
     # via psycopg
@@ -186,13 +186,10 @@ typer==0.24.1
     # via huggingface-hub
 typing-extensions==4.15.0
     # via
-    #   aiosignal
     #   anthropic
-    #   anyio
     #   huggingface-hub
     #   langchain-core
     #   perplexityai
-    #   psycopg
     #   pydantic
     #   pydantic-core
     #   typing-inspection
@@ -204,8 +201,10 @@ uuid-utils==0.14.1
     # via
     #   langchain-core
     #   langsmith
-voyageai==0.3.7
+voyageai==0.4.1
     # via -r requirements.in
+websockets==16.0
+    # via langsmith
 xxhash==3.6.0
     # via langsmith
 yarl==1.23.0

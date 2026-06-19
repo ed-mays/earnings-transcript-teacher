@@ -110,7 +110,7 @@ langchain-core==1.2.23
     # via langchain-text-splitters
 langchain-text-splitters==1.1.1
     # via voyageai
-langsmith==0.7.22
+langsmith==0.8.18
     # via langchain-core
 limits==5.8.0
     # via slowapi
@@ -147,7 +147,7 @@ propcache==0.4.1
     #   yarl
 protobuf==6.33.6
     # via modal
-psycopg==3.3.3
+psycopg[binary]==3.3.3
     # via -r api/requirements.in
 psycopg-binary==3.3.3
     # via psycopg
@@ -166,8 +166,10 @@ pydantic-core==2.41.5
     # via pydantic
 pygments==2.20.0
     # via rich
-pyjwt==2.12.1
-    # via -r api/requirements.in
+pyjwt[crypto]==2.12.1
+    # via
+    #   -r api/requirements.in
+    #   pyjwt
 python-dotenv==1.2.2
     # via
     #   -r api/requirements.in
@@ -190,7 +192,7 @@ rich==14.3.3
     # via
     #   modal
     #   typer
-sentry-sdk==2.56.0
+sentry-sdk[fastapi]==2.56.0
     # via -r api/requirements.in
 shellingham==1.5.4
     # via typer
@@ -222,19 +224,15 @@ types-toml==0.10.8.20240310
     # via modal
 typing-extensions==4.15.0
     # via
-    #   aiosignal
     #   anthropic
-    #   anyio
     #   fastapi
     #   huggingface-hub
     #   langchain-core
     #   limits
     #   modal
-    #   psycopg
     #   psycopg-pool
     #   pydantic
     #   pydantic-core
-    #   starlette
     #   synchronicity
     #   typing-inspection
 typing-inspection==0.4.2
@@ -249,18 +247,20 @@ uuid-utils==0.14.1
     # via
     #   langchain-core
     #   langsmith
-uvicorn==0.42.0
+uvicorn[standard]==0.42.0
     # via -r api/requirements.in
 uvloop==0.22.1
     # via uvicorn
-voyageai==0.3.7
+voyageai==0.4.1
     # via -r api/requirements.in
 watchfiles==1.1.1
     # via
     #   modal
     #   uvicorn
 websockets==16.0
-    # via uvicorn
+    # via
+    #   langsmith
+    #   uvicorn
 wrapt==2.1.2
     # via deprecated
 xxhash==3.6.0
