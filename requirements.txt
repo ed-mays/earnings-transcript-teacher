@@ -30,7 +30,7 @@ charset-normalizer==3.4.6
     # via requests
 click==8.3.1
     # via typer
-coverage==7.13.5
+coverage[toml]==7.13.5
     # via pytest-cov
 distro==1.9.0
     # via
@@ -38,8 +38,6 @@ distro==1.9.0
     #   perplexityai
 docstring-parser==0.17.0
     # via anthropic
-ffmpeg-python==0.2.0
-    # via voyageai
 filelock==3.25.2
     # via huggingface-hub
 frozenlist==1.8.0
@@ -48,8 +46,6 @@ frozenlist==1.8.0
     #   aiosignal
 fsspec==2026.3.0
     # via huggingface-hub
-future==1.0.0
-    # via ffmpeg-python
 h11==0.16.0
     # via httpcore
 hf-xet==1.4.2
@@ -112,7 +108,7 @@ perplexityai==0.31.0
     # via -r requirements.in
 pgvector==0.4.2
     # via -r requirements.in
-pillow==12.1.1
+pillow==12.3.0
     # via voyageai
 pluggy==1.6.0
     # via
@@ -122,7 +118,7 @@ propcache==0.4.1
     # via
     #   aiohttp
     #   yarl
-psycopg==3.3.3
+psycopg[binary]==3.3.3
     # via -r requirements.in
 psycopg-binary==3.3.3
     # via psycopg
@@ -186,13 +182,10 @@ typer==0.24.1
     # via huggingface-hub
 typing-extensions==4.15.0
     # via
-    #   aiosignal
     #   anthropic
-    #   anyio
     #   huggingface-hub
     #   langchain-core
     #   perplexityai
-    #   psycopg
     #   pydantic
     #   pydantic-core
     #   typing-inspection
@@ -204,7 +197,7 @@ uuid-utils==0.14.1
     # via
     #   langchain-core
     #   langsmith
-voyageai==0.3.7
+voyageai==0.5.0
     # via -r requirements.in
 xxhash==3.6.0
     # via langsmith
